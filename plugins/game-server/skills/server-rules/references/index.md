@@ -19,6 +19,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 
 ## AUTH: server authority and input
 
+Each rule's reason, Java do and don't, and review check are in [auth.md](auth.md).
+
 ### AUTH-01 The client sends intents only, and the server computes every result, cost, and reward.
 
 - severity: critical
@@ -70,6 +72,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 - needs: CAP-ERRORS
 
 ## MN: multi-node safety
+
+Each rule's reason, Java do and don't, and review check are in [multi-node.md](multi-node.md).
 
 ### MN-01 Feature code holds no game or user state in static fields, singletons, or node-wide maps, and its only mutable static field is the config snapshot reference that a reload swaps.
 
@@ -128,6 +132,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 
 ## BG: blue-green rollout and client compatibility
 
+Each rule's reason, Java do and don't, and review check are in [blue-green.md](blue-green.md).
+
 ### BG-01 Stored data in Couchbase and Redis changes only by added fields and keys, never by a removed, renamed, or retyped one.
 
 - severity: critical
@@ -185,6 +191,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 
 ## PERF: performance
 
+Each rule's reason, Java do and don't, and review check are in [performance.md](performance.md).
+
 ### PERF-01 The user actor thread never blocks on I/O, a sleep, or a lock held across I/O.
 
 - severity: critical
@@ -227,6 +235,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 
 ## CFG: feature config
 
+Each rule's reason, Java do and don't, and review check are in [config.md](config.md).
+
 ### CFG-01 Each feature keeps its config in its own file.
 
 - severity: important
@@ -268,6 +278,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 - needs: CAP-GENERATED
 
 ## MET: metrics
+
+Each rule's reason, Java do and don't, and review check are in [metric.md](metric.md).
 
 ### MET-01 Every user action command writes exactly one user action row, on success and on each failure, with the result code.
 
@@ -316,6 +328,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 
 ## CHEAT: cheat commands
 
+Each rule's reason, Java do and don't, and review check are in [cheat.md](cheat.md).
+
 ### CHEAT-01 Cheat command handlers are not registered when the server runs on live.
 
 - severity: critical
@@ -352,6 +366,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 - needs: CAP-CLOCK
 
 ## ADMIN: admin commands
+
+Each rule's reason, Java do and don't, and review check are in [admin.md](admin.md).
 
 ### ADMIN-01 Every admin command requires an authenticated admin session, checked on each request.
 
@@ -395,6 +411,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 
 ## HTTP: HTTP callbacks
 
+Each rule's reason, Java do and don't, and review check are in [http.md](http.md).
+
 ### HTTP-01 An HTTP endpoint serves only callers that cannot log in to the game channel, such as payment providers and platform webhooks.
 
 - severity: important
@@ -436,6 +454,8 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 - needs: CAP-HTTP
 
 ## TEST: tests
+
+Each rule's reason, Java do and don't, and review check are in [testing.md](testing.md).
 
 ### TEST-01 The feature's core logic has unit tests that run without network, sockets, or a database.
 
