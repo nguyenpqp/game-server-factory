@@ -25,8 +25,7 @@ public final class AdminSetPurchases implements AdminCommand {
         SetPurchases cmd = SetPurchases.parse(req);
         int error = SetPurchases.check(cmd, admin, EventShopConfig.current(), Env.isLive());
         if (error != Errors.OK) {
-            AdminAudit.write(admin, cmd.userId(), ACTION, cmd, null, error, traceId);
-            req.reply(error, null);
+            finish(admin, req, cmd, null, null, error, traceId);
             return;
         }
         UserActor.submitTo(cmd.userId(),
@@ -40,18 +39,21 @@ public final class AdminSetPurchases implements AdminCommand {
         int error = SetPurchases.applyTo(state, cmd, ServerClock.now(cmd.userId()));
         if (error == Errors.OK)
             state.markChanged();
-        AdminAudit.write(admin, cmd.userId(), ACTION, cmd, Snapshot.of(state), error, traceId);
-        req.reply(error, new Result(before, Snapshot.of(state)));
+        finish(admin, req, cmd, before, Snapshot.of(state), error, traceId);
     }
 
     static void applyOffline(AdminSession admin, AdminRequest req, SetPurchases cmd, String traceId) {
         KvStore.casUpdate(EventShopState.key(cmd.userId()), EventShopState.class, 5, state -> {
             state.migrate(ServerClock.now(cmd.userId()));
             return SetPurchases.applyTo(state, cmd, ServerClock.now(cmd.userId()));
-        }, (before, after, error) -> {
-            AdminAudit.write(admin, cmd.userId(), ACTION, cmd, after, error, traceId);
-            req.reply(error, new Result(before, after));
-        });
+        }, (before, after, error) -> finish(admin, req, cmd, before, after, error, traceId));
+    }
+
+    static void finish(AdminSession admin, AdminRequest req, SetPurchases cmd,
+                       Snapshot before, Snapshot after, int error, String traceId) {
+        AdminAudit.write(admin, cmd.userId(), ACTION, cmd, after, error, traceId);
+        MetricLogger.userAction(cmd.userId(), ACTION, error, traceId, admin.name());
+        req.reply(error, new Result(before, after));
     }
 }
 ```
@@ -61,6 +63,7 @@ public final class AdminSetPurchases implements AdminCommand {
 - The offline path loads the stored document, runs the same migration as a login, applies the same domain method, and writes with CAS. A conflict reloads and retries, up to the bound (MN-04).
 - `SetPurchases.applyTo` calls the document's own methods, so a repair keeps the feature's invariants.
 - Idempotency. `applyTo` stores the request id in the document's recent results and returns the first result on a repeat, as a gameplay command does. A read-only command needs no request id.
+- `finish` runs on every path. It writes the audit row, one action row under the command's own action name with the trace id, and the reply, so admin changes show up in the same metric tables as gameplay (ADMIN-03, MET-01, MET-02).
 - The audit row holds no secret and no token (MET-09).
 
 The routing is the place where a new admin command is most often forgotten. When the profile's CAP-ADMIN entry names a table or switch that maps each per-user command to its target user, add the new command there. A command that is missing from it runs on the admin's thread and races the owner.
