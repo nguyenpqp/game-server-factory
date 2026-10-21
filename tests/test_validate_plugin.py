@@ -20,6 +20,7 @@ PLUGIN = "plugins/game-server/.claude-plugin/plugin.json"
 SKILLS = "plugins/game-server/skills"
 RULES_SKILL = f"{SKILLS}/server-rules/SKILL.md"
 RULES_INDEX = f"{SKILLS}/server-rules/references/index.md"
+RULES_AUTH = f"{SKILLS}/server-rules/references/auth.md"
 PROFILE_SKILL = f"{SKILLS}/server-profile/SKILL.md"
 PROFILE_TEMPLATE = f"{SKILLS}/server-profile/references/profile-template.md"
 MARKETPLACE = ".claude-plugin/marketplace.json"
@@ -48,6 +49,16 @@ def skill_md(name, description="Rules for server features.", extra=""):
     return f"---\nname: {name}\ndescription: {description}\n{extra}---\n# {name}\n"
 
 
+RULE_HEADING = "### AUTH-01 Client sends intents only"
+INDEX = f"# Index\n\n{RULE_HEADING}\n\n- severity: critical\n- needs: none\n"
+
+
+def rule_section(heading=RULE_HEADING, needs="- needs: none", drop=None):
+    parts = [heading, "**Why.** The server decides.", "Do:", "```java\nok();\n```", "Don't:",
+             "```java\nbad();\n```", "**Check.** Read the handler.", needs]
+    return "\n\n".join(p for p in parts if p != drop) + "\n"
+
+
 def good_tree():
     return {
         MARKETPLACE: json.dumps(GOOD_MARKETPLACE, indent=2),
@@ -55,7 +66,8 @@ def good_tree():
         RULES_SKILL: skill_md("server-rules")
         + "See [index](references/index.md) and `references/index.md`.\n"
         + "Cites AUTH-01.\n",
-        RULES_INDEX: "# Index\n\n### AUTH-01 Client sends intents only\n",
+        RULES_INDEX: INDEX,
+        RULES_AUTH: "# Auth rules\n\n" + rule_section(),
         PROFILE_SKILL: skill_md(
             "server-profile", extra="disable-model-invocation: true\n"
         )
@@ -264,8 +276,8 @@ class LinkTest(ValidatorTestCase):
     def test_links_resolve_from_the_containing_file(self):
         nested = RULES_INDEX
         body = "[up](../SKILL.md) and [self](index.md) and [bad](SKILL.md)\n"
-        self.build({nested: "### AUTH-01 Rule\n" + body})
-        self.assert_fails_at(f"{nested}:2")
+        self.build({nested: INDEX + body})
+        self.assert_fails_at(f"{nested}:{INDEX.count(chr(10)) + 1}")
 
     def test_external_anchor_and_mailto_links_are_ignored(self):
         body = "\n[a](https://example.com/x) [b](#section) [c](mailto:a@example.com)\n"
@@ -325,8 +337,8 @@ class RuleIdTest(ValidatorTestCase):
         self.assertEqual(self.run_validator()[0], 0)
 
     def test_mention_outside_a_heading_does_not_define_an_id(self):
-        self.build({RULES_INDEX: "### AUTH-01 Rule\n\nAUTH-02 is only prose.\n"})
-        self.assert_fails_at(f"{RULES_INDEX}:3")
+        self.build({RULES_INDEX: INDEX + "AUTH-02 is only prose.\n"})
+        self.assert_fails_at(f"{RULES_INDEX}:{INDEX.count(chr(10)) + 1}")
 
 
 class CapabilityIdTest(ValidatorTestCase):
@@ -353,6 +365,75 @@ class CapabilityIdTest(ValidatorTestCase):
         self.assertEqual(self.run_validator()[0], 0)
 
 
+class SkillVariablePathTest(ValidatorTestCase):
+    def with_body(self, body):
+        return {RULES_SKILL: skill_md("server-rules") + body}
+
+    def test_own_script_path_must_exist(self):
+        body = "\n```bash\npython3 ${CLAUDE_SKILL_DIR}/scripts/gone.py\n```\n"
+        self.build(self.with_body(body))
+        line = self.assert_fails_at(f"{RULES_SKILL}:8")
+        self.assertIn("scripts/gone.py", line)
+
+    def test_existing_paths_pass(self):
+        body = (
+            "\nRun `python3 ${CLAUDE_SKILL_DIR}/scripts/check.py` and\n"
+            "`python3 ${CLAUDE_PLUGIN_ROOT}/skills/server-rules/scripts/check.py`.\n"
+        )
+        changes = self.with_body(body)
+        changes[f"{SKILLS}/server-rules/scripts/check.py"] = "print('ok')\n"
+        self.build(changes)
+        self.assertEqual(self.run_validator()[0], 0)
+
+    def test_plugin_root_path_must_exist(self):
+        body = "\nRun `${CLAUDE_PLUGIN_ROOT}/skills/server-profile/scripts/gone.py`.\n"
+        self.build(self.with_body(body))
+        self.assert_fails_at(f"{RULES_SKILL}:7")
+
+    def test_variables_outside_skill_md_fail(self):
+        self.build({RULES_INDEX: INDEX + "Run ${CLAUDE_SKILL_DIR}/scripts/x.py.\n"})
+        self.assert_fails_at(f"{RULES_INDEX}:{INDEX.count(chr(10)) + 1}")
+
+    def test_the_variable_as_a_shell_variable_fails(self):
+        self.build(self.with_body("\nRun `python3 $CLAUDE_SKILL_DIR/scripts/x.py`.\n"))
+        self.assert_fails_at(f"{RULES_SKILL}:7")
+
+
+class RulebookTest(ValidatorTestCase):
+    def test_index_rule_without_a_section_fails(self):
+        self.build({RULES_AUTH: "# Auth rules\n"})
+        line = self.assert_fails_at(f"{RULES_INDEX}:3")
+        self.assertIn("AUTH-01", line)
+
+    def test_missing_group_file_fails(self):
+        self.build({RULES_AUTH: None})
+        line = self.assert_fails_at(f"{RULES_INDEX}:3")
+        self.assertIn("auth.md", line)
+
+    def test_duplicate_section_fails(self):
+        self.build({RULES_AUTH: "# Auth rules\n\n" + rule_section() + "\n" + rule_section()})
+        line = self.assert_fails_at(f"{RULES_AUTH}:{3 + rule_section().count(chr(10)) + 1}")
+        self.assertIn("AUTH-01", line)
+
+    def test_heading_that_differs_from_the_index_fails(self):
+        self.build({RULES_AUTH: "# Auth rules\n\n" + rule_section(heading="### AUTH-01 Client sends intents")})
+        self.assert_fails_at(f"{RULES_AUTH}:3")
+
+    def test_needs_line_that_differs_from_the_index_fails(self):
+        self.build({RULES_AUTH: "# Auth rules\n\n" + rule_section(needs="- needs: CAP-TIME")})
+        line = self.assert_fails_at(f"{RULES_AUTH}:3")
+        self.assertIn("needs", line)
+
+    def test_each_part_is_required(self):
+        for part in ("**Why.** The server decides.", "Do:", "Don't:", "**Check.** Read the handler."):
+            with self.subTest(part=part):
+                with tempfile.TemporaryDirectory() as tmp:
+                    self.root = Path(tmp)
+                    self.build({RULES_AUTH: "# Auth rules\n\n" + rule_section(drop=part)})
+                    line = self.assert_fails_at(f"{RULES_AUTH}:3")
+                    self.assertIn(part.split()[0].strip("*").rstrip(":"), line)
+
+
 class TrackedFileScanTest(ValidatorTestCase):
     def test_home_path_in_tracked_file_fails(self):
         for prefix in ("/Us" + "ers/alice/", "/ho" + "me/alice/"):
@@ -367,10 +448,10 @@ class TrackedFileScanTest(ValidatorTestCase):
         self.build({"docs/key.txt": "x\n" + key})
         self.assert_fails_at("docs/key.txt:2")
 
-    def test_untracked_files_are_not_scanned(self):
+    def test_untracked_files_are_scanned(self):
         self.build()
         Path(self.root, "stray.txt").write_text("/Us" + "ers/alice/x\n", encoding="utf-8")
-        self.assertEqual(self.run_validator()[0], 0)
+        self.assert_fails_at("stray.txt:1")
 
     def test_placeholder_home_paths_pass(self):
         self.build({"docs/notes.txt": "use /Users/<name>/ or /home/<name>/\n"})
@@ -402,9 +483,15 @@ class DenylistTest(ValidatorTestCase):
         code, out, _ = self.run_validator("--denylist", self.denylist("# comment", "", "  "))
         self.assertEqual((code, out), (0, []))
 
-    def test_untracked_files_are_not_scanned(self):
+    def test_untracked_files_are_scanned(self):
         self.build()
         Path(self.root, "stray.txt").write_text("acme\n", encoding="utf-8")
+        self.assert_fails_at("stray.txt:1", "--denylist", self.denylist("acme"))
+
+    def test_ignored_files_are_not_scanned(self):
+        self.build({".gitignore": "local/\n"})
+        Path(self.root, "local").mkdir()
+        Path(self.root, "local", "notes.txt").write_text("acme\n", encoding="utf-8")
         self.assertEqual(self.run_validator("--denylist", self.denylist("acme"))[0], 0)
 
     def test_env_var_supplies_the_denylist(self):

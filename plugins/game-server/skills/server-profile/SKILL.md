@@ -45,10 +45,10 @@ Judge by what the code does, not by what its name suggests. A class called a lea
 
 ## Check
 
-Run the checker from the target repository root. `${CLAUDE_PLUGIN_ROOT}` is the plugin directory.
+Run the checker from the target repository root.
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/server-profile/scripts/check_profile.py docs/game-server/profile.md
+python3 ${CLAUDE_SKILL_DIR}/scripts/check_profile.py docs/game-server/profile.md
 ```
 
 It exits 1 and prints `path:line: message` when a frontmatter key from the template is missing, a capability heading is missing, a status is not `present`, `partial`, or `missing`, or an entry lacks a field its status requires. Fix the profile and run it again. Do not finish while it prints anything.
@@ -58,7 +58,7 @@ It exits 1 and prints `path:line: message` when a frontmatter key from the templ
 After the checker is clean, run it once more with the rule listing.
 
 ```
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/server-profile/scripts/check_profile.py --blocked-rules docs/game-server/profile.md
+python3 ${CLAUDE_SKILL_DIR}/scripts/check_profile.py --blocked-rules docs/game-server/profile.md
 ```
 
 For each capability that is not `present`, it prints the rule ids whose `needs:` line lists that capability. Put that list in your report, one line per capability, so the developer sees which rules cannot be met until the core changes. Also report the capabilities you marked `partial` because you could not confirm them. The profile file itself stays in the format of the template, with no extra sections.

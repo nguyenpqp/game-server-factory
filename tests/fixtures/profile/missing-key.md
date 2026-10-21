@@ -77,7 +77,7 @@ Object value = ExampleErrors.call();
 Object value = ExampleClientver.call();
 ```
 
-- blocker: AUTH-01 cannot be met for part of the cases.
+- blocker: BG-07 cannot be met for part of the cases.
 - proposal: Extend the existing class to cover the remaining cases.
 
 ### CAP-ACTOR User actor execution
@@ -105,7 +105,7 @@ Object value = ExampleOwnership.call();
 ### CAP-DRAIN Drain and handover
 
 - status: missing
-- blocker: BG-09 cannot be met. The core has no such part, so a rollout can duplicate or lose player value.
+- blocker: BG-10 cannot be met. The core has no such part, so a rollout can duplicate or lose player value.
 - proposal: Add one small helper class in the core that provides it, with a unit test.
 
 ### CAP-USERSTORE Per-user storage

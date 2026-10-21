@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Check the game-server plugin's structure, links, ids, and private terms.
+"""Check the game-server plugin's structure, links, ids, rulebook, and private terms.
 
-Prints `path:line: message` for each failure and exits 1 if any failure exists.
+The private-term scan reads every tracked file and every untracked file that git does
+not ignore. Prints `path:line: message` for each failure and exits 1 if any failure exists.
 Warnings go to stderr and do not change the exit code.
 """
 import argparse
@@ -33,6 +34,14 @@ PLACEHOLDER_CHARS = "<>{}*"
 SCHEME = re.compile(r"[a-z][a-z0-9+.-]*:", re.IGNORECASE)
 HOME_PATH = re.compile(r"/(?:Users|home)/[\w.-]+/")
 PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+SKILL_VARIABLE_PATH = re.compile(r"\$\{(CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT)\}/([\w./-]+)")
+SKILL_VARIABLE = re.compile(r"\$\{?CLAUDE_(?:SKILL_DIR|PLUGIN_ROOT)\b")
+RULE_GROUP_FILES = {
+    "AUTH": "auth.md", "MN": "multi-node.md", "BG": "blue-green.md", "PERF": "performance.md",
+    "CFG": "config.md", "MET": "metric.md", "CHEAT": "cheat.md", "ADMIN": "admin.md",
+    "HTTP": "http.md", "TEST": "testing.md",
+}
+RULE_PARTS = ("**Why.**", "Do:", "Don't:", "**Check.**")
 
 
 def relative(root, path):
@@ -206,6 +215,81 @@ def check_links(root):
     return findings
 
 
+def check_skill_variables(root):
+    findings = []
+    for path, text in plugin_files(root):
+        rel = relative(root, path)
+        for number, line in enumerate(text.splitlines(), start=1):
+            if path.name != "SKILL.md":
+                if SKILL_VARIABLE.search(line):
+                    findings.append(Finding(rel, number, "skill path variables work only in SKILL.md"))
+                continue
+            paths = list(SKILL_VARIABLE_PATH.finditer(line))
+            if len(paths) < len(SKILL_VARIABLE.findall(line)):
+                findings.append(
+                    Finding(rel, number, "write ${CLAUDE_SKILL_DIR}/<path> or ${CLAUDE_PLUGIN_ROOT}/<path>")
+                )
+            for match in paths:
+                base = path.parent if match.group(1) == "CLAUDE_SKILL_DIR" else root / PLUGIN_DIR
+                if not (base / match.group(2)).is_file():
+                    findings.append(Finding(rel, number, f"no file at {match.group(0)}"))
+    return findings
+
+
+def rule_sections(path):
+    sections, current = [], None
+    for number, line in markdown_lines(path.read_text(encoding="utf-8")):
+        if line.startswith("### "):
+            current = (number, line, [])
+            sections.append(current)
+        elif line.startswith("#"):
+            current = None
+        elif current:
+            current[2].append(line)
+    return sections
+
+
+def check_rulebook(root):
+    index = root / RULE_INDEX
+    if not index.is_file():
+        return []
+    rules, current = [], None
+    for number, line in markdown_lines(index.read_text(encoding="utf-8")):
+        match = re.match(r"### (" + RULE_ID.pattern + ") ", line)
+        if match:
+            current = {"id": match.group(1), "line": number, "heading": line, "needs": None}
+            rules.append(current)
+        elif current and current["needs"] is None and line.startswith("- needs:"):
+            current["needs"] = line
+    findings, sections = [], {}
+    for rule in rules:
+        name = RULE_GROUP_FILES[rule["id"].split("-")[0]]
+        path = index.parent / name
+        rel = relative(root, path)
+        if not path.is_file():
+            findings.append(Finding(RULE_INDEX, rule["line"], f"{rule['id']} has no group file {name}"))
+            continue
+        if name not in sections:
+            sections[name] = rule_sections(path)
+        found = [s for s in sections[name] if s[1].startswith(f"### {rule['id']} ")]
+        if not found:
+            findings.append(Finding(RULE_INDEX, rule["line"], f"{rule['id']} has no section in {name}"))
+            continue
+        for number, _, _ in found[1:]:
+            findings.append(Finding(rel, number, f"{rule['id']} has a second section"))
+        number, heading, body = found[0]
+        if heading != rule["heading"]:
+            findings.append(Finding(rel, number, f"{rule['id']} heading differs from {RULE_INDEX}"))
+        if rule["needs"] is None:
+            findings.append(Finding(RULE_INDEX, rule["line"], f"{rule['id']} has no needs line"))
+        elif rule["needs"] not in body:
+            findings.append(Finding(rel, number, f"{rule['id']} needs line differs from {RULE_INDEX}"))
+        for part in RULE_PARTS:
+            if not any(line.startswith(part) for line in body):
+                findings.append(Finding(rel, number, f"{rule['id']} has no {part} part"))
+    return findings
+
+
 def heading_ids(path, id_pattern):
     found = set()
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -237,11 +321,14 @@ def check_ids(root, id_pattern, definitions, kind):
 
 
 def tracked_texts(root):
-    proc = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True)
+    proc = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        capture_output=True,
+    )
     if proc.returncode != 0:
         return None
     texts = {}
-    for name in filter(None, proc.stdout.decode("utf-8", "replace").split("\0")):
+    for name in dict.fromkeys(filter(None, proc.stdout.decode("utf-8", "replace").split("\0"))):
         try:
             texts[name] = (root / name).read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -313,6 +400,8 @@ def main(argv=None):
         + check_plugin_manifest(root)
         + check_skills(root)
         + check_links(root)
+        + check_skill_variables(root)
+        + check_rulebook(root)
         + check_ids(root, RULE_ID, RULE_INDEX, "rule id")
         + check_ids(root, CAP_ID, PROFILE_TEMPLATE, "capability id")
         + check_tracked_files(root, denylist)
