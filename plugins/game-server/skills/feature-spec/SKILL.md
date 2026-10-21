@@ -1,0 +1,141 @@
+---
+name: feature-spec
+description: Turn a game feature design into a Java game server spec and implementation plan. Use when a developer has a design.md from gdd-intake, a GDD, or a plain feature prompt and wants the server side designed before code. The spec covers command ids, request and response fields, checks and error codes, pushes, per-user state and migrations, Redis keys, the feature config schema, metric events and KPI queries, cheat commands, admin commands and their API spec, HTTP callbacks, multi-node safety, blue-green rollout and old client compatibility, a performance budget per command, core blockers, a test plan, and design coverage. It then slices the spec into tickets for nstack Spec build or into an ordered task list for plain Claude Code. Requires the project profile from server-profile and cites rule ids from server-rules.
+---
+
+# Feature spec
+
+This skill writes the server design of one feature as `docs/game-server/features/<feature>/spec.md` in the target repository, in the [spec template](references/spec-template.md) format. On request it also slices the spec into build units with [slicing](references/slicing.md). It writes no Java. `feature-build` implements the spec one slice at a time, and `feature-review` checks the code against it.
+
+A complete spec for a daily login streak is in the [worked example](references/worked-example.md). Read it before your first spec.
+
+## Inputs
+
+- **The design.** `docs/game-server/features/<feature>/design.md`, written by `gdd-intake` in the [design template](../gdd-intake/references/design-template.md) format. Its requirement ids (`SM ST R F RW TM EC UI Q`) are what the spec's `Design` cells cite.
+- **Or a prompt.** A plain description of the feature. The header then says `Design: prompt`, and the prompt follows the header as a quote. Under the quote, list the requirements you read from it, grouped by the design template's section names (States, Rules, Formulas, Rewards, Timing, Edge cases, Config tables, UI touchpoints, Open questions), each with a design-format id and `Source: prompt`. Use bold lead-ins for the groups, never `##` headings, so the spec keeps its 14 fixed sections. A prompt longer than a page, or one with balance tables, goes through `gdd-intake` first.
+- **The profile.** `docs/game-server/profile.md`, in the [profile template](../server-profile/references/profile-template.md) format. It names every core call the spec may use, the command id scheme, the metric tables, and the test commands.
+- **The rules.** The [rule index](../server-rules/references/index.md) lists every rule id with its severity and the capabilities it needs. Load `server-rules` for the do and don't of each rule.
+
+## Stops before writing
+
+Check these before you write the header. Each one ends the run until the developer acts.
+
+1. **No profile.** When `docs/game-server/profile.md` does not exist, stop. Tell the developer to run `server-profile` first. It runs only on explicit request, so never start it yourself, and never guess the core from the code.
+2. **An open Blocker question.** When the design has a question under `Open questions` > `Blocker` with status `open`, stop and ask the developer to answer it or skip it. An answered question settles the requirements it affects. A skipped question uses its interim default, and the header lists it. Important and Minor questions do not stop the spec, and the header lists each one with its interim default.
+3. **A prescribed server mechanism.** When the design records that the GDD prescribes a server mechanism, such as "store the streak in Redis", weigh it against the rules. Follow it when no rule forbids it. Otherwise design what the rules allow, and say why in the header's open questions line.
+
+When a workflow runs this skill inside a subagent, the subagent cannot ask the developer. It writes what it has, sets the status, and returns the stop and its questions to the caller, which asks the developer through its own interview.
+
+## Procedure
+
+Write the file top to bottom in the template's section order, with status `draft`. The template gives each section's table format and the rules that section usually cites. The notes below cover the decisions the template leaves to you.
+
+### Header
+
+Take the command id block from the profile's CAP-COMMAND entry, one block per feature. The package goes under the profile's `feature_root`. The minimum client is the first client version that ships the feature.
+
+### 1. Commands
+
+- One entry per thing the player can do, from the `The player can do` column of the UI touchpoints. Add a read command when a screen shows state that the player's existing data does not carry.
+- Requests carry intents only. A request never names an amount, a price, a reward, or a result (AUTH-01).
+- Every request field has a type, a range or a length, and allowed values, checked before the Checks rows run (AUTH-04).
+- Order the Checks rows as they run: feature active and window, client version, unlock, ownership of named objects, state preconditions, then costs. Each row has its own error code (AUTH-10).
+- A cost is checked in full before any take, and the Effect says what is refunded if a later step fails (AUTH-07).
+- The Effect runs on a pure core that receives `now` and the RNG as parameters (AUTH-02, AUTH-03). Name the inventory call from CAP-INVENTORY with the reason constant and the trace id (MET-03, MET-04).
+- Decide idempotency per command. A command whose retry would grant value twice takes a `requestId` (AUTH-08). Store the smallest record that answers a replay with the first result, such as the last request id and its result for a once-a-day claim, and bound it (PERF-06).
+- Add a rate limit when the command reads the database, touches other users, or fans out (AUTH-09). Otherwise say `None.` and why.
+- New error codes come from the feature's block, added the way CAP-ERRORS describes. List shared codes in the Checks table, but only the feature's own codes in the Error codes table.
+
+### 2. Pushes
+
+Take the rows from the `Changes without player action` column of the UI touchpoints. Prefer a push at login and after the player's own commands, and let the client refresh at a time the server sent, such as `nextDayStartsAt`. A server timer per user breaks MN-11. Every push has a minimum client and is never sent to an older one (BG-06).
+
+### 3. State model
+
+- Put new per-user state in its own document, or as new fields on an existing one. Never rename, remove, or retype a stored field (BG-01).
+- Every field has a default for documents that lack it, and a bound. Every list has a cap (PERF-06).
+- Store timestamps or day numbers, and derive ready, expired, and broken from them on each read (MN-11).
+- Redis holds only cluster-wide state. Each key pattern names its hash tag, its atomic operation, and its TTL (MN-05, MN-06, PERF-08). A feature without such state writes `None.` under Redis keys.
+- States and transitions cover every design state, with the guard the server checks.
+
+### 4. Config schema
+
+Build the keys from the design's Config tables, one file per feature (CFG-01). Each allowed value and cross-row check becomes a load-time validation (CFG-02). Each lookup on the command path gets an index built at load (PERF-05). A time-bound feature takes its window from the design's Timing table (CFG-04). Secrets, allowlists, and endpoints go to environment config (CFG-07). Command id constants and other generated files change through the generator that CAP-GENERATED names (CFG-08).
+
+### 5. Metric events and KPI queries
+
+One action per command, written on success and on every error (MET-01). Each step of the design's Gameplay loop that the server sees is a funnel step (MET-05). Each reward and cost is a source or sink row (MET-04). Write one KPI query per success measure, against the tables that the profile's CAP-METRIC entry describes (MET-06). State the meaning of every extra field (MET-07).
+
+### 6. Cheat commands
+
+Give the client a cheat for every design state it must test (CHEAT-05). Reuse an existing project cheat when one reaches the state, such as a level cheat. A time cheat shifts the acting user's clock offset only (CHEAT-07). Each cheat changes state through the feature's domain methods (CHEAT-06).
+
+### 7. Admin commands and API spec
+
+Ship a read command and a repair command for the feature's per-user state (ADMIN-08). A command that overwrites or resets user data is destructive on live and needs `confirm` (ADMIN-04). Write one API entry per command (ADMIN-05). When CAP-ADMIN names an admin web repository, list the screens that call each command.
+
+### 8. HTTP endpoints
+
+Add an endpoint only for a caller that cannot log in, such as a payment provider (HTTP-01). Otherwise write `None.` with the reason.
+
+### 9. Multi-node analysis
+
+Fill every fixed row. A row that does not apply says `none` and why. Read the profile's CAP-OWNERSHIP, CAP-CROSSNODE, and CAP-LEASE entries before you claim a row is safe.
+
+### 10. Blue-green and client compatibility
+
+Fill every fixed row. Each `Test` cell names a test class and case from the Test plan, or says why no test applies.
+
+### 11. Performance budget
+
+Use 100,000 peak concurrent players and 1,000,000 daily active players unless the developer gives other numbers. Show the arithmetic for calls per second: daily calls divided by 86,400 s, times a peak factor of 3 unless the profile states another. Count database and Redis calls on the command path, and say when the save cycle writes later. Add login cost when the feature loads a new document at login.
+
+### 12. Core blockers
+
+Run the four steps in the template. In step 1, leave out a rule that the spec cites only on a fixed Multi-node or Blue-green row stating the feature has nothing of that kind, such as "The feature has no job" under MN-07. The feature does not depend on that rule, so its capability is not needed.
+
+For each blocking row, cut the profile entry's `proposal` down to what this feature needs. Write the players' failure in one sentence.
+
+When any row has resolution `open`, or an `accepted` resolution on a `critical` rule:
+
+1. Set the header to `Status: blocked`.
+2. Leave sections 13 and 14 under their headings with the line `Not written while Core blockers has an open row.`
+3. Save the file and give the Core blockers section to the developer.
+4. Stop. Only the developer sets a resolution. Never design around a missing capability.
+
+When the developer resolves every row, finish the remaining sections.
+
+### 13. Test plan
+
+Cover every case the template lists. Put each test class in the header's package, so the profile's `test_one_cmd` runs it as `<package>.<class>`. When the profile shows CAP-BOT as anything but `present`, write no bot scenario and say so in the Check line.
+
+### 14. Design coverage
+
+One row per design id, including success measures and open questions. An id the spec does not build names the Core blockers row that descoped it, or the open question that holds it.
+
+## Self-check
+
+Before you ask the developer to confirm, read the spec once against this list and fix what fails.
+
+- The 14 `##` sections appear in the template's order, with the template's headings.
+- Every table row and every behavior line has a `Rules` cell, and every cited id is a heading in the rule index.
+- Every row that comes from the design has a `Design` cell, and every design id has a Design coverage row.
+- Every capability is named by its `CAP-*` id, and every core call matches the profile's `api` field.
+- Every budget and bound is a number with a unit.
+- No request field carries a result, an amount, or a price.
+- Every Blue-green `Test` cell names a row in the Test plan.
+
+## Status and confirmation
+
+Show the developer the spec and ask for confirmation. On confirmation, set `Status: ready`. Under a workflow, the workflow's own interview confirms it. Never set `ready` while Core blockers has a row that blocks.
+
+## Slicing
+
+When the spec is `ready` and the developer asks for a build plan, follow [slicing](references/slicing.md). It writes nstack Spec build tickets to `docs/intents/<feature>-tickets.md`, or an ordered task list for plain Claude Code to `docs/game-server/features/<feature>/tasks.md`. Never slice a `draft` or `blocked` spec.
+
+## Output
+
+- `docs/game-server/features/<feature>/spec.md`, the spec.
+- On request, the tickets file or the task list from slicing.
+
+The skill writes nothing else in the target repository.
