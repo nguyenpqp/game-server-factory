@@ -77,8 +77,9 @@ The skills that exist today live inside one internal reference project. They nam
 - Plugin tests use Python `unittest` because `pytest` is not installed.
 - The Spec build playbook runs the work as the tickets in `docs/intents/game-server-plugin-tickets.md`.
 - No `gh` CLI is installed, so delivery pushes the branch and links the GitHub compare page.
+- The GDD converter reads docx, pptx, and xlsx with the Python standard library (`zipfile` and `ElementTree`), so it needs no package install. PDF needs PyMuPDF. Without it, the converter lists the PDF as skipped with the reason.
+- The developer may accept the risk of any blocked rule, critical included, as `accepted by <name>: <reason>`. This follows the owner's rule that the developer decides on a missing capability. A critical acceptance must state the deployment fact that makes the risk acceptable, such as "one node per realm". The spec header lists every accepted critical risk, and the feature-build report repeats them.
 
 ## Open questions
 
 - The owner answered "Cần sửa vài điểm" (needs some fixes) at confirmation without saying which points. Work continues on the defaults above under the owner's goal. Each correction amends this file when it arrives.
-- The GDD converter scripts may need Python packages or LibreOffice that this machine lacks. Their tests skip with a stated reason when a dependency is missing.
