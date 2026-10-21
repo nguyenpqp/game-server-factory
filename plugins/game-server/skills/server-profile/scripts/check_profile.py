@@ -132,6 +132,8 @@ def check_section(path, cap, heading_line, body, has_fence):
         filled = has_fence if field == "snippet" and "snippet" in fields else bool(fields.get(field))
         if not filled:
             fail(f"{cap} is {status} and needs {'an' if field == 'api' else 'a'} {field}")
+    if status == "partial" and fields.get("blocker") and not RULE_ID.search(fields["blocker"]):
+        fail(f"{cap} is partial and its blocker names no rule id")
     return findings, status, fields
 
 

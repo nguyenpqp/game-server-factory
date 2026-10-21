@@ -414,7 +414,7 @@ The `Resolution` cell holds one value.
 
 While any row blocks, the spec status is `blocked`. The skill that writes the spec stops and gives this section to the developer, and `feature-build` does not start. Only the developer sets a resolution. Feature code never works around a missing capability.
 
-A resolved row stays in the table with its resolution. The section says `None.` only when no row was ever needed, and then names the profile version it checked.
+A resolved row stays in the table with its resolution. The section says `None.` only when no row was ever needed, because every capability the spec needs is `present` in the profile.
 
 ### Test plan
 

@@ -14,7 +14,7 @@ An installed plugin sits in the plugin cache. This command prints its directory.
 claude plugin list --json | python3 -c 'import json,sys; print(next(p["installPath"] for p in json.load(sys.stdin) if p["id"]=="game-server@game-server-factory"))'
 ```
 
-With `claude --plugin-dir`, the directory is the absolute form of the path you passed, such as the `plugins/game-server` folder of your clone. Inside a skill's own shell snippets, `${CLAUDE_PLUGIN_ROOT}` expands to the same directory.
+With `claude --plugin-dir`, the directory is the absolute form of the path you passed, such as the `plugins/game-server` folder of your clone. When a skill loads, Claude Code substitutes `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` in the text of its SKILL.md. They are not shell variables. A person or a delegate brief that runs a script by hand uses the plugin's `installPath`.
 
 The six files you will name are `<plugin>/skills/<skill>/SKILL.md`, where `<skill>` is `server-rules`, `server-profile`, `gdd-intake`, `feature-spec`, `feature-build`, or `feature-review`. Write them out in full in every brief. A relative path or a skill name alone is not enough, because a delegate may not load the skill by name.
 

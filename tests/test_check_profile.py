@@ -90,6 +90,19 @@ class CheckProfileTest(unittest.TestCase):
             ],
         )
 
+    def test_partial_blocker_without_rule_id(self):
+        text = (FIXTURES / "valid.md").read_text(encoding="utf-8").replace(
+            "- blocker: BG-07 cannot be met for part of the cases.",
+            "- blocker: Old clients cannot be told apart.",
+        )
+        heading = line_of(FIXTURES / "valid.md", "### CAP-CLIENTVER")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "profile.md")
+            path.write_text(text, encoding="utf-8")
+            code, out, _ = run(path)
+        self.assertEqual(code, 1)
+        self.assertEqual(out, [f"{path}:{heading}: CAP-CLIENTVER is partial and its blocker names no rule id"])
+
     def test_unreadable_profile(self):
         path = FIXTURES / "does-not-exist.md"
         code, out, _ = run(path)
