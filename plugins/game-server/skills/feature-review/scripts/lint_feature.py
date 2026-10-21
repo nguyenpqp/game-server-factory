@@ -39,7 +39,8 @@ Comments and string, text block, and character literals are blanked before any
 pattern runs, so a commented-out call is not a finding. Import and package lines are
 skipped. Files under `generated_paths` and `test_root` are skipped, even when named
 on the command line. These paths and `feature_root` are relative to the repository
-root, the directory that holds `docs/game-server/profile.md`.
+root, the directory that holds `docs/game-server/profile.md`. A profile at any other
+place is a usage error.
 """
 import argparse
 import json
@@ -202,7 +203,10 @@ class Settings:
                     number = lines_of.get(f"lint.{key}", 1)
                     raise UsageError(f"{profile_path}:{number}: lint.{key}: invalid regex: {error}") from error
             self.patterns[key] = compiled
-        self.repo_root = Path(profile_path).resolve().parents[2]
+        resolved = Path(profile_path).resolve()
+        if resolved.parent.parts[-2:] != ("docs", "game-server"):
+            raise UsageError(f"{profile_path}: the profile must sit at docs/game-server/profile.md")
+        self.repo_root = resolved.parents[2]
         self.feature_root = str(data.get("feature_root") or "")
         generated = data.get("generated_paths") or []
         generated = generated if isinstance(generated, list) else [generated]

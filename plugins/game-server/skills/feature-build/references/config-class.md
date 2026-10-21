@@ -103,7 +103,7 @@ static EventShopConfig validate(RawEventShop raw) {
 - Validation runs at load and at reload, never on the first command. A bad file fails startup or the reload, and the message names the file and the key (CFG-02). A failed reload keeps the old snapshot.
 - Each check matches a row of the spec's Config schema. Each `Validation` cell becomes one `if`, and each `Index built at load` cell becomes one map.
 - Check every referenced id against the catalog it points into, such as item ids, so a typo fails at load.
-- The JSON parser ignores keys it does not know, so an old server reads a file that has a newer key (BG-08). A key that the new version adds is optional, and its default lives on the raw field, like `minClientVersion` above. When the project's parser fails on unknown keys, CAP-CONFIG is `partial`, and the slice stops at gate 3.
+- The JSON parser ignores keys it does not know, so an old server reads a file that has a newer key (BG-08). A key that the new version adds is optional, and its default lives on the raw field, like `minClientVersion` above. When the project's parser fails on unknown keys, CAP-CONFIG is `partial`. The slice stops at gate 3 when CAP-CONFIG is `missing`, or when it is `partial` and its `blocker` line names a rule that the slice's rows cite.
 - A key never changes meaning. A new meaning gets a new key (BG-08).
 - Secrets, allowlists, and endpoints do not go in this file. Read them from the environment config that CAP-ENV names (CFG-07).
 

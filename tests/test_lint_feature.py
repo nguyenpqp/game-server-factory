@@ -73,10 +73,10 @@ def profile_with(replacements):
     for old, new in replacements:
         assert old in text, old
         text = text.replace(old, new)
-    handle = tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8")
-    handle.write(text)
-    handle.close()
-    return Path(handle.name)
+    profile = Path(tempfile.mkdtemp()) / "docs" / "game-server" / "profile.md"
+    profile.parent.mkdir(parents=True)
+    profile.write_text(text, encoding="utf-8")
+    return profile
 
 
 def write_repo(root, files, profile_text=None, replacements=()):
@@ -307,6 +307,15 @@ class ProfileKeys(unittest.TestCase):
         code, _, err = run("--profile", PROFILE, FIXTURES / "nope")
         self.assertEqual(code, 2)
         self.assertIn("nope", err)
+
+    def test_a_profile_outside_docs_game_server_is_a_usage_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = Path(tmp) / "profile.md"
+            profile.write_text(PROFILE.read_text(encoding="utf-8"), encoding="utf-8")
+            code, out, err = run("--profile", profile, DEMO / "ForbiddenTime.java")
+        self.assertEqual((code, out), (2, ""))
+        self.assertEqual(len(err.splitlines()), 1)
+        self.assertIn("docs/game-server/profile.md", err)
 
     def test_real_profile_template_parses(self):
         text = PROFILE_TEMPLATE.read_text(encoding="utf-8")

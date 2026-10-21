@@ -74,7 +74,7 @@ static int shiftDays(UserClockOffset offset, int days, boolean live) {
 }
 ```
 
-A time cheat moves server time for the acting user only, through the per-user offset that CAP-CLOCK provides (CHEAT-07). Other users and other nodes keep real time. On live, `ServerClock.now(userId)` ignores the offset. When the profile has no per-user offset, CAP-CLOCK is `partial`, and time cheats stop at gate 3. Never move the node's clock.
+A time cheat moves server time for the acting user only, through the per-user offset that CAP-CLOCK provides (CHEAT-07). Other users and other nodes keep real time. On live, `ServerClock.now(userId)` ignores the offset. When the profile has no per-user offset, CAP-CLOCK is `partial`. The slice stops at gate 3 when CAP-CLOCK is `missing`, or when it is `partial` and its `blocker` line names a rule that the slice's rows cite. Never move the node's clock.
 
 ## Coverage of the design's states
 

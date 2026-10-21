@@ -76,7 +76,7 @@ record BuyRequest(int error, String requestId, String shopItemId, int quantity) 
 
 - Parse checks presence, type, length, and the ranges that need no config (AUTH-04). Ranges that come from config, such as the largest quantity, are checks in `process`.
 - A field that a newer client added has a default that gives the old behavior, so an old client's request still works (BG-05, TEST-07).
-- The decoder must report a missing field as absent. When the project's decoder throws or reads garbage on a missing field, CAP-COMMAND is `partial` and the slice stops at gate 3.
+- The decoder must report a missing field as absent. When the project's decoder throws or reads garbage on a missing field, CAP-COMMAND is `partial`. The slice stops at gate 3 when CAP-COMMAND is `missing`, or when it is `partial` and its `blocker` line names a rule that the slice's rows cite.
 - The request carries intents only, such as which item and how many. It never carries a price, a reward, or a result (AUTH-01).
 
 ## The pure core

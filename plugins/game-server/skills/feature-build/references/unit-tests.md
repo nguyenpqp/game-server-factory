@@ -2,7 +2,7 @@
 
 Tests come first in each slice. They call the pure core with in-memory state, an injected clock, and an injected RNG, so they run with no network, socket, or database (TEST-01). Each test class runs with the profile's `test_one_cmd`.
 
-The real test framework, the in-memory state builders, and the hooks that set config, time, random numbers, environment, and metric capture come from the profile's CAP-UNITTEST entry. When the entry has no way to build per-user state without a database, CAP-UNITTEST is `partial`, and the slice stops at gate 3.
+The real test framework, the in-memory state builders, and the hooks that set config, time, random numbers, environment, and metric capture come from the profile's CAP-UNITTEST entry. When the entry has no way to build per-user state without a database, CAP-UNITTEST is `partial`. The slice stops at gate 3 when CAP-UNITTEST is `missing`, or when it is `partial` and its `blocker` line names a rule that the slice's rows cite.
 
 ## Layout
 
@@ -125,7 +125,7 @@ Write these cases for every command.
 
 ## Metric rows
 
-Assert one action row per command call, on success and on each error, with the action name, the result code, the trace id, and the extras from the spec (TEST-08, MET-01). Use the capture hook that the profile's CAP-UNITTEST or CAP-METRIC entry names, around the shell's `run`. A profile with no capture hook has CAP-UNITTEST as `partial`, and gate 3 decides like for any other capability. When the spec's Core blockers row for it is resolved, assert the outcome fields that the row is built from, and name that row in the slice report. Never add a static list of rows to feature code to make the test possible (MN-01).
+Assert one action row per command call, on success and on each error, with the action name, the result code, the trace id, and the extras from the spec (TEST-08, MET-01). Use the capture hook that the profile's CAP-UNITTEST or CAP-METRIC entry names, around the shell's `run`. A profile with no capture hook has CAP-UNITTEST as `partial`. The slice stops at gate 3 when CAP-UNITTEST is `missing`, or when it is `partial` and its `blocker` line names a rule that the slice's rows cite. When the spec's Core blockers row for it is resolved, assert the outcome fields that the row is built from, and name that row in the slice report. Never add a static list of rows to feature code to make the test possible (MN-01).
 
 ## Cheats
 

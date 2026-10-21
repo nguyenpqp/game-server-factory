@@ -32,7 +32,7 @@ The profile shows every capability the spec needs as `present`, with two excepti
 
 ## How the blocker resolved
 
-The first draft cited BG-06 and BG-07, whose `needs:` line names CAP-CLIENTVER. The skill wrote the Core blockers row with resolution `open`, set `Status: blocked`, and stopped. The developer kept the login version on the session and added a minimum version check to the core, then updated the profile entry to `present`. The skill set the resolution to `core changed`, wrote the Test plan and Design coverage, and asked for confirmation. The developer confirmed, and the status became `ready`.
+The first draft cited BG-06 and BG-07, and the `blocker` line of the partial CAP-CLIENTVER entry names both. The skill wrote the Core blockers row with resolution `open`, set `Status: blocked`, and stopped. The developer kept the login version on the session and added a minimum version check to the core, then updated the profile entry to `present`. The skill set the resolution to `core changed`, wrote the Test plan and Design coverage, and asked for confirmation. The developer confirmed, and the status became `ready`.
 
 ## The spec
 
