@@ -14,7 +14,10 @@ Output under <work_dir>:
     raw/<base>_<sheet>.csv     one file per xlsx sheet; CSV line n is sheet row n
     raw/<base>_<sheet>.md      sheet notes: merged cells, formulas, comments, preview
     raw/<name>                 md, txt, csv, and json files copied as they are
-    images/                    raster images from the files and loose images in the folder
+    images/                    raster images from the files and loose images in the folder,
+                               named <kind>_<base>-...img<n> with <kind> doc, slides, sheet, or
+                               pdf, so files that share a stem keep apart; loose images are
+                               standalone-<base>
     conversion-manifest.json   what was converted, skipped, and needs an export
     conversion-manifest.md     the same for a reader
 
@@ -182,7 +185,7 @@ def convert_docx(path, raw_dir, images_dir):
     with zipfile.ZipFile(path) as archive:
         names = docx_style_names(archive)
         rels = read_rels(archive, "word/document.xml")
-        sink = ImageSink(archive, images_dir, base)
+        sink = ImageSink(archive, images_dir, f"doc_{base}")
         body = parse(archive, "word/document.xml").find(W + "body")
         lines = [f"# Document: {path.name}", ""]
         tables = paragraphs = 0
@@ -275,7 +278,7 @@ def convert_pptx(path, raw_dir, images_dir):
     lines = [f"# Slides: {path.name}", ""]
     tables = notes_slides = 0
     with zipfile.ZipFile(path) as archive:
-        sink = ImageSink(archive, images_dir, base)
+        sink = ImageSink(archive, images_dir, f"slides_{base}")
         members = slide_members(archive)
         for number, member in enumerate(members, start=1):
             root = parse(archive, member)
@@ -430,7 +433,7 @@ def convert_xlsx(path, raw_dir, images_dir):
             sheets.append({"sheet": name, "csv": f"{stem}.csv", "md": f"{stem}.md", "rows": rows,
                            "cols": columns, "merged_ranges": len(merges), "formulas": len(formulas),
                            "comments": len(comments)})
-        sink = ImageSink(archive, images_dir, base)
+        sink = ImageSink(archive, images_dir, f"sheet_{base}")
         sink.copy_folder("xl/media/")
     return {"source": path.name, "type": "xlsx", "sheets": sheets, "images_extracted": sink.count,
             "images_skipped": sink.skipped}
@@ -465,7 +468,7 @@ def convert_pdf(path, raw_dir, images_dir):
                     if pixmap.n - pixmap.alpha >= 4:
                         pixmap = fitz.Pixmap(fitz.csRGB, pixmap)
                     images += 1
-                    name = f"{base}-page{number:03d}-img{images:03d}.png"
+                    name = f"pdf_{base}-page{number:03d}-img{images:03d}.png"
                     pixmap.save(str(images_dir / name))
                     lines += [image_line(name), ""]
                 except Exception:

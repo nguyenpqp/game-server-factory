@@ -147,7 +147,7 @@ formula:
 - Scenario: The player opens the panel at 23:59 and taps claim at 00:01.
 - Handling: The claim counts for the new day.
 - Related: R1, TM1.
-- Source: answer Q1.
+- Source: S1 slide 5.
 
 ## Config tables
 

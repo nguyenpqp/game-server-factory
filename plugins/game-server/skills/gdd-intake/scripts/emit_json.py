@@ -28,7 +28,10 @@ import re
 import sys
 from pathlib import Path
 
-SPLIT_CITATIONS = re.compile(r"\s*;\s*|\s*,\s*(?=(?:S\d+\b|prompt\b|answer Q\d))")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from convert_office import column_number  # noqa: E402
+from lint_design import SPLIT_CITATIONS, fields_of, find_tables, parse_document  # noqa: E402
+
 SHEET_CITATION = re.compile(
     r"(S\d+) (.+)!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?")
 KEY_PART = re.compile(r"([A-Za-z_][\w-]*)(\[\])?")
@@ -39,63 +42,28 @@ class DesignError(Exception):
     pass
 
 
-
-def split_row(text):
-    cells = re.split(r"(?<!\\)\|", text.strip())
-    if cells and cells[0].strip() == "":
-        cells = cells[1:]
-    if cells and cells[-1].strip() == "":
-        cells = cells[:-1]
-    return [cell.strip().replace("\\|", "|") for cell in cells]
-
-
-def section_lines(text):
-    blocks, current, fenced = [], None, False
-    for raw in text.splitlines():
-        if raw.lstrip().startswith(("```", "~~~")):
-            fenced = not fenced
-        match = None if fenced else re.match(r"^(#{1,6})\s+(.*?)\s*$", raw)
-        if match:
-            current = {"level": len(match.group(1)), "title": match.group(2).strip("` "), "lines": []}
-            blocks.append(current)
-        elif current is not None:
-            current["lines"].append(raw)
-    return blocks
-
-
-def table_rows(lines):
-    rows = [split_row(l) for l in lines if l.lstrip().startswith("|")]
-    if len(rows) < 2:
-        return [], []
-    return rows[0], rows[2:]
-
-
-def source_files(blocks):
+def source_files(nodes):
     files = {}
-    for block in blocks:
-        if block["level"] == 2 and block["title"] == "Sources":
-            headers, rows = table_rows(block["lines"])
-            if "Id" in headers and "Input" in headers:
-                for cells in rows:
-                    if len(cells) == len(headers):
-                        name = cells[headers.index("Input")].strip("`")
-                        files[cells[headers.index("Id")]] = Path(name).name
+    for node in nodes:
+        if node.level == 2 and node.text == "Sources":
+            for _, headers, rows in find_tables(node):
+                if "Id" in headers and "Input" in headers:
+                    for _, cells in rows:
+                        if len(cells) == len(headers):
+                            name = cells[headers.index("Input")].strip("`")
+                            files[cells[headers.index("Id")]] = Path(name).name
     return files
 
 
-def config_entries(blocks):
+def config_entries(nodes):
     entries, inside = [], False
-    for block in blocks:
-        if block["level"] == 2:
-            inside = block["title"] == "Config tables"
-        elif inside and block["level"] == 3:
-            fields = {}
-            for line in block["lines"]:
-                match = re.match(r"^- ([A-Za-z][A-Za-z ]*?):\s*(.*)$", line)
-                if match:
-                    fields.setdefault(match.group(1), match.group(2))
-            headers, rows = table_rows(block["lines"])
-            entries.append({"title": block["title"], "fields": fields, "headers": headers, "rows": rows})
+    for node in nodes:
+        if node.level == 2:
+            inside = node.text == "Config tables"
+        elif inside and node.level == 3:
+            fields = {name: value for name, (_, value) in fields_of(node).items()}
+            tables = [(headers, [cells for _, cells in rows]) for _, headers, rows in find_tables(node)]
+            entries.append({"title": node.text, "fields": fields, "tables": tables})
     return entries
 
 
@@ -122,13 +90,6 @@ class Sheets:
         return self.cache[name]
 
 
-def column_number(letters):
-    number = 0
-    for letter in letters:
-        number = number * 26 + ord(letter) - 64
-    return number
-
-
 def sheet_values(source, files, sheets, shape, warn, label):
     for item in SPLIT_CITATIONS.split(source.strip().rstrip(".")):
         match = SHEET_CITATION.fullmatch(item.strip())
@@ -136,9 +97,8 @@ def sheet_values(source, files, sheets, shape, warn, label):
             continue
         source_id, sheet, c1, r1, c2, r2 = match.groups()
         c2, r2 = c2 or c1, r2 or r1
-        if shape == "cell" and (c1, r1) != (c2, r2):
-            return None
-        if shape == "column" and c1 != c2:
+        if (shape == "cell" and (c1, r1) != (c2, r2)) or (shape == "column" and c1 != c2):
+            warn(f"{label}: {item.strip()} is not a single {shape}; using the Example")
             return None
         rows = sheets.rows(files.get(source_id, ""), sheet.strip("'"))
         if rows is None:
@@ -166,6 +126,8 @@ def coerce(raw, type_name, warn, label):
         return "" if kind == "string" else None
     try:
         if kind in ("integer", "int"):
+            if re.fullmatch(r"[+-]?\d+", raw):
+                return int(raw)
             number = float(raw)
             if not number.is_integer():
                 raise ValueError
@@ -246,24 +208,26 @@ def render(node, index, warn):
 
 
 def build_draft(entry, files, sheets, warn):
-    headers = entry["headers"]
-    for column in ("Key", "Type", "Example"):
-        if column not in headers:
-            raise DesignError(f"config '{entry['title']}' has no {column} column")
     root = Node("object")
-    from_sheets = 0
-    for cells in entry["rows"]:
-        if len(cells) != len(headers):
-            raise DesignError(f"config '{entry['title']}' has a row with {len(cells)} cells, expected {len(headers)}")
-        key = cells[headers.index("Key")].strip("`")
-        fill = None
-        if sheets is not None and "Source" in headers:
-            shape = "column" if "[]" in key else "cell"
-            fill = sheet_values(cells[headers.index("Source")], files, sheets, shape, warn, key)
-            from_sheets += bool(fill)
-        add_key(root, key, {"key": key, "type": cells[headers.index("Type")],
-                            "example": cells[headers.index("Example")].strip("`"), "fill": fill})
-    return root, from_sheets, len(entry["rows"])
+    from_sheets = total = 0
+    for headers, rows in entry["tables"] or [([], [])]:
+        for column in ("Key", "Type", "Example"):
+            if column not in headers:
+                raise DesignError(f"config '{entry['title']}' has no {column} column")
+        for cells in rows:
+            if len(cells) != len(headers):
+                raise DesignError(
+                    f"config '{entry['title']}' has a row with {len(cells)} cells, expected {len(headers)}")
+            key = cells[headers.index("Key")].strip("`")
+            fill = None
+            if sheets is not None and "Source" in headers:
+                shape = "column" if "[]" in key else "cell"
+                fill = sheet_values(cells[headers.index("Source")], files, sheets, shape, warn, key)
+                from_sheets += bool(fill)
+            add_key(root, key, {"key": key, "type": cells[headers.index("Type")],
+                                "example": cells[headers.index("Example")].strip("`"), "fill": fill})
+            total += 1
+    return root, from_sheets, total
 
 
 def emit_entry(entry, base, files, sheets, warn):
@@ -307,8 +271,8 @@ def main(argv=None):
         warnings.append(message)
         print(f"warning: {message}", file=sys.stderr)
 
-    blocks = section_lines(design.read_text(encoding="utf-8"))
-    entries = [e for e in config_entries(blocks)]
+    _, nodes, _ = parse_document(design.read_text(encoding="utf-8"))
+    entries = config_entries(nodes)
     if not entries:
         print("No config tables in the design; nothing to emit.")
         return 0
@@ -316,7 +280,7 @@ def main(argv=None):
         sheets = Sheets(sheets_dir) if sheets_dir else None
         base = out_dir or design.parent
         for entry in entries:
-            target, from_sheets, total = emit_entry(entry, base, source_files(blocks), sheets, warn)
+            target, from_sheets, total = emit_entry(entry, base, source_files(nodes), sheets, warn)
             print(f"{entry['title']} -> {target} ({total} keys, {from_sheets} filled from sheets)")
     except DesignError as error:
         print(f"error: {error}", file=sys.stderr)

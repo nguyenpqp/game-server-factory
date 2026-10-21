@@ -21,7 +21,7 @@ The brief gives absolute paths for these.
 
 Read the slides in order, the documents, then the sheet notes before the sheet CSVs. The notes list merged cells, formulas, and comments. A CSV line number equals the sheet row number and its first column is column A, so you can cite `Sheet!A2:D8` straight from the file. Read the images that sit next to the text that mentions them. Read the first 30 CSV rows unless the pattern changes later.
 
-Give each input an id in the Sources table: `S1`, `S2`, and so on, in file name order. With only a prompt, write `None.` under the table and cite the text as `prompt`.
+Give each input an id in the Sources table: `S1`, `S2`, and so on, in file name order. With only a prompt, the Sources section has no table: write `None.`, keep the `Scope:` line, and cite the text as `prompt`.
 
 ### 2. Note the terms
 

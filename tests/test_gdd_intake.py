@@ -280,6 +280,20 @@ class ConvertTest(TempDirCase):
         self.assertEqual(entry["sheets"][0]["csv"], "balance_Rewards.csv")
         self.assertEqual([p.read_bytes() for p in (self.work / "images").iterdir()], [PNG])
 
+    def test_images_from_inputs_with_the_same_stem_do_not_collide(self):
+        make_docx(self.inputs / "challenge.docx")
+        make_xlsx(self.inputs / "challenge.xlsx")
+        make_pptx(self.inputs / "challenge.pptx")
+        manifest = self.convert()
+        images = sorted(p.name for p in (self.work / "images").iterdir())
+        self.assertEqual(len(images), 3, images)
+        self.assertEqual(sum(f["images_extracted"] for f in manifest["files"]), 3)
+        for name in ("doc_challenge.md", "slides_challenge.md"):
+            text = (self.work / "raw" / name).read_text(encoding="utf-8")
+            linked = re.findall(r"\]\(\.\./images/([^)]+)\)", text)
+            self.assertEqual(len(linked), 1, text)
+            self.assertIn(linked[0], images)
+
     def test_text_files_pass_through_and_legacy_formats_are_skipped(self):
         (self.inputs / "notes.md").write_text("# Notes\n", encoding="utf-8")
         (self.inputs / "old.ppt").write_bytes(b"x")
@@ -338,8 +352,7 @@ def template_skeleton():
     match = re.search(r"````markdown\n(.*?)\n````", text, re.DOTALL)
     assert match, "design-template.md has no skeleton block"
     skeleton = match.group(1) + "\n"
-    skeleton = replace_once(skeleton, "Scope: <server-only, full-stack, or logic-only>", "Scope: server-only")
-    return replace_once(skeleton, "- Status: open", "- Status: answered on 2026-01-05: The server day.")
+    return replace_once(skeleton, "Scope: <server-only, full-stack, or logic-only>", "Scope: server-only")
 
 
 class LintCleanTest(unittest.TestCase):
@@ -646,6 +659,50 @@ class EmitJsonTest(TempDirCase):
         draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
         self.assertIsNone(draft["limits"]["perDay"])
         self.assertIn("limits.perDay", err)
+
+    def test_a_range_that_does_not_fit_the_key_warns(self):
+        design = self.write_design(CONFIG_DESIGN.replace("S1 Settings!B2 |", "S1 Settings!B2:B3 |"))
+        self.write_sheets()
+        code, out, err = run_main(emit_json, [str(design), "--sheets", str(self.work)])
+        self.assertEqual(code, 0, err)
+        warnings = [line for line in err.splitlines() if line.startswith("warning:")]
+        self.assertTrue(any("unlockLevel" in w and "B2:B3" in w for w in warnings), err)
+        self.assertTrue(any("tiers[].items" in w and "B2:D4" in w for w in warnings), err)
+        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
+        self.assertEqual(draft["unlockLevel"], 8)
+
+    def test_tables_are_read_one_at_a_time_and_fenced_lines_are_ignored(self):
+        extra = (
+            "\n```text\n| `fenced` | x | integer | 1 | any | prompt |\n```\n\n"
+            "| Key | Meaning | Type | Example | Allowed values | Source |\n"
+            "| --- | --- | --- | --- | --- | --- |\n"
+            "| `bonus` | Extra key | integer | 2 | any | prompt |\n"
+        )
+        design = self.write_design(CONFIG_DESIGN + extra)
+        code, out, err = run_main(emit_json, [str(design)])
+        self.assertEqual(code, 0, err)
+        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
+        self.assertEqual(draft["bonus"], 2)
+        self.assertNotIn("fenced", draft)
+        self.assertNotIn("Key", draft)
+
+    def test_large_integers_keep_every_digit(self):
+        big = 2 ** 53 + 1
+        design = self.write_design(CONFIG_DESIGN.replace("| integer | 3 |", f"| integer | {big} |"))
+        code, out, err = run_main(emit_json, [str(design)])
+        self.assertEqual(code, 0, err)
+        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
+        self.assertEqual(draft["limits"]["perDay"], big)
+
+    def test_runs_isolated_with_its_shared_helpers(self):
+        design = self.write_design()
+        result = subprocess.run(
+            [sys.executable, "-I", str(SKILL / "scripts" / "emit_json.py"), str(design)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(emit_json.find_tables.__module__, "lint_design")
+        self.assertEqual(emit_json.column_number.__module__, "convert_office")
 
     def test_design_without_config_tables_writes_nothing(self):
         design = self.write_design(read_fixture("prompt-only-design.md"))
