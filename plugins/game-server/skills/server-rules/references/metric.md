@@ -122,7 +122,7 @@ MetricLogger.userAction(user, "streak", error, traceId, extras);
 Do:
 
 ```sql
-SELECT toDate(time) AS day, uniqExact(user_id) AS claimers
+SELECT CAST(time AS DATE) AS day, COUNT(DISTINCT user_id) AS claimers
 FROM user_action
 WHERE action = 'streak_claim' AND result = 0
 GROUP BY day;

@@ -37,16 +37,18 @@ Do:
 ```java
 class GardenState {
     int level;
-    @JsonAnySetter @JsonAnyGetter
-    Map<String, Object> unknown = new HashMap<>();
+    Map<String, Object> unknown = new HashMap<>();   // the codec fills it on decode
 }
+String saved = Codec.encode(state);                  // and writes it back on encode
 ```
 
 Don't:
 
 ```java
-mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-// unknown fields are read, then dropped on the next save
+class GardenState {
+    int level;                                       // the codec skips unknown keys
+}
+String saved = Codec.encode(state);                  // so the save drops them
 ```
 
 **Check.** Confirm the stored class keeps unknown fields, and that a round-trip test loads a document with an extra field and saves it back intact.
