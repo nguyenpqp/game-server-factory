@@ -111,6 +111,7 @@ class CheckProfileTest(unittest.TestCase):
         self.assertIn("lint.time_call", keys)
         self.assertIn("profile_version", keys)
         self.assertNotIn("lint", keys)
+        self.assertNotIn("lint.command_method", keys)
 
     def test_blocked_rules_lists_rules_per_non_present_capability(self):
         code, out, _ = run("--blocked-rules", FIXTURES / "valid.md")

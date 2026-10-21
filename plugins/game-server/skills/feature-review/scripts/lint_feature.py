@@ -15,8 +15,9 @@ Checks, with the rule each reports. A check whose profile value is empty is skip
 - AUTH-02: a line matches a `forbidden_time` pattern.
 - AUTH-03: a line matches a `forbidden_random` pattern.
 - MN-01: a static field that is not final, or a `static final` mutable collection,
-  array, or atomic holder. A static field is exempt when it is `volatile` or typed
-  `AtomicReference` and sits in a class whose simple name ends with `Config`.
+  array, or atomic holder. The config snapshot reference is exempt: a `volatile`
+  static field whose type ends with `Config`, or an `AtomicReference<T>` whose `T`
+  ends with `Config`.
   A `static final` collection built by `List.of`, `Set.of`, `Map.of`, `copyOf`, or
   `Collections.unmodifiable*` is immutable and exempt.
 - CHEAT-02: a class whose signature (annotations, modifiers, extends, implements)
@@ -25,8 +26,10 @@ Checks, with the rule each reports. A check whose profile value is empty is skip
   review question.
 - MET-01 and MET-02: a command class has no `metric_call` match (MET-01) or no
   `trace_id_call` match (MET-02) in its body. A command class is a class under
-  `feature_root` that declares a method named `handle`. A metric call in a shared
-  helper or base class is a false finding, so treat the line as a prompt to check.
+  `feature_root` that declares a method whose name matches `command_method`, or
+  `handle\w*` when the profile has no such key. A metric call in a shared helper or
+  base class is a false finding, so treat the line as a prompt to check. When no
+  checked class under `feature_root` is a command class, one note goes to stderr.
 - PERF-01: a line matches a `blocking_calls` pattern.
 
 `time_call` and `random_call` name the approved calls. The reviewer uses them, and the
@@ -35,7 +38,8 @@ linter does not.
 Comments and string, text block, and character literals are blanked before any
 pattern runs, so a commented-out call is not a finding. Import and package lines are
 skipped. Files under `generated_paths` and `test_root` are skipped, even when named
-on the command line.
+on the command line. These paths and `feature_root` are relative to the repository
+root, the directory that holds `docs/game-server/profile.md`.
 """
 import argparse
 import json
@@ -56,18 +60,21 @@ RULE_BLOCKING = "PERF-01"
 
 LINT_KEYS = (
     "time_call", "forbidden_time", "random_call", "forbidden_random", "env_live_check",
-    "metric_call", "trace_id_call", "cheat_marker", "blocking_calls",
+    "metric_call", "trace_id_call", "command_method", "cheat_marker", "blocking_calls",
 )
 LIST_KEYS = {"forbidden_time", "forbidden_random", "blocking_calls"}
+DEFAULT_COMMAND_METHOD = r"handle\w*"
 
 TYPE_KEYWORD = re.compile(r"(?<![.\w@])(?:class|interface|enum|record)\s+([A-Za-z_]\w*)")
 STATIC_KEYWORD = re.compile(r"\bstatic\b")
 ANNOTATION = re.compile(r"@\w+(?:\.\w+)*\s*(?:\([^()]*\))?")
+ANNOTATION_ARGS = re.compile(r"@\w+(?:\.\w+)*\s*\(")
+SNAPSHOT_HOLDER = re.compile(r"\bAtomicReference\s*<\s*([\w.]+)\s*>")
 GENERICS = re.compile(r"<[^<>]*>")
 BRACES = re.compile(r"[{}]")
 FIELD_END = re.compile(r"[=;({]")
-HANDLE_DECLARATION = re.compile(
-    r"(?<![\w.])(?!(?:return|new|else|throw|case)\b)[\w<>\[\],.?]+\s+handle\s*\("
+METHOD_DECLARATION = re.compile(
+    r"(?<![\w.])(?!(?:return|new|else|throw|case)\b)[\w<>\[\],.?]+\s+([A-Za-z_]\w*)\s*\("
 )
 SKIPPED_LINE = re.compile(r"^\s*(?:import|package)\b")
 TYPE_WORDS = {"class", "interface", "enum", "record"}
@@ -88,8 +95,25 @@ class UsageError(Exception):
     pass
 
 
-def parse_scalar(text):
+def strip_comment(text):
     text = text.strip()
+    if text[:1] in ("'", '"'):
+        quote, i = text[0], 1
+        while i < len(text):
+            if quote == "'" and text.startswith("''", i):
+                i += 2
+            elif text[i] == quote:
+                break
+            else:
+                i += 2 if quote == '"' and text[i] == "\\" else 1
+        rest = text[i + 1:].strip()
+        return text[:i + 1] if rest.startswith("#") else text
+    match = re.search(r"(?:^|\s)#", text)
+    return text[:match.start()].rstrip() if match else text
+
+
+def parse_scalar(text):
+    text = strip_comment(text)
     if text == "[]":
         return []
     if len(text) >= 2 and text[0] == text[-1] == "'":
@@ -115,6 +139,7 @@ def parse_block(items, pos, indent, lines_of, prefix):
     while pos < len(items) and items[pos][0] == indent:
         _, text, number = items[pos]
         key, sep, value = text.partition(":")
+        value = strip_comment(value)
         if not sep or not re.fullmatch(r"\w+", key):
             raise UsageError(f"line {number}: expected `key: value`")
         lines_of[prefix + key] = number
@@ -166,6 +191,8 @@ class Settings:
         self.patterns = {}
         for key in LINT_KEYS:
             value = raw.get(key, [] if key in LIST_KEYS else "")
+            if key == "command_method" and key not in raw:
+                value = DEFAULT_COMMAND_METHOD
             values = value if isinstance(value, list) else [value]
             compiled = []
             for pattern in filter(None, values):
@@ -175,21 +202,22 @@ class Settings:
                     number = lines_of.get(f"lint.{key}", 1)
                     raise UsageError(f"{profile_path}:{number}: lint.{key}: invalid regex: {error}") from error
             self.patterns[key] = compiled
+        self.repo_root = Path(profile_path).resolve().parents[2]
         self.feature_root = str(data.get("feature_root") or "")
-        self.skipped_roots = [
-            str(root) for root in [data.get("test_root"), *(data.get("generated_paths") or [])] if root
-        ]
+        generated = data.get("generated_paths") or []
+        generated = generated if isinstance(generated, list) else [generated]
+        self.skipped_roots = [str(root) for root in [data.get("test_root"), *generated] if root]
 
     def one(self, key):
         return self.patterns[key][0] if self.patterns[key] else None
 
-
-def under(path, root):
-    root = root.strip("/").removeprefix("./")
-    if not root:
-        return False
-    posix = "/" + Path(path).as_posix().lstrip("/")
-    return f"/{root}/" in posix + "/"
+    def under(self, path, root):
+        parts = Path(root.strip("/")).parts
+        try:
+            relative = Path(path).resolve().relative_to(self.repo_root).parts
+        except ValueError:
+            return False
+        return bool(parts) and relative[:len(parts)] == parts
 
 
 def mask(text):
@@ -236,6 +264,19 @@ class TypeSpan:
         self.signature_at = signature_at
         self.body_start = -1
         self.body_end = -1
+
+
+def without_annotation_braces(masked):
+    out = list(masked)
+    for match in ANNOTATION_ARGS.finditer(masked):
+        depth, i = 1, match.end()
+        while i < len(masked) and depth:
+            char = masked[i]
+            depth += {"(": 1, ")": -1}.get(char, 0)
+            if char in "{}":
+                out[i] = " "
+            i += 1
+    return "".join(out)
 
 
 def is_declaration(masked, match):
@@ -300,6 +341,7 @@ def check_static(path, masked, spans):
             continue
         end = stop.start()
         header = ANNOTATION.sub("", masked[start:end])
+        holder = SNAPSHOT_HOLDER.search(header)
         while True:
             header, count = GENERICS.subn("", header)
             if not count:
@@ -315,7 +357,8 @@ def check_static(path, masked, spans):
         type_name = names[-2].split(".")[-1]
         owner = enclosing(spans, at)
         owner_name = owner.name if owner else ""
-        if owner_name.endswith("Config") and ("volatile" in mods or type_name == "AtomicReference"):
+        if (type_name.endswith("Config") and "volatile" in mods) or (
+                type_name == "AtomicReference" and holder and holder.group(1).endswith("Config")):
             continue
         line = line_of(masked, at)
         if "final" not in mods:
@@ -346,8 +389,10 @@ def check_cheat(path, masked, spans, settings):
     return findings
 
 
-def declares_handle(masked, span, spans):
-    for match in HANDLE_DECLARATION.finditer(masked, span.body_start + 1, span.body_end):
+def declares_command_method(masked, span, spans, method):
+    for match in METHOD_DECLARATION.finditer(masked, span.body_start + 1, span.body_end):
+        if not method.fullmatch(match.group(1)):
+            continue
         at = match.end()
         if enclosing(spans, at) is not span:
             continue
@@ -362,20 +407,22 @@ def declares_handle(masked, span, spans):
 
 
 def check_commands(path, masked, spans, settings):
-    if not under(path, settings.feature_root):
-        return []
+    method = settings.one("command_method")
+    if not method or not settings.under(path, settings.feature_root):
+        return [], False
     metric, trace = settings.one("metric_call"), settings.one("trace_id_call")
-    findings = []
+    findings, found = [], False
     for span in spans:
-        if not declares_handle(masked, span, spans):
+        if not declares_command_method(masked, span, spans, method):
             continue
+        found = True
         body = masked[span.body_start:span.body_end]
         line = line_of(masked, span.keyword_at)
         if metric and not metric.search(body):
             findings.append(Finding(path, line, RULE_METRIC, f"command class `{span.name}` has no metric call"))
         if trace and not trace.search(body):
             findings.append(Finding(path, line, RULE_TRACE, f"command class `{span.name}` mints no trace id"))
-    return findings
+    return findings, found
 
 
 def lint_file(path, settings):
@@ -384,15 +431,16 @@ def lint_file(path, settings):
     except OSError as error:
         raise UsageError(f"{path}: cannot read: {error.strerror}") from error
     masked = mask(text)
-    spans = type_spans(masked)
-    return (
+    spans = type_spans(without_annotation_braces(masked))
+    commands, found = check_commands(path, masked, spans, settings)
+    return found, (
         scan_lines(path, masked, settings.patterns["forbidden_time"], RULE_TIME,
                    "server time must be injected, found")
         + scan_lines(path, masked, settings.patterns["forbidden_random"], RULE_RANDOM,
                      "random numbers must come from the injected source, found")
         + check_static(path, masked, spans)
         + check_cheat(path, masked, spans, settings)
-        + check_commands(path, masked, spans, settings)
+        + commands
         + scan_lines(path, masked, settings.patterns["blocking_calls"], RULE_BLOCKING, "blocking call")
     )
 
@@ -407,7 +455,7 @@ def collect(paths, settings):
             files.append(path)
         else:
             raise UsageError(f"{raw}: no such file or directory")
-    return [f for f in files if not any(under(f, root) for root in settings.skipped_roots)]
+    return [f for f in files if not any(settings.under(f, root) for root in settings.skipped_roots)]
 
 
 def main(argv=None):
@@ -417,12 +465,18 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         settings = Settings(args.profile)
-        findings = []
+        findings, any_command = [], False
         for file in collect(args.paths, settings):
-            findings += lint_file(str(file), settings)
+            found, file_findings = lint_file(str(file), settings)
+            findings += file_findings
+            any_command = any_command or found
     except UsageError as error:
         print(error, file=sys.stderr)
         return 2
+    method = settings.one("command_method")
+    if method and not any_command and (settings.one("metric_call") or settings.one("trace_id_call")):
+        print(f"note: no class under feature_root declares a method matching lint.command_method "
+              f"`{method.pattern}`, so MET-01 and MET-02 checked no class", file=sys.stderr)
     for finding in sorted(findings, key=lambda f: (f.path, f.line, f.rule)):
         print(f"{finding.path}:{finding.line}: {finding.rule} {finding.message}")
     return 1 if findings else 0

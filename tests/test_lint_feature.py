@@ -17,10 +17,13 @@ PROFILE_TEMPLATE = (
     ROOT / "plugins" / "game-server" / "skills" / "server-profile" / "references" / "profile-template.md"
 )
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "lint"
-PROFILE = FIXTURES / "profile.md"
+PROFILE = FIXTURES / "docs" / "game-server" / "profile.md"
 MAIN = FIXTURES / "src" / "main" / "java"
 TEST_TREE = FIXTURES / "src" / "test" / "java"
 DEMO = MAIN / "com" / "example" / "game" / "feature" / "demo"
+FEATURE_DIR = "src/main/java/com/example/game/feature/demo"
+SKILLS = ROOT / "plugins" / "game-server" / "skills"
+NO_COMMAND_NOTE = "note: no class under feature_root declares a method matching lint.command_method"
 
 spec = importlib.util.spec_from_file_location("lint_feature", SCRIPT)
 lint = importlib.util.module_from_spec(spec)
@@ -76,13 +79,44 @@ def profile_with(replacements):
     return Path(handle.name)
 
 
+def write_repo(root, files, profile_text=None, replacements=()):
+    text = PROFILE.read_text(encoding="utf-8") if profile_text is None else profile_text
+    for old, new in replacements:
+        assert old in text, old
+        text = text.replace(old, new)
+    profile = Path(root) / "docs" / "game-server" / "profile.md"
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    profile.write_text(text, encoding="utf-8")
+    for rel, content in files.items():
+        path = Path(root) / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    return profile
+
+
+def template_profile():
+    text = PROFILE_TEMPLATE.read_text(encoding="utf-8")
+    return re.search(r"```yaml\n(---\n.*?\n---)\n```", text, re.S).group(1) + "\n"
+
+
+def reference_snippets():
+    snippets = []
+    for path in sorted((SKILLS / "server-rules" / "references").glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        snippets += [(path.name, b) for b in re.findall(r"^Do:\n\n```java\n(.*?)^```", text, re.M | re.S)]
+    for path in sorted((SKILLS / "feature-build" / "references").glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        snippets += [(path.name, b) for b in re.findall(r"^```java\n(.*?)^```", text, re.M | re.S)]
+    return snippets
+
+
 class FixtureChecks(unittest.TestCase):
     def check_file(self, name):
         path = DEMO / name
         code, out, err = run("--profile", PROFILE, path)
         self.assertEqual(parse_output(out), expected_markers(path))
         self.assertEqual(code, 1)
-        self.assertEqual(err, "")
+        self.assertTrue(err == "" or err.startswith(NO_COMMAND_NOTE), err)
 
     def test_forbidden_time_calls(self):
         self.check_file("ForbiddenTime.java")
@@ -137,6 +171,111 @@ class Scope(unittest.TestCase):
             code, out, _ = run("--profile", PROFILE, outside)
         self.assertEqual((code, out), (0, ""))
 
+    def test_roots_compare_path_components_from_the_repo_root(self):
+        forbidden = "final class A {\n    long t() { return System.currentTimeMillis(); }\n}\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp) / "test" / "repo"
+            profile = write_repo(
+                repo,
+                {
+                    f"{FEATURE_DIR}/test/Foo.java": forbidden,
+                    f"{FEATURE_DIR}/Bar.java": forbidden,
+                    "test/Skipped.java": forbidden,
+                },
+                replacements=[("test_root: 'src/test/java'", "test_root: 'test'")],
+            )
+            code, out, _ = run("--profile", profile, repo)
+        self.assertEqual({name for name, _, _ in parse_output(out)}, {"Foo.java", "Bar.java"})
+        self.assertEqual(code, 1)
+
+    def test_a_scalar_generated_paths_is_one_path(self):
+        forbidden = "final class A {\n    long t() { return System.currentTimeMillis(); }\n}\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = write_repo(
+                tmp,
+                {"src/gen/Gen.java": forbidden, "src/gens/Kept.java": forbidden},
+                replacements=[("generated_paths:\n  - 'src/main/java/com/example/game/generated'\n",
+                               "generated_paths: 'src/gen'\n")],
+            )
+            code, out, _ = run("--profile", profile, tmp)
+        self.assertEqual({name for name, _, _ in parse_output(out)}, {"Kept.java"})
+
+
+class CommandClasses(unittest.TestCase):
+    def lint_one(self, source, replacements=()):
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = write_repo(tmp, {f"{FEATURE_DIR}/Cmd.java": source}, replacements=replacements)
+            return run("--profile", profile, Path(tmp) / FEATURE_DIR / "Cmd.java")
+
+    def test_a_handle_client_request_class_without_a_metric_call_fails(self):
+        source = (
+            "final class ClaimHandler {\n"
+            "    public void handleClientRequest(User user, DataCmd cmd) {\n"
+            "        String trace = TraceIds.next();\n"
+            "    }\n"
+            "}\n"
+        )
+        code, out, err = self.lint_one(source)
+        self.assertEqual(parse_output(out), {("Cmd.java", 1, "MET-01")})
+        self.assertEqual((code, err), (1, ""))
+
+    def test_the_profile_names_the_command_method(self):
+        source = "final class ClaimHandler {\n    Result execute(Request r) { return null; }\n}\n"
+        code, out, _ = self.lint_one(
+            source, [("  cheat_marker:", "  command_method: 'execute'\n  cheat_marker:")]
+        )
+        self.assertEqual(parse_output(out), {("Cmd.java", 1, "MET-01"), ("Cmd.java", 1, "MET-02")})
+        code, out, _ = self.lint_one(source)
+        self.assertEqual((code, out), (0, ""))
+
+    def test_no_command_class_prints_one_note_and_keeps_the_exit_code(self):
+        code, out, err = self.lint_one("final class Util {\n    int one() { return 1; }\n}\n")
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(len(err.splitlines()), 1, err)
+        self.assertTrue(err.startswith(NO_COMMAND_NOTE), err)
+
+
+class ClassSignatures(unittest.TestCase):
+    def test_braces_inside_annotation_arguments_keep_the_cheat_check(self):
+        source = (
+            '@CheatCommand(names = {"a", "b"})\n'
+            "final class GrantCheat {\n"
+            "    void apply(UserActor user) { user.add(1); }\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = write_repo(tmp, {f"{FEATURE_DIR}/GrantCheat.java": source})
+            code, out, _ = run("--profile", profile, Path(tmp) / FEATURE_DIR / "GrantCheat.java")
+        self.assertEqual(parse_output(out), {("GrantCheat.java", 2, "CHEAT-02")})
+
+    def test_config_snapshot_fields_are_exempt_by_their_type(self):
+        source = (
+            "import java.util.concurrent.atomic.AtomicReference;\n"
+            "final class StreakService {\n"
+            "    private static volatile StreakConfig config;\n"
+            "    static final AtomicReference<StreakConfig> REF = new AtomicReference<>();\n"
+            "}\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = write_repo(tmp, {"src/main/java/StreakService.java": source})
+            code, out, _ = run("--profile", profile, Path(tmp) / "src/main/java/StreakService.java")
+        self.assertEqual((code, out), (0, ""))
+
+
+class ReferenceSnippets(unittest.TestCase):
+    def test_every_do_snippet_and_build_reference_snippet_lints_clean(self):
+        snippets = reference_snippets()
+        self.assertGreater(len(snippets), 40)
+        with tempfile.TemporaryDirectory() as tmp:
+            files = {f"{FEATURE_DIR}/Snippet{n:03d}.java": body for n, (_, body) in enumerate(snippets)}
+            profile = write_repo(tmp, files, profile_text=template_profile())
+            failures = []
+            for n, (source, _) in enumerate(snippets):
+                code, out, err = run("--profile", profile, Path(tmp) / FEATURE_DIR / f"Snippet{n:03d}.java")
+                if code == 2 or out:
+                    failures.append(f"{source} snippet {n}: {out or err}")
+        self.assertEqual(failures, [], "\n".join(failures))
+
 
 class ProfileKeys(unittest.TestCase):
     def test_empty_list_skips_the_check(self):
@@ -177,6 +316,29 @@ class ProfileKeys(unittest.TestCase):
         self.assertEqual(data["lint"]["cheat_marker"], "@CheatCommand")
         self.assertEqual(len(data["lint"]["forbidden_time"]), 4)
         self.assertEqual(data["generated_paths"], ["src/main/java/com/example/game/generated"])
+        self.assertEqual(data["lint"]["command_method"], "handle\\w*")
+
+    def test_a_trailing_comment_after_a_scalar_is_dropped(self):
+        data = lint.parse_profile(
+            "---\n"
+            "lint:  # patterns\n"
+            "  time_call: 'ServerClock\\.now\\(' # the clock\n"
+            "  plain: abc # note\n"
+            "  hashed: 'a # b'\n"
+            "  forbidden_time:\n"
+            "    - 'Instant\\.now\\(' # legacy\n"
+            "---\n"
+        )
+        self.assertEqual(
+            data["lint"],
+            {"time_call": "ServerClock\\.now\\(", "plain": "abc", "hashed": "a # b",
+             "forbidden_time": ["Instant\\.now\\("]},
+        )
+
+    def test_a_commented_cheat_marker_still_drives_the_check(self):
+        profile = profile_with([("  cheat_marker: '@CheatCommand'", "  cheat_marker: '@CheatCommand' # marker")])
+        code, out, _ = run("--profile", profile, DEMO / "CheatNoEnv.java")
+        self.assertEqual({rule for _, _, rule in parse_output(out)}, {"CHEAT-02"})
 
 
 class RuleIds(unittest.TestCase):

@@ -17,9 +17,14 @@ final class StaticState {
     static final AtomicReference<Object> HOLDER = new AtomicReference<>(); // EXPECT: MN-01
     private static final Map<String, Integer> WRAPPED = // EXPECT: MN-01
         new HashMap<>();
+    static FeatureConfig plain; // EXPECT: MN-01
 
     static final class Inner {
         private static long hits; // EXPECT: MN-01
+    }
+
+    static final class LimitsConfig {
+        static volatile Map<String, Integer> limits; // EXPECT: MN-01
     }
 
     static int helper() { return counter; }

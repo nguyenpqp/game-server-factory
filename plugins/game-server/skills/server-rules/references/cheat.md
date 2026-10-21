@@ -64,7 +64,12 @@ Do:
 
 ```java
 @CheatCommand
-final class CheatGrowAll { /* ... */ }
+final class CheatGrowAll {
+    static ErrorCode process(UserState state) {
+        if (Env.isLive()) return ErrorCode.INVALID_ACTION;
+        return HarvestCore.growAll(state);
+    }
+}
 ```
 
 Don't:
@@ -107,9 +112,14 @@ CheatSetStreak.process(state, streak);   // no row
 Do:
 
 ```java
-@CheatCommand final class CheatSetStreak { /* any day 0..max */ }
-@CheatCommand final class CheatSkipCooldown { /* claim now */ }
-@CheatCommand final class CheatResetFeature { /* back to first open */ }
+@CheatCommand
+final class CheatSetStreak {   // any day 0..max
+    static ErrorCode process(UserState state, int day) {
+        if (Env.isLive()) return ErrorCode.INVALID_ACTION;
+        return StreakCore.setStreak(state, day);
+    }
+}
+// CheatSkipCooldown (claim now) and CheatResetFeature (back to first open) have the same shape.
 ```
 
 Don't:

@@ -37,9 +37,9 @@ final class Clean {
         return GameRandom.nextInt(6);
     }
 
-    static final class ClaimConfig {
-        private static volatile Object current;
-        static final AtomicReference<Object> REF = new AtomicReference<>();
+    static final class ClaimService {
+        private static volatile ClaimConfig current;
+        static final AtomicReference<ClaimConfig> REF = new AtomicReference<>();
     }
 
     @CheatCommand

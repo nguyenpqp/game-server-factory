@@ -6,7 +6,7 @@ Usage: check_profile.py [--blocked-rules] <profile.md>
 Prints `path:line: message` for each failure and exits 1 if any failure exists.
 The required frontmatter keys and capability headings are read from
 `references/profile-template.md` next to this script, so the template is the
-single source. With `--blocked-rules`, a clean profile also prints, for each
+single source. `lint.command_method` is optional. With `--blocked-rules`, a clean profile also prints, for each
 capability that is not present, the rule ids from the rule index that need it.
 """
 import argparse
@@ -24,6 +24,7 @@ RULE_INDEX = SKILLS / "server-rules" / "references" / "index.md"
 STATUSES = ("present", "partial", "missing")
 FIELDS_WHEN_PRESENT = ("api", "file", "snippet")
 FIELDS_WHEN_NOT_PRESENT = ("blocker", "proposal")
+OPTIONAL_KEYS = {"lint.command_method"}
 
 FENCE = re.compile(r"^\s*(```|~~~)")
 CAP_HEADING = re.compile(r"^###\s+(CAP-[A-Z]+)\b")
@@ -74,7 +75,7 @@ def load_template(path=TEMPLATE):
     block = split_frontmatter(sample.group(1).splitlines()) if sample else None
     if block is None:
         raise ValueError(f"{path}: no frontmatter example found")
-    keys = [key for key in parse_keys(block)]
+    keys = [key for key in parse_keys(block) if key not in OPTIONAL_KEYS]
     caps = [m.group(1) for _, line in unfenced(lines) if (m := CAP_HEADING.match(line))]
     return keys, caps
 

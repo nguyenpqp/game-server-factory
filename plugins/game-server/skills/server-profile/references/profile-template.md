@@ -11,7 +11,7 @@ Rule ids such as `MN-02` refer to the rule index of the `server-rules` skill. Ea
 
 ## Frontmatter
 
-The block below is the complete key set. Every key is required. The values are generic examples.
+The block below is the complete key set. Every key is required except `lint.command_method`. The values are generic examples.
 
 ```yaml
 ---
@@ -40,6 +40,7 @@ lint:
   env_live_check: 'Env\.isLive\(\)'
   metric_call: 'MetricLogger\.userAction\('
   trace_id_call: 'TraceIds\.next\('
+  command_method: 'handle\w*'
   cheat_marker: '@CheatCommand'
   blocking_calls:
     - 'Thread\.sleep\('
@@ -69,6 +70,7 @@ lint:
 | `lint.env_live_check` | regex | The expression that is true when the server runs on live. | CAP-ENV |
 | `lint.metric_call` | regex | The call that writes a user action metric row. | CAP-METRIC |
 | `lint.trace_id_call` | regex | The call that mints a trace id. | CAP-TRACEID |
+| `lint.command_method` | regex | Name of the method that marks a command class: a class that declares a method whose whole name matches is a command class. Optional. When the key is absent, the linter uses `handle\w*`. | CAP-COMMAND |
 | `lint.cheat_marker` | regex | Text that every cheat command class contains, such as an annotation or a base class. | CAP-CHEAT |
 | `lint.blocking_calls` | list of regexes | Calls that block the calling thread on I/O, a sleep, or a wait. Name the project's own future and sync client calls, and leave out patterns such as `\.get\(\)` that also match plain getters. | CAP-ACTOR |
 
