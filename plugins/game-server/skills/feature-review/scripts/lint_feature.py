@@ -27,7 +27,7 @@ Checks, with the rule each reports. A check whose profile value is empty is skip
 - MET-01 and MET-02: a command class has no `metric_call` match (MET-01) or no
   `trace_id_call` match (MET-02) in its body. A command class is a class under
   `feature_root` that declares a method whose name matches `command_method`, or
-  `handle\w*` when the profile has no such key. A metric call in a shared helper or
+  `handle\\w*` when the profile has no such key. A metric call in a shared helper or
   base class is a false finding, so treat the line as a prompt to check. When no
   checked class under `feature_root` is a command class, one note goes to stderr.
 - PERF-01: a line matches a `blocking_calls` pattern.
