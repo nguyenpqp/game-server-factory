@@ -81,7 +81,7 @@ log.info("streak set for " + targetId);
 Do:
 
 ```java
-if (Env.isLive() && !targetId.toString().equals(req.readString("confirmUserId"))) {
+if (Env.isLive() && !String.valueOf(targetId).equals(req.readString("confirmUserId"))) {
     return ErrorCode.CONFIRM_REQUIRED;
 }
 ```

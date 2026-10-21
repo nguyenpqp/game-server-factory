@@ -84,6 +84,7 @@ Do:
 
 ```java
 String lock = "{pay:" + txId + "}:lock";
+// LOCK_TTL outlasts the provider's longest retry window.
 if (!RedisOps.setNx(lock, traceId, LOCK_TTL)) {
     return alreadyHandled(txId);
 }
