@@ -1,0 +1,13 @@
+{
+  "name": "game-server-factory",
+  "owner": {
+    "name": "nguyenpqp"
+  },
+  "plugins": [
+    {
+      "name": "game-server",
+      "source": "./plugins/game-server",
+      "description": "Skills that turn a GDD or a feature prompt into multi-node, blue-green-safe Java game server code with unit tests and metric logs."
+    }
+  ]
+}

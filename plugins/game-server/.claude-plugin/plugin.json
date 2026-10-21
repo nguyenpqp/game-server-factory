@@ -1,0 +1,9 @@
+{
+  "name": "game-server",
+  "description": "Rulebook, profile, intake, spec, build, and review skills for Java game server features that run on many nodes, survive blue-green deploys, and keep old clients working.",
+  "author": {
+    "name": "nguyenpqp"
+  },
+  "license": "MIT",
+  "keywords": ["game-server", "java", "multi-node", "blue-green", "gdd", "metrics"]
+}
