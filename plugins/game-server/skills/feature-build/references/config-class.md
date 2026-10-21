@@ -1,0 +1,111 @@
+# Config class
+
+Each feature reads its balance from its own JSON file (CFG-01). The config class loads the file, validates it, and publishes one immutable snapshot. A command reads the snapshot once and uses it from start to end (CFG-03).
+
+The real loader, the config directory, the JSON parser, and the reload hook come from the profile's CAP-CONFIG entry. Environment values, such as secrets and allowlists, come from CAP-ENV.
+
+## The class
+
+```java
+public final class EventShopConfig {
+    static final String FILE = "event-shop.json";
+
+    private static volatile EventShopConfig current;
+
+    private final boolean isActive;
+    private final long startMs;
+    private final long endMs;
+    private final ClientVersion minClientVersion;
+    private final Map<String, ShopItem> itemsById;
+
+    private EventShopConfig(RawEventShop raw, Map<String, ShopItem> itemsById) {
+        this.isActive = raw.isActive;
+        this.startMs = raw.startMs;
+        this.endMs = raw.endMs;
+        this.minClientVersion = ClientVersion.parse(raw.minClientVersion);
+        this.itemsById = Map.copyOf(itemsById);
+    }
+
+    public static EventShopConfig current() {
+        return current;
+    }
+
+    public static void load(FeatureConfig loader) {
+        current = parse(loader.read(FILE));
+    }
+
+    static EventShopConfig parse(String json) {
+        RawEventShop raw = FeatureConfig.fromJson(json, RawEventShop.class);
+        return validate(raw);
+    }
+
+    static void setForTest(EventShopConfig cfg) {
+        current = cfg;
+    }
+
+    public boolean isActive(long now) {
+        return isActive && now >= startMs && now < endMs;
+    }
+
+    public ShopItem item(String id) {
+        return itemsById.get(id);
+    }
+
+    public ClientVersion minClientVersion() {
+        return minClientVersion;
+    }
+}
+```
+
+- `current` is the only mutable static field in the feature (MN-01). `load` builds a whole new snapshot and swaps the reference once, so a reload never leaves a half-built config visible.
+- Every field is `final`, and every collection is a copy made with `Map.copyOf` or `List.copyOf`. Nothing hands out a mutable view.
+- `isActive(now)` combines the `isActive` flag with the time window, against the `now` that the command passed in (CFG-04, AUTH-06). A feature with no window drops `startMs` and `endMs`.
+- `item(id)` is a map read from an index built at load (PERF-05). Stored data and client packets name entries by this stable id, never by list position (CFG-06).
+- Balance numbers, such as prices, limits, rewards, and durations, are keys in the file (CFG-05).
+- `setForTest` lets a unit test install a config. The test restores the previous value afterward (TEST-11). Keep it package-private.
+
+## The raw form and validation
+
+```java
+static final class RawEventShop {
+    boolean isActive;
+    long startMs;
+    long endMs;
+    String minClientVersion = "0.0.0";
+    List<RawShopItem> items;
+}
+
+static EventShopConfig validate(RawEventShop raw) {
+    if (raw.endMs <= raw.startMs)
+        throw new ConfigException(FILE, "endMs", "must be after startMs");
+    if (raw.items == null || raw.items.isEmpty())
+        throw new ConfigException(FILE, "items", "must not be empty");
+    Map<String, ShopItem> byId = new HashMap<>();
+    for (RawShopItem it : raw.items) {
+        String key = "items[" + it.id + "]";
+        if (it.id == null || it.id.isBlank())
+            throw new ConfigException(FILE, "items[].id", "must not be blank");
+        if (byId.containsKey(it.id))
+            throw new ConfigException(FILE, key, "duplicate id");
+        if (it.dailyLimit < 1)
+            throw new ConfigException(FILE, key + ".dailyLimit", "must be 1 or more");
+        if (it.maxPerBuy < 1 || it.maxPerBuy > it.dailyLimit)
+            throw new ConfigException(FILE, key + ".maxPerBuy", "must be 1 to dailyLimit");
+        if (!ItemCatalog.isKnown(it.rewardItemId))
+            throw new ConfigException(FILE, key + ".rewardItemId", "unknown item " + it.rewardItemId);
+        byId.put(it.id, ShopItem.from(it));
+    }
+    return new EventShopConfig(raw, byId);
+}
+```
+
+- Validation runs at load and at reload, never on the first command. A bad file fails startup or the reload, and the message names the file and the key (CFG-02). A failed reload keeps the old snapshot.
+- Each check matches a row of the spec's Config schema. Each `Validation` cell becomes one `if`, and each `Index built at load` cell becomes one map.
+- Check every referenced id against the catalog it points into, such as item ids, so a typo fails at load.
+- The JSON parser ignores keys it does not know, so an old server reads a file that has a newer key (BG-08). A key that the new version adds is optional, and its default lives on the raw field, like `minClientVersion` above. When the project's parser fails on unknown keys, CAP-CONFIG is `partial`, and the slice stops at gate 3.
+- A key never changes meaning. A new meaning gets a new key (BG-08).
+- Secrets, allowlists, and endpoints do not go in this file. Read them from the environment config that CAP-ENV names (CFG-07).
+
+## Registration
+
+Call `load` where the profile's CAP-CONFIG entry loads feature configs at startup, and in its reload hook when the project has one. When the project has no reload, a config change needs a restart, and the snapshot shape still holds.
