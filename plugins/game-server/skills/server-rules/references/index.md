@@ -178,7 +178,7 @@ An id is a group name, a hyphen, and a two-digit number. Numbers run from `01` i
 - severity: critical
 - needs: CAP-DRAIN, CAP-OWNERSHIP, CAP-USERSTORE
 
-### BG-11 A node that meets an inbox entry or cross-node message of a type it does not know leaves it unchanged in the user's inbox, so a newer version applies it later.
+### BG-11 A node that meets an inbox entry or cross-node message of a type it does not know puts or leaves it unchanged in the user's inbox, so a newer version applies it later.
 
 - severity: critical
 - needs: CAP-INBOX, CAP-CROSSNODE
