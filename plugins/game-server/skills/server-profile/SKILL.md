@@ -41,7 +41,7 @@ Field rules.
 - `blocker` names the rule ids that cannot be met and says what fails for players or operators. Take the ids from the `needs:` lines of the rule index.
 - `proposal` is the smallest core change that would make the capability `present`. Name the class to add or extend and the behavior it must have. Do not design a rewrite.
 
-Judge by what the code does, not by what its name suggests. A class called a lease that never renews is not a lease. When you cannot tell, read the call sites. When you still cannot tell, mark the capability `partial` and say what you could not confirm in the `blocker`.
+Judge by what the code does, not by what its name suggests. A class called a lease that never renews is not a lease. When you cannot tell, read the call sites. When you still cannot tell, mark the capability `partial`. In the `blocker`, name the rule ids that the unconfirmed part would break and say what you could not confirm.
 
 ## Check
 
