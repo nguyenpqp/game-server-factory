@@ -137,7 +137,7 @@ Each rule's reason, Java do and don't, and review check are in [blue-green.md](b
 ### BG-01 Stored data in Couchbase and Redis changes only by added fields and keys, never by a removed, renamed, or retyped one.
 
 - severity: critical
-- needs: CAP-USERSTORE, CAP-REDIS
+- needs: CAP-USERSTORE
 
 ### BG-02 Loading and saving a document keeps every field that the running server version does not know.
 

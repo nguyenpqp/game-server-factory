@@ -6,8 +6,10 @@ Usage: check_profile.py [--blocked-rules] <profile.md>
 Prints `path:line: message` for each failure and exits 1 if any failure exists.
 The required frontmatter keys and capability headings are read from
 `references/profile-template.md` next to this script, so the template is the
-single source. `lint.command_method` is optional. With `--blocked-rules`, a clean profile also prints, for each
-capability that is not present, the rule ids from the rule index that need it.
+single source. `lint.command_method` is optional. With `--blocked-rules`, a clean
+profile also prints, for each capability that is not present, the rule ids it
+blocks: for a missing capability, every rule in the rule index whose `needs` line
+names it, and for a partial one, the rule ids on its `blocker` line.
 """
 import argparse
 import re
@@ -30,7 +32,8 @@ FENCE = re.compile(r"^\s*(```|~~~)")
 CAP_HEADING = re.compile(r"^###\s+(CAP-[A-Z]+)\b")
 ANY_HEADING = re.compile(r"^#{1,6}\s")
 FIELD_LINE = re.compile(r"^-\s+(\w+):\s*(.*)$")
-RULE_HEADING = re.compile(r"^###\s+((?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST)-\d{2})\b")
+RULE_ID = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST)-\d{2}\b")
+RULE_HEADING = re.compile(r"^###\s+(" + RULE_ID.pattern + ")")
 KEY_LINE = re.compile(r"^(\s*)([A-Za-z_]\w*):(.*)$")
 
 
@@ -115,11 +118,11 @@ def check_section(path, cap, heading_line, body, has_fence):
 
     if "status" not in fields:
         fail(f"{cap} has no status line (use present, partial, or missing)")
-        return findings, None
+        return findings, None, fields
     status = fields["status"].strip("`")
     if status not in STATUSES:
         fail(f"{cap} has invalid status '{status}' (use present, partial, or missing)", status_line)
-        return findings, None
+        return findings, None, fields
     required = {
         "present": FIELDS_WHEN_PRESENT,
         "partial": FIELDS_WHEN_PRESENT + FIELDS_WHEN_NOT_PRESENT,
@@ -129,7 +132,7 @@ def check_section(path, cap, heading_line, body, has_fence):
         filled = has_fence if field == "snippet" and "snippet" in fields else bool(fields.get(field))
         if not filled:
             fail(f"{cap} is {status} and needs {'an' if field == 'api' else 'a'} {field}")
-    return findings, status
+    return findings, status, fields
 
 
 def check_profile(path, template=TEMPLATE):
@@ -137,7 +140,7 @@ def check_profile(path, template=TEMPLATE):
     try:
         lines = Path(path).read_text(encoding="utf-8").splitlines()
     except FileNotFoundError:
-        return [Finding(path, 1, "file not found")], {}
+        return [Finding(path, 1, "file not found")], {}, {}
     findings = []
     block = split_frontmatter(lines)
     if block is None:
@@ -150,20 +153,21 @@ def check_profile(path, template=TEMPLATE):
             if key not in present
         ]
     sections = capability_sections(lines)
-    statuses = {}
+    statuses, blockers = {}, {}
     for cap in required_caps:
         if cap not in sections:
             findings.append(Finding(path, 1, f"missing capability heading {cap}"))
             continue
         heading_line, body, fence = sections[cap]
-        section_findings, status = check_section(path, cap, heading_line, body, fence[0])
+        section_findings, status, fields = check_section(path, cap, heading_line, body, fence[0])
         findings += section_findings
         if status:
             statuses[cap] = status
-    return findings, statuses
+            blockers[cap] = fields.get("blocker", "")
+    return findings, statuses, blockers
 
 
-def blocked_rules(statuses, index=RULE_INDEX):
+def blocked_rules(statuses, blockers, index=RULE_INDEX):
     needs, rule = {}, None
     for line in Path(index).read_text(encoding="utf-8").splitlines():
         heading = RULE_HEADING.match(line)
@@ -172,7 +176,13 @@ def blocked_rules(statuses, index=RULE_INDEX):
         elif rule and line.startswith("- needs:"):
             for cap in re.findall(r"CAP-[A-Z]+", line):
                 needs.setdefault(cap, []).append(rule)
-    return {cap: needs.get(cap, []) for cap, status in statuses.items() if status != "present"}
+    blocked = {}
+    for cap, status in statuses.items():
+        if status == "missing":
+            blocked[cap] = needs.get(cap, [])
+        elif status == "partial":
+            blocked[cap] = list(dict.fromkeys(RULE_ID.findall(blockers.get(cap, ""))))
+    return blocked
 
 
 def main(argv=None):
@@ -180,13 +190,13 @@ def main(argv=None):
     parser.add_argument("profile")
     parser.add_argument("--blocked-rules", action="store_true")
     args = parser.parse_args(argv)
-    findings, statuses = check_profile(args.profile)
+    findings, statuses, blockers = check_profile(args.profile)
     for finding in findings:
         print(f"{finding.path}:{finding.line}: {finding.message}")
     if findings:
         return 1
     if args.blocked_rules:
-        for cap, rules in blocked_rules(statuses).items():
+        for cap, rules in blocked_rules(statuses, blockers).items():
             print(f"{cap} ({statuses[cap]}): {', '.join(rules) if rules else 'none'}")
     return 0
 

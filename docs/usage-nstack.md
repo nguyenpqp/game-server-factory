@@ -74,7 +74,7 @@ developer. If the spec hits a stop (a core blocker or an open Blocker question),
 write what you have, set the status, and return the stop and its questions to me.
 ```
 
-The skill fills all fourteen sections of the spec and cites a rule id on every row. If Core blockers has a row that blocks, the spec is `blocked`, and the delegate returns the row with the smallest core change. The coordinator brings it to you. You pick a resolution for each row (the core changes, the requirement is descoped, or you accept the risk by name). An accepted resolution on a critical rule still blocks the spec.
+The skill fills all fourteen sections of the spec and cites a rule id on every row. If Core blockers has a row that blocks, the spec is `blocked`, and the delegate returns the row with the smallest core change. The coordinator brings it to you. You pick a resolution for each row (the core changes, the requirement is descoped, or you accept the risk by name). You may accept a critical rule too, but the reason must state the deployment fact that makes the risk acceptable, such as "one node per realm". The spec header lists every accepted critical rule, and the feature-build report repeats them.
 
 The coordinator then shows you the spec as part of the Interview confirmation. When you confirm, the spec status becomes `ready`. Commit the spec.
 
@@ -117,7 +117,7 @@ Build only T05. Write only inside its Writes. Write the failing test first.
 End every commit message with the line "Ticket: 05".
 ```
 
-`feature-build` checks its gates before any code. The spec must be `ready`, every capability the slice uses must be `present` in the profile or have a resolved blocker row, and the command ids must exist in the generated files. If a gate fails, the delegate stops and reports it. If the generated ids are missing, the ids ticket (T01 in the worked example) is the one that adds them.
+`feature-build` checks its gates before any code. The spec must be `ready`, every capability the slice uses must be `present` in the profile or have a resolved blocker row, and the command ids must exist in the generated files. If a gate fails, the delegate stops and reports it. If the generated ids are missing, the ids ticket (T01 in the worked example) is the one that adds them. It edits the generator source, runs the regenerate command from the profile's CAP-GENERATED entry, and reads the generated files back. No ticket edits a generated file by hand.
 
 The check after each slice is the ticket's Verify, which is the profile's `test_one_cmd`. If the build tool (such as `gradle` or `mvn`) is not on the machine, the delegate still writes the tests and the code, and reports every check as unrun with the line "code not compiled". The coordinator treats an unrun check as unrun and never as green. On a machine with no JDK, the whole build lands that way, and the compile and test run happens later on a machine that has the tool.
 
@@ -146,6 +146,6 @@ Nstack's built-in `/code-review` still runs over the branch. It checks general c
 
 ## Notes
 
-- The profile, design, and spec are plain files in the target repository. If you change the core, rerun `server-profile`. `feature-build` compares the profile version with the one named in the spec header and stops on a mismatch.
+- The profile, design, and spec are plain files in the target repository. After a core change, rerun `server-profile`, then rerun feature-spec's Core blockers step on every spec not yet built. `profile_version` is the profile template's version, so it does not catch a core change.
 - Only the main session can ask you questions. A delegate that hits a stop returns it, and the coordinator asks.
 - If you skip nstack for a feature, the same files drive [a plain Claude Code chat](usage-plain.md).

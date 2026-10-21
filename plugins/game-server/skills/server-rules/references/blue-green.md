@@ -26,7 +26,7 @@ class GardenState {
 
 **Check.** Diff each stored class and Redis key layout. Any removed, renamed, or retyped field or key is a finding.
 
-- needs: CAP-USERSTORE, CAP-REDIS
+- needs: CAP-USERSTORE
 
 ### BG-02 Loading and saving a document keeps every field that the running server version does not know.
 

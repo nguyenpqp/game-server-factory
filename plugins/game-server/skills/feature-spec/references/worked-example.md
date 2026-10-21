@@ -41,11 +41,12 @@ The first draft cited BG-06 and BG-07, whose `needs:` line names CAP-CLIENTVER. 
 
 - Design: `docs/game-server/features/login-streak/design.md`
 - Profile: `docs/game-server/profile.md`, profile_version 1
-- Package: `src/main/java/com/example/game/feature/streak`
+- Package: `com.example.game.feature.streak`
 - Command ids: 4200 to 4299
 - Minimum client for the feature: 1.4.0
 - Status: ready
 - Open design questions: None. Q1 is answered, and TM1 and EC1 use the answer.
+- Accepted risks: None.
 
 ## Commands
 

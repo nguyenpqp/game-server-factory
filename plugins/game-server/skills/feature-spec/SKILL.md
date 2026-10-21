@@ -32,7 +32,7 @@ Write the file top to bottom in the template's section order, with status `draft
 
 ### Header
 
-Take the command id block from the profile's CAP-COMMAND entry, one block per feature. The package goes under the profile's `feature_root`. The minimum client is the first client version that ships the feature.
+Take the command id block from the profile's CAP-COMMAND entry, one block per feature. The package is a Java package, such as `com.example.game.feature.streak`. Its directory is the profile's `feature_root` plus the package's last segment. The minimum client is the first client version that ships the feature.
 
 ### 1. Commands
 
@@ -96,7 +96,9 @@ Run the four steps in the template. In step 1, leave out a rule that the spec ci
 
 For each blocking row, cut the profile entry's `proposal` down to what this feature needs. Write the players' failure in one sentence.
 
-When any row has resolution `open`, or an `accepted` resolution on a `critical` rule:
+A `critical` rule may be accepted only with a reason that states the deployment fact that makes the risk acceptable, such as "one node per realm". Without that fact the row counts as `open`. List each accepted critical rule id with its reason on the header's `Accepted risks` line. Write `None.` there when there is none.
+
+When any row counts as `open`:
 
 1. Set the header to `Status: blocked`.
 2. Leave sections 13 and 14 under their headings with the line `Not written while Core blockers has an open row.`

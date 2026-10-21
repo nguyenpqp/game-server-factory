@@ -22,9 +22,9 @@ Rule ids refer to the [rule index](../server-rules/references/index.md).
 Check these in order. Each failed gate stops the skill with a report to the developer.
 
 1. The spec header's `Status` is `ready`. On `blocked`, refuse to start, and quote the Core blockers rows that block. On `draft`, ask the developer to finish and confirm the spec first.
-2. The profile's `profile_version` matches the version that the spec header names. When they differ, list the capability entries that changed and ask whether the spec still holds.
-3. Every capability that the slice uses is `present` in the profile, or its Core blockers row has the resolution `core changed`, `descoped`, or `accepted by <name>: <reason>`. Find the capabilities from the `needs` lines of the rules that the slice's spec rows cite. A capability that is `partial` or `missing` with no resolved row stops the build. Report the rule ids blocked, the profile entry's `blocker` and `proposal`, and the spec rows that need it. Never work around a missing capability in feature code.
-4. Every command id, push id, error code, and wire key that the slice needs exists in the generated files. When one is missing, stop and name the change from the profile's CAP-GENERATED entry, which gives the generator source to edit, the ids to add, and the regenerate command. Never write into a path under `generated_paths` (CFG-08).
+2. The profile's `profile_version` matches the template version that the spec header names. The version is the profile template's version only, so it does not change when a capability entry changes. When they differ, stop and ask the developer to rerun `server-profile` and then feature-spec's Core blockers step on the spec.
+3. Every capability that the slice uses is `present` in the profile, or its Core blockers row has the resolution `core changed`, `descoped`, or `accepted by <name>: <reason>`. Find the capabilities from the `needs` lines of the rules that the slice's spec rows cite. A `missing` capability blocks every rule whose `needs` line names it. A `partial` capability blocks only the rule ids on its profile `blocker` line. A blocked rule with no resolved row stops the build. A `critical` rule accepted with no deployment fact in the reason counts as `open`. Report the rule ids blocked, the profile entry's `blocker` and `proposal`, and the spec rows that need it. Never work around a missing capability in feature code.
+4. Every command id, push id, error code, and wire key that the slice needs exists in the generated files. A slice whose Writes name the generator source is the ids slice. It adds the missing ids itself: it edits that source, runs the regenerate command from CAP-GENERATED, and reads the generated files back. Any other slice stops when an id is missing, and names the change from the profile's CAP-GENERATED entry, which gives the generator source to edit, the ids to add, and the regenerate command. No slice hand-edits a file under `generated_paths` (CFG-08).
 
 ## Translate the patterns into the project
 
@@ -51,7 +51,7 @@ The references write Java with generic names. Before using a pattern, replace ea
 | `HttpEndpoint` | CAP-HTTP |
 | Test fixtures | CAP-UNITTEST |
 
-Put production code under the profile's `feature_root`, in the package that the spec header names. Put tests under `test_root`, in the same package.
+Put production code in the Java package that the spec header names. Its directory is the profile's `feature_root` plus the package's last segment. Put tests under `test_root`, in the same package.
 
 ## The slice loop
 
@@ -66,10 +66,11 @@ Run these steps for each slice, in order.
    - Cheat commands use [cheat commands](references/cheat-commands.md).
    - Admin commands use [admin commands](references/admin-commands.md).
    - An HTTP endpoint uses [HTTP callbacks](references/http-callbacks.md).
+   - The ids slice changes ids only through the generator, as gate 4 says.
 4. Wire registration in the places that the profile names. Register the command handler where CAP-COMMAND says. Register the cheat handler only when the server is not live (CHEAT-01). Load the config at startup and in the reload hook from CAP-CONFIG. Register each inbox entry type with CAP-INBOX. Add each per-user admin command to the routing that sends it to the target user's owner (ADMIN-02). A command that is coded but not registered fails no unit test, so read the registration code back after the edit.
 5. Add the metric calls that the spec's Metric events section lists. Every action row, currency or item reason, and extra field matches the spec by name. Every row carries the action's trace id (MET-01, MET-02, MET-03, MET-04, MET-07).
 6. Run `test_one_cmd` from the profile once per test class of the slice, with `{class}` replaced by the fully qualified class name. Fix the code until every class passes. Do not weaken a test to make it pass.
-7. Check the new files against the profile's `lint` keys. None contains a match for `lint.forbidden_time`, `lint.forbidden_random`, or `lint.blocking_calls`. Each command class contains `lint.metric_call` and `lint.trace_id_call`. A command class is a class under `feature_root` that declares a method whose name matches `lint.command_method`, or `handle\w*` when the profile has no such key. Each cheat class contains `lint.cheat_marker` and `lint.env_live_check`. A key with an empty value skips its check.
+7. Check the new files against the profile's `lint` keys. None contains a match for `lint.forbidden_time`, `lint.forbidden_random`, or `lint.blocking_calls`. Each command class contains `lint.metric_call` and `lint.trace_id_call`. A command class is a class under `feature_root` that declares a method whose name matches `lint.command_method`, or `handle\w*` when the profile has no such key. Each cheat class contains `lint.cheat_marker` and `lint.env_live_check`. A key with an empty value skips its check. A `lint.blocking_calls` match inside an HTTP endpoint class, a class built on the profile's CAP-HTTP endpoint API, is expected, because that class runs on an HTTP worker thread. Keep it, and list it under Lint self-check as kept.
 8. Report the slice. Hand the diff to `feature-review` when the developer or the workflow asks for a review.
 
 ### When the build tool is missing
@@ -87,8 +88,9 @@ End each slice with this report. Write `none` for an empty part.
 - Files: <every file added or changed>
 - Tests: <each test class and its cases>
 - Check: <each test_one_cmd as run> passed | failed with <failing cases> | NOT RUN, <tool> not found
-- Lint self-check: clean | <file:line and the matched key>
+- Lint self-check: clean | <file:line and the matched key, or `kept` for a blocking call in an HTTP endpoint class>
 - Rules: <the rule ids the slice implements>
+- Accepted risks: <the spec header's Accepted risks line>
 - Stopped on: <the failed gate, with the blocker or the generator change the developer must make>
 - Follow-ups: <work outside the slice, such as a spec row that contradicts the profile>
 ```

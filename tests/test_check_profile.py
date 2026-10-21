@@ -121,6 +121,12 @@ class CheckProfileTest(unittest.TestCase):
         self.assertRegex(by_cap["CAP-LEASE"], r"^CAP-LEASE \(missing\): .*\bMN-07\b")
         self.assertRegex(by_cap["CAP-BOT"], r"^CAP-BOT \(partial\): .*\bTEST-\d\d\b")
 
+    def test_partial_blocks_only_the_rules_on_its_blocker_line(self):
+        code, out, _ = run("--blocked-rules", FIXTURES / "valid.md")
+        self.assertEqual(code, 0, out)
+        self.assertIn("CAP-CLIENTVER (partial): BG-07", out)
+        self.assertIn("CAP-DRAIN (missing): BG-10", out)
+
     def test_blocked_rules_is_silent_when_the_profile_fails(self):
         code, out, _ = run("--blocked-rules", FIXTURES / "missing-key.md")
         self.assertEqual(code, 1)

@@ -92,7 +92,7 @@ public final class ShopPaymentCallback implements HttpEndpoint {
 - The status answers the caller's retry question (HTTP-08). Delivered and duplicate answer 200. A bad payload answers 400. A bad signature answers 401. A forbidden caller answers 403. An in-flight duplicate, a failed append, or an exception answers 503, so the caller retries.
 - The metric row holds the transaction id, the user id, the result, and the trace id (HTTP-07). It never holds the secret, the signature, the raw body, or payment credentials (MET-09).
 - `ServerClock.now()` here is node time with no user offset, because no user session exists yet.
-- The handler runs on an HTTP worker thread, not on a user actor. The Redis and inbox calls are I/O, and they must not run on any user actor thread (PERF-01).
+- The handler runs on an HTTP worker thread, not on a user actor. The Redis and inbox calls are I/O, and they must not run on any user actor thread (PERF-01). A `lint.blocking_calls` match in this class is expected. Keep it, and report it under Lint self-check as kept.
 
 ## The inbox entry
 

@@ -106,7 +106,7 @@ The status follows from the "Must provide" list under each capability:
 - `partial` means the project provides some items. `blocker` and `proposal` cover the missing items.
 - `missing` means the project provides none of the items.
 
-To find the rules that a missing capability blocks, take every rule in the rule index whose `needs` line lists that capability id.
+To find the rules that a missing capability blocks, take every rule in the rule index whose `needs` line lists that capability id. A partial capability blocks only the rule ids on its `blocker` line.
 
 An entry for a present capability, under its heading `### CAP-CLOCK Server time`:
 

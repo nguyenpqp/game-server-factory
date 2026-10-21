@@ -24,7 +24,7 @@ A command is composite when it has a cost or a grant, plus idempotency or pushes
 Shared shapes come first, because every later slice reads them.
 
 1. **Shared shapes.** These slices block on nothing and build in parallel.
-   - Ids and wire keys. Command ids, push ids, error codes, and request and response keys, changed through the generator that the profile's CAP-GENERATED entry names. Generated files never change by hand (CFG-08).
+   - Ids and wire keys. Command ids, push ids, error codes, and request and response keys, changed through the generator that the profile's CAP-GENERATED entry names. This is the ids slice. `feature-build` edits the generator source, runs the regenerate command, and reads the generated files back. Generated files never change by hand (CFG-08).
    - State model. Each stored document with its defaults, bounds, schema version, and migration, plus the domain methods that cheats and admin commands call, such as a `restore` method. Its compatibility tests ship with it.
    - Config schema. The config class with its load, validation, indexes, and immutable snapshot, plus its validation tests.
 2. **Commands.** One slice per command, or three for a composite command, in the order of the spec's Commands section. A command slice is blocked by the shared shapes it reads. Pushes ship with the command that triggers them.
@@ -41,9 +41,9 @@ The tickets file follows the Spec build playbook. It starts with the spec path, 
 
 - **Builds.** What the slice makes work, from the player's or the developer's side, naming the spec rows it builds.
 - **Blocked by.** The ticket numbers that gate it, or `None`.
-- **Writes.** The paths or globs the slice may write. Feature code goes under `feature_root`, tests under `test_root`. A generator slice lists the generator source and the files in `generated_paths` that the generator rewrites.
+- **Writes.** The paths or globs the slice may write. Feature code goes under `feature_root`, tests under `test_root`. The ids slice lists the generator source and the files in `generated_paths` that the generator rewrites.
 - **Acceptance.** One checkable line per spec row the slice builds, with the spec row's rule ids. Add one line per Test plan case the slice must pass, naming the class and the case.
-- **Verify.** One exact command. Take the profile's `test_one_cmd`, put each test class's fully qualified name in `{class}`, and join the commands with `&&`. A slice with no test class uses `build_cmd`. A generator slice runs the regenerate command from CAP-GENERATED, then `build_cmd`. Mark the command `root-only` when it needs a database, a metric store, or credentials that a worktree lacks.
+- **Verify.** One exact command. Take the profile's `test_one_cmd`, put each test class's fully qualified name in `{class}`, and join the commands with `&&`. A slice with no test class uses `build_cmd`. The ids slice runs the regenerate command from CAP-GENERATED, then `build_cmd`. Mark the command `root-only` when it needs a database, a metric store, or credentials that a worktree lacks.
 
 Each delegate brief names the absolute paths of the `feature-build` and `server-rules` skill files, the spec, and the profile. The implementer writes tests first, runs Verify, and reports Verify as unrun when the build tool is missing on the machine. The branch review runs `feature-review` once after every ticket lands.
 

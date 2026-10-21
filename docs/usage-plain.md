@@ -57,7 +57,7 @@ Use feature-spec to write the server spec for daily-streak from its design.md.
 
 The skill needs the profile, so it stops and points you to `server-profile` if the file is missing. It writes `docs/game-server/features/daily-streak/spec.md` section by section. Each row cites rule ids from the rulebook, and each row from the design cites a design id. The spec covers commands, pushes, state, config, metrics, cheats, admin commands, HTTP endpoints, the multi-node analysis, the blue-green and old-client matrix, the performance budget, and the test plan.
 
-If Core blockers has a row that blocks, the skill sets the status to `blocked` and stops. The row names the capability, the rules it breaks, the players' failure, and the smallest core change. Choose a resolution for each row. You can change the core, descope what depends on it, or accept the risk by name. An accepted resolution on a critical rule still blocks the spec. Tell the skill your choice, and it finishes the remaining sections.
+If Core blockers has a row that blocks, the skill sets the status to `blocked` and stops. The row names the capability, the rules it breaks, the players' failure, and the smallest core change. Choose a resolution for each row. You can change the core, descope what depends on it, or accept the risk by name. You may accept a critical rule too, but the reason must state the deployment fact that makes the risk acceptable, such as "one node per realm". The spec header lists every accepted critical rule, and the feature-build report repeats them. Tell the skill your choice, and it finishes the remaining sections.
 
 Read the finished spec, ask for fixes in plain words, and confirm it. The status then becomes `ready`. Commit the spec.
 
@@ -110,6 +110,6 @@ Use feature-build to fix finding 2 of the review above, then rerun feature-revie
 
 ## Keep the files current
 
-- The profile, design, and spec are plain files in your repository. When the core changes, rerun `server-profile`. `feature-build` compares the profile version with the one in the spec header and stops on a mismatch.
+- The profile, design, and spec are plain files in your repository. After a core change, rerun `server-profile`, then rerun feature-spec's Core blockers step on every spec not yet built. `profile_version` is the profile template's version, so it does not catch a core change.
 - When a design rule changes, edit `design.md`, rerun the lint, and ask `feature-spec` to update the spec rows that cite the changed ids.
 - `server-rules` loads on its own when a skill needs a rule. To read one yourself, ask for it by id, such as the rule index at `plugins/game-server/skills/server-rules/references/index.md`.

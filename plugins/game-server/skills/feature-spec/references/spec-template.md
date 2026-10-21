@@ -51,12 +51,15 @@ The formats below use the daily login streak from the design template as their e
 
 - Design: `docs/game-server/features/login-streak/design.md`
 - Profile: `docs/game-server/profile.md`, profile_version 1
-- Package: `src/main/java/com/example/game/feature/streak`
+- Package: `com.example.game.feature.streak`
 - Command ids: 4200 to 4299
 - Minimum client for the feature: 1.4.0
 - Status: draft
-- Open design questions: Q1, with the interim default "the server day"
+- Open design questions: Q1, skipped by <name> on <date>, with the interim default "the server day"
+- Accepted risks: None.
 ```
+
+`Package` is a Java package. Its directory is the profile's `feature_root` plus the package's last segment. `profile_version` is the version of the profile template that the profile follows. `Accepted risks` lists each `critical` rule id that a Core blockers row accepts, with its reason. It says `None.` when there is none.
 
 When the input is a prompt instead of a design, `Design` says `prompt`, and the prompt follows the header as a quote. The spec then gives the requirements it reads from the prompt their own ids, in the design template's id format.
 
@@ -385,10 +388,10 @@ The section states the peak load and one row per command and push. Calls per sec
 
 The section lists every capability that a cited rule needs and that the profile does not show as `present`. Build the list in four steps.
 
-1. Collect every rule id that the spec cites.
+1. Collect every rule id that the spec cites. Leave out a rule that the spec cites only on a fixed Multi-node or Blue-green row that says the feature has nothing of that kind, such as "The feature has no job" under MN-07.
 2. Read each rule's `needs:` line in the rule index.
 3. Read each needed capability's status in the profile.
-4. Write one row per capability whose status is `partial` or `missing`.
+4. Write one row per capability that blocks a collected rule. A `missing` capability blocks every rule whose `needs:` line names it. A `partial` capability blocks only the rule ids on its profile `blocker` line. `Rules blocked` lists the collected rules that the capability blocks.
 
 The smallest core change comes from the profile entry's `proposal`, cut down to what this feature needs.
 
@@ -407,11 +410,11 @@ The `Resolution` cell holds one value.
 | `open` | The row waits for the developer. | yes |
 | `core changed` | The developer changed the core, and the profile now shows the capability as `present`. | no |
 | `descoped` | The developer removed the feature parts that need the capability. The row names the design ids dropped. | no |
-| `accepted by <name>: <reason>` | The developer accepts the risk. This value is valid only when every rule blocked is `important` or `minor`. Otherwise the row counts as `open`. | no |
+| `accepted by <name>: <reason>` | The developer accepts the risk. The value is valid for any severity. When a rule blocked is `critical`, the reason states the deployment fact that makes the risk acceptable, such as "one node per realm", and the header's `Accepted risks` line lists the rule. A critical acceptance without that fact counts as `open`. | no |
 
 While any row blocks, the spec status is `blocked`. The skill that writes the spec stops and gives this section to the developer, and `feature-build` does not start. Only the developer sets a resolution. Feature code never works around a missing capability.
 
-When every needed capability is `present`, the section says `None.` and names the profile version it checked.
+A resolved row stays in the table with its resolution. The section says `None.` only when no row was ever needed, and then names the profile version it checked.
 
 ### Test plan
 

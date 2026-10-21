@@ -27,7 +27,7 @@ This skill holds rules and nothing else. It does not scan a project, write a spe
 
 1. Open [the rule index](references/index.md). It lists every id with its one-line rule, its severity, and the capability ids it needs.
 2. Open the group file for that id and read its section. The section gives a one-line reason, a Java do and don't, how a reviewer checks it, and the same `needs` line.
-3. Check the profile for each capability on the `needs` line. A capability marked `missing` blocks the rule. A `partial` one blocks the rules that its `blocker` line names. Report the blocker and the profile's proposal instead of writing a workaround.
+3. Check the profile for each capability on the `needs` line. A capability marked `missing` blocks every rule whose `needs` line names it. A `partial` one blocks only the rule ids on its `blocker` line. Report the blocker and the profile's proposal instead of writing a workaround.
 
 When designing a feature, read every group that the feature touches. When reviewing, report each finding with its severity, rule id, `file:line`, and a concrete failure scenario.
 
