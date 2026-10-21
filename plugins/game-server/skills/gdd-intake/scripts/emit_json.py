@@ -39,7 +39,6 @@ class DesignError(Exception):
     pass
 
 
-# ---------------------------------------------------------------- reading the design
 
 def split_row(text):
     cells = re.split(r"(?<!\\)\|", text.strip())
@@ -51,7 +50,6 @@ def split_row(text):
 
 
 def section_lines(text):
-    """Split the design into heading blocks: level, title, and the lines under each heading."""
     blocks, current, fenced = [], None, False
     for raw in text.splitlines():
         if raw.lstrip().startswith(("```", "~~~")):
@@ -73,7 +71,6 @@ def table_rows(lines):
 
 
 def source_files(blocks):
-    """Map a source id such as S2 to the file name in the Sources table."""
     files = {}
     for block in blocks:
         if block["level"] == 2 and block["title"] == "Sources":
@@ -87,7 +84,6 @@ def source_files(blocks):
 
 
 def config_entries(blocks):
-    """Return one dict per `### file.json` entry under the Config tables section."""
     entries, inside = [], False
     for block in blocks:
         if block["level"] == 2:
@@ -103,7 +99,6 @@ def config_entries(blocks):
     return entries
 
 
-# ---------------------------------------------------------------- sheet values
 
 class Sheets:
     def __init__(self, work_dir):
@@ -135,10 +130,6 @@ def column_number(letters):
 
 
 def sheet_values(source, files, sheets, shape, warn, label):
-    """Return the strings that a Source cell points at, or None.
-
-    shape is "cell" for a plain key and "column" for a list key.
-    """
     for item in SPLIT_CITATIONS.split(source.strip().rstrip(".")):
         match = SHEET_CITATION.fullmatch(item.strip())
         if not match:
@@ -159,7 +150,6 @@ def sheet_values(source, files, sheets, shape, warn, label):
     return None
 
 
-# ---------------------------------------------------------------- building the draft
 
 class Node:
     def __init__(self, kind):

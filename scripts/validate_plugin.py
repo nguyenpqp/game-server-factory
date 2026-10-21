@@ -29,7 +29,6 @@ CAP_ID = re.compile(r"\bCAP-[A-Z]+\b")
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 INLINE_CODE = re.compile(r"`([^`\n]+)`")
 CHECKED_PREFIXES = ("references/", "scripts/", "prompts/", "../")
-# Placeholders and globs name no single file, so they cannot resolve.
 PLACEHOLDER_CHARS = "<>{}*"
 SCHEME = re.compile(r"[a-z][a-z0-9+.-]*:", re.IGNORECASE)
 HOME_PATH = re.compile(r"/(?:Users|home)/[\w.-]+/")
@@ -41,7 +40,6 @@ def relative(root, path):
 
 
 def load_json(root, rel):
-    """Return (object or None, findings)."""
     path = root / rel
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -98,10 +96,6 @@ def check_plugin_manifest(root):
 
 
 def parse_frontmatter(text):
-    """Return {key: (value, line)} for a leading `---` block, or None.
-
-    Handles `key: value` lines and indented continuation lines; nothing else.
-    """
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
         return None
@@ -171,7 +165,6 @@ def check_skills(root):
 
 
 def plugin_files(root):
-    """Yield (path, text) for each text file under the plugin directory."""
     for path in sorted((root / PLUGIN_DIR).rglob("*")):
         if not path.is_file() or "__pycache__" in path.parts:
             continue
@@ -182,7 +175,6 @@ def plugin_files(root):
 
 
 def markdown_lines(text):
-    """Yield (number, line) outside fenced code blocks."""
     fenced = False
     for number, line in enumerate(text.splitlines(), start=1):
         if line.lstrip().startswith(("```", "~~~")):
@@ -245,7 +237,6 @@ def check_ids(root, id_pattern, definitions, kind):
 
 
 def tracked_texts(root):
-    """Map each git-tracked file to its text, or None when git cannot list files."""
     proc = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True)
     if proc.returncode != 0:
         return None
@@ -295,7 +286,6 @@ def check_denylist(texts, denylist):
     pattern = re.compile(
         "|".join(rf"(?<!\w){re.escape(term)}(?!\w)" for term in terms), re.IGNORECASE
     )
-    # The message omits the matched term so output stays safe to paste.
     return scan(texts, pattern, "contains a denylist term")
 
 

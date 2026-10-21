@@ -87,7 +87,6 @@ def resolve(part, target):
 
 
 def read_rels(archive, part):
-    """Map relationship id to (type, member name) for one package part."""
     rels_name = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
     if rels_name not in archive.namelist():
         return {}
@@ -100,7 +99,6 @@ def read_rels(archive, part):
 
 
 class ImageSink:
-    """Copies raster images out of an archive and names them after the source file."""
 
     def __init__(self, archive, images_dir, base):
         self.archive, self.images_dir, self.base = archive, images_dir, base
@@ -109,7 +107,6 @@ class ImageSink:
         self.skipped = []
 
     def copy(self, member, label=""):
-        """Return the copied file name, or None when the member is missing or not a raster image."""
         if member in self.names:
             return self.names[member]
         extension = RASTER.get(member.rsplit(".", 1)[-1].lower())
@@ -137,7 +134,6 @@ def image_line(name, alt=""):
     return f"![{alt or name}](../images/{name})"
 
 
-# ---------------------------------------------------------------- docx
 
 def docx_style_names(archive):
     if "word/styles.xml" not in archive.namelist():
@@ -151,7 +147,6 @@ def docx_style_names(archive):
 
 
 def heading_level(style_id, names):
-    """0 for Title, 1 to 9 for Heading n, None for any other style."""
     name = names.get(style_id, style_id or "").lower()
     if name == "title":
         return 0
@@ -233,7 +228,6 @@ def convert_docx(path, raw_dir, images_dir):
             "tables": tables, "images_extracted": sink.count, "images_skipped": sink.skipped}
 
 
-# ---------------------------------------------------------------- pptx
 
 def drawing_paragraph(paragraph):
     parts = []
@@ -321,7 +315,6 @@ def convert_pptx(path, raw_dir, images_dir):
             "images_skipped": sink.skipped}
 
 
-# ---------------------------------------------------------------- xlsx
 
 def column_number(letters):
     number = 0
@@ -366,7 +359,6 @@ def cell_value(cell, strings):
 
 
 def read_sheet(archive, member, strings):
-    """Return (values, formulas, merges, comments) with cells keyed by A1 reference."""
     root = parse(archive, member)
     values, formulas = {}, {}
     row_number = 0
@@ -444,7 +436,6 @@ def convert_xlsx(path, raw_dir, images_dir):
             "images_skipped": sink.skipped}
 
 
-# ---------------------------------------------------------------- pdf
 
 def convert_pdf(path, raw_dir, images_dir):
     base = safe_name(path.stem)
@@ -484,7 +475,6 @@ def convert_pdf(path, raw_dir, images_dir):
             "tables": tables, "images_extracted": images}
 
 
-# ---------------------------------------------------------------- run
 
 def copy_loose_image(path, images_dir):
     name = f"standalone-{safe_name(path.stem)}.{RASTER[path.suffix.lower().lstrip('.')]}"

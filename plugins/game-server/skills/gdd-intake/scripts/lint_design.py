@@ -6,7 +6,7 @@ Usage:
 
 Prints `path:line: message` for each problem and exits 1 if there is any.
 
-The checks need no judgment, so a script can make them:
+Checks:
   - the title and the sixteen `##` sections, once each and in order
   - `None.` under every empty section, and no table without rows
   - requirement ids: format, one prefix per section, never repeated
@@ -17,9 +17,8 @@ The checks need no judgment, so a script can make them:
   - the columns and the Draft path that emit_json.py reads in each config table
   - TBD, TODO, and FIXME outside the Open questions section
 
-It does not check glossary coverage. A regular expression cannot tell a domain
-term from a formula, a key path, or a value, and an earlier version of this check
-reported mostly false positives. The self-reviewer prompt checks the glossary.
+Glossary coverage is left to the self-reviewer prompt, because a regex check for it
+reported mostly false positives.
 """
 import re
 import sys
@@ -69,7 +68,6 @@ class Node:
 
 
 def parse_document(text):
-    """Return (root, all nodes, all lines). Headings inside code fences do not count."""
     root = Node(0, "", 0, None)
     nodes, lines = [], []
     current, fenced = root, False
@@ -105,7 +103,6 @@ def split_row(text):
 
 
 def find_tables(node):
-    """Return a list of (header line number, headers, [(line number, cells)])."""
     tables, run = [], []
     for line in node.body + [Line(0, "", False)]:
         if line.text.lstrip().startswith("|") and not line.fenced:
@@ -142,7 +139,6 @@ class Linter:
     def section(self, name):
         return next((n for n in self.nodes if n.level == 2 and n.text == name), None)
 
-    # ---- ids and citations
 
     def check_id(self, raw, prefix, line, section_name):
         match = re.fullmatch(r"([A-Z]+)(\d+)", raw)
@@ -189,7 +185,6 @@ class Linter:
             elif token != "prompt" and token not in self.source_ids:
                 self.add(line, f"{token} is not in the Sources table")
 
-    # ---- structure
 
     def check_title_and_order(self):
         titles = [n for n in self.nodes if n.level == 1]
@@ -434,7 +429,6 @@ class Linter:
 
 
 def fields_of_free(node, name):
-    """Find a '<name>: value' line that is not a list item, such as 'Scope: server-only'."""
     for line in node.body:
         if line.text.startswith(f"{name}:") and not line.fenced:
             return line.number, line.text.split(":", 1)[1].strip()
@@ -442,7 +436,6 @@ def fields_of_free(node, name):
 
 
 def lint(text):
-    """Return a sorted list of (line number, message). An empty list means the design is clean."""
     return Linter(text).run()
 
 

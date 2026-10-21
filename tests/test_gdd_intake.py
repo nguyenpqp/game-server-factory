@@ -157,7 +157,6 @@ def make_pptx(path):
         {
             "[Content_Types].xml": f"{XML}<Types/>",
             "ppt/presentation.xml": presentation,
-            # The deck shows slide2.xml first, so file order and deck order differ.
             "ppt/_rels/presentation.xml.rels": rels(
                 ("rId1", f"{R}/slide", "slides/slide2.xml"),
                 ("rId2", f"{R}/slide", "slides/slide1.xml"),
@@ -339,7 +338,6 @@ def template_skeleton():
     match = re.search(r"````markdown\n(.*?)\n````", text, re.DOTALL)
     assert match, "design-template.md has no skeleton block"
     skeleton = match.group(1) + "\n"
-    # The skeleton leaves the scope as a placeholder and cites the answer to a question that is still open.
     skeleton = replace_once(skeleton, "Scope: <server-only, full-stack, or logic-only>", "Scope: server-only")
     return replace_once(skeleton, "- Status: open", "- Status: answered on 2026-01-05: The server day.")
 

@@ -105,7 +105,6 @@ def parse_scalar(text):
 
 
 def parse_block(items, pos, indent, lines_of, prefix):
-    """Parse items[pos:] at `indent` into a dict or a list. Return (value, next pos)."""
     if items[pos][1].startswith("- "):
         values = []
         while pos < len(items) and items[pos][0] == indent and items[pos][1].startswith("- "):
@@ -130,7 +129,6 @@ def parse_block(items, pos, indent, lines_of, prefix):
 
 
 def parse_profile(text, lines_of=None):
-    """Parse the profile frontmatter: a small YAML subset with nested maps and lists."""
     lines_of = {} if lines_of is None else lines_of
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
@@ -195,7 +193,6 @@ def under(path, root):
 
 
 def mask(text):
-    """Blank comments and string, text block, and char literals. Keep newlines and columns."""
     out = list(text)
     n, i = len(text), 0
 
@@ -242,14 +239,12 @@ class TypeSpan:
 
 
 def is_declaration(masked, match):
-    """True when a `{` follows the type keyword before any `;`."""
     tail = masked[match.end():match.end() + 400]
     brace, semicolon = tail.find("{"), tail.find(";")
     return brace >= 0 and (semicolon < 0 or brace < semicolon)
 
 
 def type_spans(masked):
-    """Find class, interface, enum, and record declarations with their body extents."""
     events = [
         (m.start(), "type", m) for m in TYPE_KEYWORD.finditer(masked) if is_declaration(masked, m)
     ] + [(m.start(), m.group(), None) for m in BRACES.finditer(masked)]
@@ -352,7 +347,6 @@ def check_cheat(path, masked, spans, settings):
 
 
 def declares_handle(masked, span, spans):
-    """True when the class itself, not a nested class, declares a method named handle."""
     for match in HANDLE_DECLARATION.finditer(masked, span.body_start + 1, span.body_end):
         at = match.end()
         if enclosing(spans, at) is not span:

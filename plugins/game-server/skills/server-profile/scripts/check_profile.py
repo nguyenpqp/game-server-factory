@@ -34,7 +34,6 @@ KEY_LINE = re.compile(r"^(\s*)([A-Za-z_]\w*):(.*)$")
 
 
 def unfenced(lines):
-    """Yield (line number, text) for lines outside fenced code blocks."""
     fenced = False
     for number, line in enumerate(lines, 1):
         if FENCE.match(line):
@@ -45,7 +44,6 @@ def unfenced(lines):
 
 
 def split_frontmatter(lines):
-    """Return (block lines with their numbers, or None when there is no block)."""
     if not lines or lines[0].strip() != "---":
         return None
     for end in range(1, len(lines)):
@@ -55,11 +53,6 @@ def split_frontmatter(lines):
 
 
 def parse_keys(block):
-    """Return {dotted key: line number} for the leaf keys of a frontmatter block.
-
-    A top-level key with indented `sub: value` children is replaced by its
-    dotted children. A key with an inline value or `- item` children is a leaf.
-    """
     keys, parent = {}, None
     for number, line in block:
         match = KEY_LINE.match(line)
@@ -75,7 +68,6 @@ def parse_keys(block):
 
 
 def load_template(path=TEMPLATE):
-    """Return (required frontmatter keys, capability ids in template order)."""
     text = Path(path).read_text(encoding="utf-8")
     lines = text.splitlines()
     sample = re.search(r"```yaml\n(.*?)```", text, re.S)
@@ -88,7 +80,6 @@ def load_template(path=TEMPLATE):
 
 
 def capability_sections(lines):
-    """Return {cap id: (heading line, field lines, has fenced block)} for the profile body."""
     sections, current, fenced = {}, None, False
     for number, line in enumerate(lines, 1):
         if FENCE.match(line):
@@ -172,7 +163,6 @@ def check_profile(path, template=TEMPLATE):
 
 
 def blocked_rules(statuses, index=RULE_INDEX):
-    """Return {cap id: [rule ids that list it in `needs:`]} for non-present caps."""
     needs, rule = {}, None
     for line in Path(index).read_text(encoding="utf-8").splitlines():
         heading = RULE_HEADING.match(line)

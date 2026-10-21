@@ -93,7 +93,6 @@ class ValidatorTestCase(unittest.TestCase):
         self.outside.mkdir()
 
     def build(self, changes=None):
-        """Write the clean tree with `changes` (path -> content, None deletes) and track it."""
         files = {**good_tree(), **(changes or {})}
         write_tree(self.root, files)
         git(self.root, "init", "-q")
