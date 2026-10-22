@@ -93,12 +93,11 @@ def capability_sections(lines):
             fenced = not fenced
             if current:
                 sections[current][1].append((number, line))
-                sections[current][2][0] = True
         elif fenced:
             continue
         elif CAP_HEADING.match(line):
             current = CAP_HEADING.match(line).group(1)
-            sections.setdefault(current, (number, [], [False]))
+            sections.setdefault(current, (number, []))
         elif ANY_HEADING.match(line):
             current = None
         elif current:
@@ -106,8 +105,9 @@ def capability_sections(lines):
     return sections
 
 
-def check_section(path, cap, heading_line, body, has_fence):
+def check_section(path, cap, heading_line, body):
     findings = []
+    has_fence = any(FENCE.match(line) for _, line in body)
     fields, status_line = {}, heading_line
     for number, line in body:
         match = FIELD_LINE.match(line)
@@ -163,8 +163,8 @@ def check_profile(path, template=TEMPLATE):
         if cap not in sections:
             findings.append(Finding(path, 1, f"missing capability heading {cap}"))
             continue
-        heading_line, body, fence = sections[cap]
-        section_findings, status, fields = check_section(path, cap, heading_line, body, fence[0])
+        heading_line, body = sections[cap]
+        section_findings, status, fields = check_section(path, cap, heading_line, body)
         findings += section_findings
         if status:
             statuses[cap] = status
