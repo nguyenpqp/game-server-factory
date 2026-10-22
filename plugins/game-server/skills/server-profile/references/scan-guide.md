@@ -49,7 +49,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 
 - Search for executors. `rg -n "newSingleThreadExecutor|Executors\.new|ExecutorService|EventLoopGroup|DefaultEventExecutor|Disruptor|ScheduledExecutorService"`.
 - Find how a user maps to a thread, usually `hash(userId) % n`. Find the call that submits work to another user's executor.
-- Read the login path for blocking database reads. `rg -n "\.get\(\)|\.join\(\)|\.await\(|\.sync\(\)|Thread\.sleep"` inside classes on that path. The results feed `lint.blocking_calls`.
+- Read the login path for blocking database reads. `rg -n "\.get\(\)|\.join\(\)|\.await\(|\.sync\(\)|Thread\.sleep"` inside classes on that path. The results feed `lint.blocking_calls`. Leave a synchronous Redis call out of it when the CAP-REDIS entry records that call as the project's pattern, with its timeout and circuit breaker, so the linter does not flag every feature that uses it.
 
 ### CAP-OWNERSHIP
 

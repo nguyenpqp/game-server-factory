@@ -340,7 +340,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | Pushes and online checks for other users | The StreakState push to an admin's target | AdminSetStreak | Through the ownership record and cross-node delivery | A push through a node-local session map misses a target on another node | MN-10 |
 | Timed effects | `lastClaimDay` | The owner actor | Derived from the stored day on each read | A timer lost at drain leaves a claim not ready | MN-11 |
 | Contested shared things | none | none | No two users race for one thing | none | MN-03, MN-14 |
-| Reads of another user's state | none | none | AdminGetStreak reads on the owner, or a private copy that it only shows | none | MN-02 |
+| Reads of another user's state | The StreakState of an admin's target | AdminGetStreak, read only | A snapshot built on the owner, or a private copy when offline that it only shows and never saves | A stale copy used to grant or saved back overwrites the player's progress | MN-02 |
 | Unknown results from Redis or the store | The offline CAS write of AdminSetStreak | AdminSetStreak | A timeout re-reads and answers retry-later, never applies the change twice | A repair applied twice, or reported as failed after it landed | MN-04, MN-13 |
 | Late writes after a handover | none | none | The feature buffers no write | none | MN-15 |
 
@@ -359,7 +359,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | An old node meets a new inbox entry or cross-node message type | The entry stays in the inbox for a newer node, and an unknown message is ignored because it only carries a signal | The feature adds no entry type, and AdminSetStreak uses the core's existing admin routing | BG-11 | none, no new entry type |
 | A node drains during a claim | The claim finishes and its save is confirmed before ownership moves | The core's drain | BG-10 | none, core behavior |
 | The servers roll back to the old version | Data and granted items from the new version survive | Additive fields only | BG-01, BG-02, BG-09 | `StreakStateCompatTest` unknown field |
-| Both versions write the same shared document | Neither version drops the other's fields | StreakState has one writer at a time, the owner or an admin holding its slot | BG-02 | none, no shared document |
+| Both versions write the same shared document | Neither version drops the other's fields | Only the new version has code that writes StreakState | BG-02 | none, the old version never writes StreakState |
 | A stored format changes in a way the old version cannot read | The release ships as a maintenance deploy with a rollback step | No format changes | BG-12 | none, no format change |
 | A boot step of the feature fails | The node does not boot | The config load throws on an invalid file | BG-13 | `StreakConfigTest` day 3 missing |
 | A cluster job runs while the old version holds the cluster lease | The job still runs, and runs once per unit | The feature has no job | MN-07 | none, no job |
@@ -416,6 +416,9 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | `StreakAdminTest` | AdminSetStreak on live without `confirm` | unit | `CONFIRM_REQUIRED`, no change | none | TEST-03 |
 | `StreakAdminTest` | AdminSetStreak with count -1 | unit | `OUT_OF_RANGE`, no change | none | TEST-03 |
 | `StreakAdminTest` | Replay of one AdminSetStreak request id | unit | One change and one audit row | none | TEST-09 |
+| `StreakAdminTest` | Offline AdminSetStreak whose CAS fails after it applied | unit | The retry re-reads, one change and one audit row | none | TEST-09, MN-04 |
+| `StreakAdminTest` | Offline AdminSetStreak whose CAS fails before it applied | unit | The retry applies it, one change and one audit row | none | TEST-09, MN-04 |
+| `StreakAdminTest` | A login on a second node during an offline AdminSetStreak | unit | The login answers retry-later until the edit ends, then loads the repaired state | none | TEST-13, ADMIN-02 |
 | `StreakAdminTest` | AdminSetStreak for an online 1.4.0 player | unit | One StreakState push to the target with the stored `streakCount` and `lastClaimDay` | none | TEST-01 |
 | `StreakAdminTest` | Push to a 1.3.0 player | unit | No StreakState push | none | TEST-07 |
 | `StreakConfigTest` | Valid file | unit | Loads, and the day index has 7 entries | RW1, RW7 | TEST-05 |

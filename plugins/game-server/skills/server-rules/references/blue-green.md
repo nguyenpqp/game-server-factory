@@ -253,7 +253,7 @@ KvStore.saveAsync(userId, state);
 
 - needs: CAP-DRAIN, CAP-OWNERSHIP, CAP-USERSTORE
 
-### BG-11 An inbox entry of a type the node does not know stays in the inbox unchanged for a newer version, and a cross-node message carries only a signal, so a node may ignore a message type it does not know.
+### BG-11 An inbox entry of a type the node does not know stays in the inbox unchanged for a newer version, and a fire-and-forget cross-node message carries only a signal, so a node may ignore a message type it does not know.
 
 **Why.** An old node that drops an unknown entry loses a purchase or a gift that a new node sent. Pub/sub drops messages during reconnects anyway, so anything that must arrive goes into the inbox first, and the message only wakes the owner.
 
@@ -280,9 +280,9 @@ if (handler == null) {
 CrossNode.send(userId, new GiftMessage(gift));   // the gift exists only in the message
 ```
 
-Every refresh that a message triggers also runs on a periodic sweep, so a lost message only delays it. Store inbox payloads as raw text, so every version writes them back unchanged. A shared log that every node replays, such as a market stream, skips an entry it cannot read without blocking, and is trimmed by an age no shorter than the life of what it carries.
+Every refresh that a message triggers also runs on a periodic sweep, so a lost message only delays it. A request that waits for the owner's reply, such as an admin command routed to the owner, may carry the change, because the sender sees a lost or unknown request and retries it, and ADMIN-07 makes the retry safe. Store inbox payloads as raw text, so every version writes them back unchanged. A shared log that every node replays, such as a market stream, skips an entry it cannot read without blocking, and is trimmed by an age no shorter than the life of what it carries.
 
-**Check.** Find the inbox dispatch, and confirm an unknown type is kept, not removed or acknowledged. For each cross-node send, find the inbox write before it and the sweep that covers a lost message.
+**Check.** Find the inbox dispatch, and confirm an unknown type is kept, not removed or acknowledged. For each fire-and-forget cross-node send, find the inbox write before it and the sweep that covers a lost message. A request that carries a change must wait for a reply and be safe to retry.
 
 - needs: CAP-INBOX, CAP-CROSSNODE
 

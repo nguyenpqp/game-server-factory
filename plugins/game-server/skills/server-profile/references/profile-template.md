@@ -275,7 +275,7 @@ Must provide:
 
 - A message to a user's owner node that runs on that user's executor, with ordering per sender and a bounded queue, and a sender that never blocks on Redis.
 - A fallback to the durable inbox when the user is offline or the owner cannot be reached.
-- A receiver that ignores a message type it does not know, without failing the executor. This is safe only because messages carry signals, and anything that must arrive is in the durable inbox first.
+- A receiver that ignores a message type it does not know, without failing the executor. This is safe only because fire-and-forget messages carry signals, and anything that must arrive is in the durable inbox first. A request that waits for the owner's reply may carry a change, because the sender retries it.
 - A periodic sweep that covers a lost message, such as an inbox sweep of online users and a periodic config reload.
 - A broadcast to every node, for cache invalidation.
 

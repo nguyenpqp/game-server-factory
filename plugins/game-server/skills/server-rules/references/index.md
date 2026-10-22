@@ -204,7 +204,7 @@ Each rule's reason, Java do and don't, and review check are in [blue-green.md](b
 - severity: critical
 - needs: CAP-DRAIN, CAP-OWNERSHIP, CAP-USERSTORE
 
-### BG-11 An inbox entry of a type the node does not know stays in the inbox unchanged for a newer version, and a cross-node message carries only a signal, so a node may ignore a message type it does not know.
+### BG-11 An inbox entry of a type the node does not know stays in the inbox unchanged for a newer version, and a fire-and-forget cross-node message carries only a signal, so a node may ignore a message type it does not know.
 
 - severity: critical
 - needs: CAP-INBOX, CAP-CROSSNODE
