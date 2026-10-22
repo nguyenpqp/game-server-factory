@@ -196,6 +196,19 @@ Read each reply and push that the diff adds or changes, field by field, against 
 | SYNC-03 | important | no | A boolean in a reply or push that compares stored values, config, or server time, such as `ready` or `claimedToday`. Both the start and the end of one timer. |
 | SYNC-04 | critical | no | A push after the player's own command or at login. A push for a time the client can compute. Value that exists only in a push, with no stored state or inbox entry behind it. |
 
+## LOG: Logging
+
+Read every log call, comment, and exception message that the diff adds.
+
+| Rule | Severity | Lint | Look for |
+| --- | --- | --- | --- |
+| LOG-01 | important | no | `System.out`, `System.err`, `printStackTrace`, or a logger from any factory other than the profile's. |
+| LOG-02 | important | no | An error for a failure the code handled, or a debug or info line for a lost write or a broken invariant. A message that does not say what the failure cost. |
+| LOG-03 | important | no | A log call in a catch block that passes `e.getMessage()` or nothing instead of the exception as the last argument. |
+| LOG-04 | important | no | A log line on a command, job, callback, or inbox path with no user id or no trace id. |
+| LOG-05 | minor | no | An info line or higher on the success path of a command. |
+| LOG-06 | minor | no | A rule id, a document file name, or a section number in a comment, a log message, or an exception message. |
+
 ## DES: Design conformance
 
 Read `design.md` itself, beside the spec and the code. Build the trace table from the design's ids, not from the spec's Design coverage, so an id the spec dropped still gets a row.

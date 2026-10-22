@@ -7,7 +7,7 @@ description: >
   ids, cheat commands, admin commands, HTTP or payment callbacks, anti-cheat and server
   authority checks, multi-node safety, blue-green rollout, compatibility with old
   clients, feature boundaries, or client sync. It holds the fixed rule ids (AUTH, MN, BG,
-  PERF, CFG, MET, CHEAT, ADMIN, HTTP, TEST, DES, MOD, SYNC) with a severity, a Java do and
+  PERF, CFG, MET, CHEAT, ADMIN, HTTP, TEST, DES, MOD, SYNC, LOG) with a severity, a Java do and
   don't, and a review check for each rule.
   Specs, builds, reviews, and the feature linter cite these ids.
 ---
@@ -20,7 +20,7 @@ This skill is the rulebook for feature code on a Java game server. The server is
 
 This skill holds rules and nothing else. It does not scan a project, write a spec, write code, or run a review.
 
-- The project profile from `server-profile` names the real classes behind each capability id, such as `CAP-CLOCK`. The examples here use generic names (`UserActor`, `KvStore`, `FeatureConfig`, `MetricLogger`, `TraceIds`, `ServerClock`, `RedisOps`, `Inbox`, `Env`, `GameRandom`). Map them to the profile's names before writing code.
+- The project profile from `server-profile` names the real classes behind each capability id, such as `CAP-CLOCK`. The examples here use generic names (`UserActor`, `KvStore`, `FeatureConfig`, `MetricLogger`, `FeatureLogs`, `TraceIds`, `ServerClock`, `RedisOps`, `Inbox`, `Env`, `GameRandom`). Map them to the profile's names before writing code.
 - `feature-spec`, `feature-build`, and `feature-review` apply the rules and cite them by id.
 - The rule set is fixed. Never invent an id. If a case needs a rule that the index lacks, report it as a gap.
 
@@ -47,6 +47,7 @@ When designing a feature, read every group that the feature touches. When review
 - [DES, design conformance](references/design-conformance.md). Every design id built and tested or recorded as descoped, the design's behavior and numbers in the code, and every settled decision kept.
 - [MOD, modularity](references/modularity.md). Imports only of the feature's own, shared, and contract packages, and contract calls for every cross-feature effect a reply depends on.
 - [SYNC, client sync](references/client-sync.md). A read command that rebuilds the client's view, absolute post-change values with server time, stored instants only, and pushes only for changes the client did not cause.
+- [LOG, logging](references/logging.md). The feature's own logger, a level that matches the harm, the exception last, the user id and trace id on each line, no success-path lines, and no rule ids in code text.
 
 ## Never
 

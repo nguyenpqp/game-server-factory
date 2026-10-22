@@ -44,7 +44,7 @@ The references write Java with generic names. Before using a pattern, replace ea
 | `Env` | CAP-ENV |
 | `ServerClock` | CAP-CLOCK |
 | `GameRandom` | CAP-RNG |
-| `MetricLogger` | CAP-METRIC |
+| `MetricLogger`, `FeatureLogs` | CAP-METRIC |
 | `TraceIds` | CAP-TRACEID |
 | `@CheatCommand` | CAP-CHEAT |
 | `AdminCommand`, `AdminAudit` | CAP-ADMIN |
@@ -116,3 +116,4 @@ When the check did not run, the report also says that the code was not compiled.
 - Never add a fixed metric column, and never log a secret, token, or signature (MET-07, MET-09).
 - Never remove, rename, or retype a stored field, a response field, or a config key (BG-01, BG-04, BG-08).
 - Never put a balance number in code (CFG-05).
+- Never cite a rule id or a document name in a code comment, a log message, or an exception message. State the reason in plain words (LOG-06).

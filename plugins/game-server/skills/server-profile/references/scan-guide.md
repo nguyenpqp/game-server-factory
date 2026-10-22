@@ -146,6 +146,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 - Search for the logger. `rg -n "class \w*(Metric|Log)\w*"`, then `rg -n "log4j|slf4j|Logger\.|appender"`.
 - Find the call that writes a user action row. Its call pattern becomes `lint.metric_call`. Check for a trace id column, system and exception rows, extra fields, and the queue behavior when it is full.
 - Find where rows land and how they are queried, such as a log shipper and a table per log type.
+- Find the application logger that feature code uses for errors and warnings. `rg -n "getLogger\(|LoggerFactory|LogManager|Logger\.get"`. Record the call that gives a feature its logger, and the config that sets a level per logger name.
 
 ### CAP-TRACEID
 

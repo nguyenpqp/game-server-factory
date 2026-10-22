@@ -36,7 +36,7 @@ FENCE = re.compile(r"^\s*(```|~~~)")
 CAP_HEADING = re.compile(r"^###\s+(CAP-[A-Z]+)\b")
 ANY_HEADING = re.compile(r"^#{1,6}\s")
 FIELD_LINE = re.compile(r"^-\s+(\w+):\s*(.*)$")
-RULE_ID = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST|DES|MOD|SYNC)-\d{2}\b")
+RULE_ID = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST|DES|MOD|SYNC|LOG)-\d{2}\b")
 RULE_HEADING = re.compile(r"^###\s+(" + RULE_ID.pattern + ")")
 KEY_LINE = re.compile(r"^(\s*)([A-Za-z_]\w*):(.*)$")
 

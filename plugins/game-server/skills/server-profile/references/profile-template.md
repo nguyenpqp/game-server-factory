@@ -368,6 +368,7 @@ Must provide:
 - System rows and exception rows.
 - A description of where rows land, such as one table per log type, and how to query them for KPIs.
 - Asynchronous writes that never block the user actor thread, with the drop policy stated.
+- The application logger for feature code, with the call that gives each feature its logger and the config that sets that logger's level.
 
 Typical partial: rows have no trace id column, or extra fields cannot be queried downstream.
 

@@ -40,7 +40,7 @@ Review feature code against the feature design, the rule index, the project prof
    - Each row that is not `matched`, `descoped`, or `client only` is a finding. A finding with no code line, such as a `missing` id, cites the design id and the spec row in place of `file:line`.
 
    These findings cite DES ids. Their severity follows the index and the severity audit in step 7.
-4. **Review rule group by rule group.** Open `references/review-checklist.md`. Walk the other groups in the order AUTH, MN, BG, PERF, CFG, MET, CHEAT, ADMIN, HTTP, TEST, MOD, SYNC. For each group, compare the code with the matching spec sections:
+4. **Review rule group by rule group.** Open `references/review-checklist.md`. Walk the other groups in the order AUTH, MN, BG, PERF, CFG, MET, CHEAT, ADMIN, HTTP, TEST, MOD, SYNC, LOG. For each group, compare the code with the matching spec sections:
    - Every spec row has code that does what the row says.
    - Every code path that changes state has a spec row.
    - Every capability the spec marks `missing` or `partial` in Core blockers is handled as the spec says, and the code does not work around the blocker.

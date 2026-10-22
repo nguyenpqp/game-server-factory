@@ -578,3 +578,37 @@ Each rule's reason, Java do and don't, and review check are in [client-sync.md](
 
 - severity: critical
 - needs: CAP-RESPONSE, CAP-INBOX
+
+## LOG: logging
+
+Each rule's reason, Java do and don't, and review check are in [logging.md](logging.md).
+
+### LOG-01 Feature code logs only through the logger that the profile's CAP-METRIC entry gives each feature, never through a print call or a logger it names itself.
+
+- severity: important
+- needs: CAP-METRIC
+
+### LOG-02 Each log line's level follows its consequence, with error for a durable loss or a broken invariant, warn for a handled failure, info for a rare state change, and debug for tracing.
+
+- severity: important
+- needs: CAP-METRIC
+
+### LOG-03 A log call that reports an exception passes the exception as its last argument, never only its message.
+
+- severity: important
+- needs: CAP-METRIC
+
+### LOG-04 Each log line about a user's action carries the user id and the trace id of that action.
+
+- severity: important
+- needs: CAP-METRIC, CAP-TRACEID
+
+### LOG-05 A command writes no log line on its success path.
+
+- severity: minor
+- needs: none
+
+### LOG-06 Code comments, log messages, and exception messages cite no rule id and no document name, and state the reason in their own words.
+
+- severity: minor
+- needs: none
