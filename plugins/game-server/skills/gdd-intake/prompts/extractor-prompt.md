@@ -6,8 +6,8 @@ You write the first `design.md` for one feature. You read every source, then wri
 
 The brief gives absolute paths for these.
 
-- Raw folder. Converted text: `slides_*.md` for decks, `doc_*.md` and `pdf_*.md` for documents, `<file>_<sheet>.md` and `<file>_<sheet>.csv` for sheets, and copied text files.
-- Images folder. Pictures from the files and loose images. Open them with Read. They show mockups, flows, and charts.
+- Raw folder. Converted text: `slides_*.md` for decks, `pdf_*.md` for PDFs, `<file>.md` for each docx and xlsx, named after the source file, and copied text files. A docx's pictures sit in `raw/assets/`, linked where they appear.
+- Images folder. Pictures from slides, sheets, and PDFs, and loose images. Open them, and the docx pictures, with Read. They show mockups, flows, and charts.
 - Manifest. `conversion-manifest.json` in the work folder.
 - Feature prompt. Present when there are no files, or when the developer added text to the files.
 - Feature name and scope: `server-only`, `full-stack`, or `logic-only`.
@@ -18,7 +18,7 @@ The brief gives absolute paths for these.
 
 ### 1. Read everything
 
-Read the slides in order, the documents, then the sheet notes before the sheet CSVs. The notes list merged cells, formulas, and comments. A CSV line number equals the sheet row number and its first column is column A, so you can cite `Sheet!A2:D8` straight from the file. Read the images that sit next to the text that mentions them. Read the first 30 CSV rows unless the pattern changes later.
+Read the slides in order, the documents, then the workbooks. Each sheet is a `## Sheet:` section with a `Range:` line and one table. The table's header row is the first row of that range, and its first column is the range's first column, so count from the range's top-left cell to cite `Sheet!A2:D8`. A cell with a formula shows the formula, and a merged label repeats in each cell of its range. Read the images that sit next to the text that mentions them. On a long sheet, read the first 30 rows closely, and read on where the pattern changes.
 
 Give each input an id in the Sources table: `S1`, `S2`, and so on, in file name order. With only a prompt, the Sources section has no table: write `None.`, keep the `Scope:` line, and cite the text as `prompt`.
 

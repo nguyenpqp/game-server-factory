@@ -70,7 +70,7 @@ The skills work in a plain chat, across sessions, or under any workflow plugin. 
 
 ## Check this repository
 
-Run these from the repository root. Both use the Python 3 standard library only.
+Run these from the repository root. Both run on Python 3 alone, and the converter tests for docx and xlsx need python-docx and openpyxl.
 
 ```
 python3 -m unittest discover -s tests
@@ -81,4 +81,4 @@ The unit tests cover the validator and the `gdd-intake` converter. A test that n
 
 The validator checks the manifests, each skill's frontmatter, every relative link, every rule id and capability id against its index, and the tracked files for absolute home paths and private keys. It also scans the tracked files for terms from a denylist. The denylist is a plain text file with one term per line. The public repository must hold no internal project names, class names, hosts, or GDD content, so each maintainer keeps the list of those terms in a local file that is never committed. The validator fails if a tracked file contains any listed term, matched without regard to case. Pass the file with `--denylist` or set `GSS_DENYLIST`. Without either, the validator warns that it skipped the private-term scan.
 
-PyMuPDF is optional. `gdd-intake` uses it only to read PDF files. For docx, pptx, and xlsx it needs nothing beyond Python 3.
+`gdd-intake` reads docx with python-docx and xlsx with openpyxl (`python3 -m pip install python-docx openpyxl`). PyMuPDF is optional and reads PDF files. For pptx it needs nothing beyond Python 3.

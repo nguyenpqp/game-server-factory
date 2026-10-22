@@ -52,7 +52,7 @@ Use gdd-intake for a daily login streak. Players who log in on consecutive days
 earn a reward that grows each day, and a missed day resets the streak.
 ```
 
-A prompt skips conversion and gives a design with more open questions. PDF files need PyMuPDF (`python3 -m pip install pymupdf`). Without it, the skill lists each PDF it could not read and asks you to install PyMuPDF or to export the PDF to docx or Markdown. The other formats need only Python 3.
+A prompt skips conversion and gives a design with more open questions. docx files need python-docx and xlsx files need openpyxl (`python3 -m pip install python-docx openpyxl`). PDF files need PyMuPDF (`python3 -m pip install pymupdf`). Without a package, the skill lists the files it could not read and asks you to install it. A PDF can also be exported to docx or Markdown. Slides and text files need only Python 3.
 
 The skill writes `design.md` with an id on every requirement and a source citation for each one. It then lists the open questions. Each question has a tier (Blocker, Important, or Minor) and an interim default. Answer them, or skip one to keep its default. A Blocker question left open stops the spec. If a workflow you use runs its own interview, the skill stops after the open questions and hands them over instead of asking you itself.
 
@@ -135,7 +135,7 @@ Use feature-build to fix finding 2 of the review above, then rerun feature-revie
 
 A clean review covers the server rules and the design. It does not replace a general code review.
 
-The skills check their own work by reading, with no check scripts. The one script in the plugin is the `gdd-intake` converter, which turns docx, pptx, xlsx, and PDF files into text that the agent reads.
+The skills check their own work by reading, with no check scripts. The one script in the plugin is the `gdd-intake` converter, which turns docx, pptx, xlsx, and PDF files into Markdown that the agent reads.
 
 ## With subagents or a workflow
 

@@ -7,7 +7,7 @@ If you must guess, the item fails. A guess that is easy to make is still a guess
 ## Inputs
 
 - The design path.
-- The sources: converted text, sheet CSVs, and images in the work folder, or the feature prompt.
+- The sources: the converted Markdown and the images in the work folder, or the feature prompt.
 - The scope: `server-only`, `full-stack`, or `logic-only`.
 - The format check result. The writer read the draft against the template. Check its items again, because a writer misses its own slips: sections, ids, `Source:` lines, question statuses, and `None.`.
 - The template, `../references/design-template.md`.
