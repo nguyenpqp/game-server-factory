@@ -222,6 +222,20 @@ def make_xlsx(path):
     )
 
 
+def make_one_sheet_xlsx(path, sheet, value):
+    write_zip(
+        path,
+        {
+            "[Content_Types].xml": f"{XML}<Types/>",
+            "xl/workbook.xml": f'{XML}<workbook xmlns="{S}" xmlns:r="{R}"><sheets>'
+            f'<sheet name="{sheet}" sheetId="1" r:id="rId1"/></sheets></workbook>',
+            "xl/_rels/workbook.xml.rels": rels(("rId1", f"{R}/worksheet", "worksheets/sheet1.xml")),
+            "xl/worksheets/sheet1.xml": f'{XML}<worksheet xmlns="{S}"><sheetData><row r="1">'
+            f'<c r="A1" t="inlineStr"><is><t>{value}</t></is></c></row></sheetData></worksheet>',
+        },
+    )
+
+
 class ConvertTest(TempDirCase):
     def convert(self):
         code, out, err = run_main(convert, [str(self.inputs), str(self.work)])
@@ -293,6 +307,35 @@ class ConvertTest(TempDirCase):
             linked = re.findall(r"\]\(\.\./images/([^)]+)\)", text)
             self.assertEqual(len(linked), 1, text)
             self.assertIn(linked[0], images)
+
+    def test_loose_images_that_share_a_stem_get_their_own_names(self):
+        (self.inputs / "a.jpeg").write_bytes(b"jpeg bytes")
+        (self.inputs / "a.jpg").write_bytes(b"jpg bytes")
+        manifest = self.convert()
+        outputs = {f["source"]: f["output"] for f in manifest["files"]}
+        self.assertEqual(outputs, {"a.jpeg": "images/standalone-a.jpg", "a.jpg": "images/standalone-a_.jpg"})
+        for source, output in outputs.items():
+            self.assertEqual((self.work / output).read_bytes(), (self.inputs / source).read_bytes())
+
+    def test_sheets_whose_names_join_to_the_same_stem_get_their_own_files(self):
+        make_one_sheet_xlsx(self.inputs / "a.xlsx", "b_c", "from a")
+        make_one_sheet_xlsx(self.inputs / "a_b.xlsx", "c", "from a_b")
+        manifest = self.convert()
+        csvs = {f["source"]: (f["sheets"][0]["csv"], f["sheets"][0]["md"]) for f in manifest["files"]}
+        self.assertEqual(csvs, {"a.xlsx": ("a_b_c.csv", "a_b_c.md"), "a_b.xlsx": ("a_b_c_.csv", "a_b_c_.md")})
+        self.assertEqual((self.work / "raw" / "a_b_c.csv").read_text(encoding="utf-8"), "from a\n")
+        self.assertEqual((self.work / "raw" / "a_b_c_.csv").read_text(encoding="utf-8"), "from a_b\n")
+        self.assertIn("(file: a_b.xlsx)", (self.work / "raw" / "a_b_c_.md").read_text(encoding="utf-8"))
+
+    def test_a_copied_text_file_does_not_overwrite_a_sheet_csv(self):
+        make_one_sheet_xlsx(self.inputs / "a.xlsx", "b", "sheet value")
+        (self.inputs / "a_b.csv").write_text("text,file\n", encoding="utf-8")
+        manifest = self.convert()
+        by_source = {f["source"]: f for f in manifest["files"]}
+        self.assertEqual(by_source["a.xlsx"]["sheets"][0]["csv"], "a_b.csv")
+        self.assertEqual(by_source["a_b.csv"]["output"], "raw/a_b_.csv")
+        self.assertEqual((self.work / "raw" / "a_b.csv").read_text(encoding="utf-8"), "sheet value\n")
+        self.assertEqual((self.work / "raw" / "a_b_.csv").read_text(encoding="utf-8"), "text,file\n")
 
     def test_text_files_pass_through_and_legacy_formats_are_skipped(self):
         (self.inputs / "notes.md").write_text("# Notes\n", encoding="utf-8")

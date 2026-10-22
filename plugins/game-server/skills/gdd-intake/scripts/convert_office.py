@@ -21,6 +21,9 @@ Output under <work_dir>:
     conversion-manifest.json   what was converted, skipped, and needs an export
     conversion-manifest.md     the same for a reader
 
+When two inputs would write the same output name, the later one in name order gets `_`
+before its extension, so no output overwrites another.
+
 Exit codes: 0 when the run finished (skipped files and warnings are listed in the
 manifest), 1 for a bad command line or a missing input folder.
 """
@@ -28,6 +31,7 @@ import csv
 import json
 import posixpath
 import re
+import shutil
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
@@ -60,6 +64,13 @@ FORMULA_LIMIT = 80
 
 def safe_name(name):
     return "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
+
+
+def claim(used, stem, *suffixes):
+    while any(stem + suffix in used for suffix in suffixes):
+        stem += "_"
+    used.update(stem + suffix for suffix in suffixes)
+    return stem
 
 
 def cell_text(value):
@@ -103,8 +114,8 @@ def read_rels(archive, part):
 
 class ImageSink:
 
-    def __init__(self, archive, images_dir, base):
-        self.archive, self.images_dir, self.base = archive, images_dir, base
+    def __init__(self, archive, images_dir, base, used):
+        self.archive, self.images_dir, self.base, self.used = archive, images_dir, base, used
         self.names = {}
         self.counters = {}
         self.skipped = []
@@ -118,7 +129,7 @@ class ImageSink:
             return None
         prefix = f"{self.base}-{label}img" if label else f"{self.base}-img"
         self.counters[prefix] = self.counters.get(prefix, 0) + 1
-        name = f"{prefix}{self.counters[prefix]:03d}.{extension}"
+        name = claim(self.used, f"{prefix}{self.counters[prefix]:03d}", f".{extension}") + f".{extension}"
         (self.images_dir / name).write_bytes(self.archive.read(member))
         self.names[member] = name
         return name
@@ -179,13 +190,13 @@ def docx_text(paragraph):
     return "".join(parts).strip()
 
 
-def convert_docx(path, raw_dir, images_dir):
-    base = safe_name(path.stem)
-    out = raw_dir / f"doc_{base}.md"
+def convert_docx(path, raw_dir, images_dir, used):
+    stem = claim(used, f"doc_{safe_name(path.stem)}", ".md")
+    out = raw_dir / f"{stem}.md"
     with zipfile.ZipFile(path) as archive:
         names = docx_style_names(archive)
         rels = read_rels(archive, "word/document.xml")
-        sink = ImageSink(archive, images_dir, f"doc_{base}")
+        sink = ImageSink(archive, images_dir, stem, used)
         body = parse(archive, "word/document.xml").find(W + "body")
         lines = [f"# Document: {path.name}", ""]
         tables = paragraphs = 0
@@ -203,19 +214,17 @@ def convert_docx(path, raw_dir, images_dir):
                 continue
             paragraphs += 1
             text = docx_text(block)
-            properties = block.find(W + "pPr")
-            style = properties.find(W + "pStyle") if properties is not None else None
+            style = block.find(f"{W}pPr/{W}pStyle")
             level = heading_level(style.get(W + "val") if style is not None else None, names)
+            numbering = block.find(f"{W}pPr/{W}numPr")
             if text and level is not None:
-                lines += ["#" * min(level + 1, 6) + " " + text if level else "# " + text, ""]
+                lines += ["#" * min(level + 1, 6) + " " + text, ""]
+            elif text and numbering is not None:
+                ilvl = numbering.find(W + "ilvl")
+                depth = int(ilvl.get(W + "val", "0")) if ilvl is not None else 0
+                lines.append("  " * depth + "- " + text)
             elif text:
-                numbered = properties is not None and properties.find(W + "numPr") is not None
-                if numbered:
-                    ilvl = properties.find(W + "numPr").find(W + "ilvl")
-                    depth = int(ilvl.get(W + "val", "0")) if ilvl is not None else 0
-                    lines.append("  " * depth + "- " + text)
-                else:
-                    lines += [text, ""]
+                lines += [text, ""]
             for blip in block.iter(A + "blip"):
                 target = rels.get(blip.get(R + "embed"))
                 name = sink.copy(target[1]) if target else None
@@ -272,13 +281,13 @@ def notes_text(archive, rels):
     return ""
 
 
-def convert_pptx(path, raw_dir, images_dir):
-    base = safe_name(path.stem)
-    out = raw_dir / f"slides_{base}.md"
+def convert_pptx(path, raw_dir, images_dir, used):
+    stem = claim(used, f"slides_{safe_name(path.stem)}", ".md")
+    out = raw_dir / f"{stem}.md"
     lines = [f"# Slides: {path.name}", ""]
     tables = notes_slides = 0
     with zipfile.ZipFile(path) as archive:
-        sink = ImageSink(archive, images_dir, f"slides_{base}")
+        sink = ImageSink(archive, images_dir, stem, used)
         members = slide_members(archive)
         for number, member in enumerate(members, start=1):
             root = parse(archive, member)
@@ -386,13 +395,12 @@ def read_sheet(archive, member, strings):
     return values, formulas, merges, comments
 
 
-def convert_xlsx(path, raw_dir, images_dir):
+def convert_xlsx(path, raw_dir, images_dir, used):
     base = safe_name(path.stem)
     sheets = []
     with zipfile.ZipFile(path) as archive:
         strings = shared_strings(archive)
         rels = read_rels(archive, "xl/workbook.xml")
-        used = set()
         for sheet in parse(archive, "xl/workbook.xml").iter(S + "sheet"):
             name = sheet.get("name", "")
             target = rels.get(sheet.get(R + "id"))
@@ -401,10 +409,7 @@ def convert_xlsx(path, raw_dir, images_dir):
             values, formulas, merges, comments = read_sheet(archive, target[1], strings)
             rows = max((r for r, _ in values), default=0)
             columns = max((c for _, c in values), default=0)
-            stem = f"{base}_{safe_name(name)}"
-            while stem in used:
-                stem += "_"
-            used.add(stem)
+            stem = claim(used, f"{base}_{safe_name(name)}", ".csv", ".md")
             with (raw_dir / f"{stem}.csv").open("w", newline="", encoding="utf-8") as handle:
                 writer = csv.writer(handle, lineterminator="\n")
                 for r in range(1, rows + 1):
@@ -433,16 +438,16 @@ def convert_xlsx(path, raw_dir, images_dir):
             sheets.append({"sheet": name, "csv": f"{stem}.csv", "md": f"{stem}.md", "rows": rows,
                            "cols": columns, "merged_ranges": len(merges), "formulas": len(formulas),
                            "comments": len(comments)})
-        sink = ImageSink(archive, images_dir, f"sheet_{base}")
+        sink = ImageSink(archive, images_dir, f"sheet_{base}", used)
         sink.copy_folder("xl/media/")
     return {"source": path.name, "type": "xlsx", "sheets": sheets, "images_extracted": sink.count,
             "images_skipped": sink.skipped}
 
 
 
-def convert_pdf(path, raw_dir, images_dir):
-    base = safe_name(path.stem)
-    out = raw_dir / f"pdf_{base}.md"
+def convert_pdf(path, raw_dir, images_dir, used):
+    stem = claim(used, f"pdf_{safe_name(path.stem)}", ".md")
+    out = raw_dir / f"{stem}.md"
     images = tables = 0
     with fitz.open(str(path)) as document:
         pages = document.page_count
@@ -468,7 +473,7 @@ def convert_pdf(path, raw_dir, images_dir):
                     if pixmap.n - pixmap.alpha >= 4:
                         pixmap = fitz.Pixmap(fitz.csRGB, pixmap)
                     images += 1
-                    name = f"pdf_{base}-page{number:03d}-img{images:03d}.png"
+                    name = claim(used, f"{stem}-page{number:03d}-img{images:03d}", ".png") + ".png"
                     pixmap.save(str(images_dir / name))
                     lines += [image_line(name), ""]
                 except Exception:
@@ -479,9 +484,10 @@ def convert_pdf(path, raw_dir, images_dir):
 
 
 
-def copy_loose_image(path, images_dir):
-    name = f"standalone-{safe_name(path.stem)}.{RASTER[path.suffix.lower().lstrip('.')]}"
-    (images_dir / name).write_bytes(path.read_bytes())
+def copy_loose_image(path, images_dir, used):
+    extension = "." + RASTER[path.suffix.lower().lstrip(".")]
+    name = claim(used, f"standalone-{safe_name(path.stem)}", extension) + extension
+    shutil.copyfile(path, images_dir / name)
     return {"source": path.name, "type": "standalone-image", "output": f"images/{name}"}
 
 
@@ -492,6 +498,7 @@ def convert_folder(input_folder, work_dir):
     manifest = {"input_folder": str(input_folder), "work_dir": str(work_dir),
                 "converted_at": datetime.now().isoformat(timespec="seconds"),
                 "files": [], "skipped": [], "export_requests": [], "warnings": []}
+    used = set()
     for path in sorted(input_folder.iterdir()):
         extension = path.suffix.lower()
         if path.name.startswith(("~$", ".")):
@@ -501,13 +508,13 @@ def convert_folder(input_folder, work_dir):
             continue
         try:
             if extension == ".docx":
-                manifest["files"].append(convert_docx(path, raw_dir, images_dir))
+                manifest["files"].append(convert_docx(path, raw_dir, images_dir, used))
             elif extension == ".pptx":
-                manifest["files"].append(convert_pptx(path, raw_dir, images_dir))
+                manifest["files"].append(convert_pptx(path, raw_dir, images_dir, used))
             elif extension == ".xlsx":
-                manifest["files"].append(convert_xlsx(path, raw_dir, images_dir))
+                manifest["files"].append(convert_xlsx(path, raw_dir, images_dir, used))
             elif extension == ".pdf" and HAS_PYMUPDF:
-                manifest["files"].append(convert_pdf(path, raw_dir, images_dir))
+                manifest["files"].append(convert_pdf(path, raw_dir, images_dir, used))
             elif extension == ".pdf":
                 manifest["export_requests"].append({
                     "file": path.name,
@@ -520,10 +527,11 @@ def convert_folder(input_folder, work_dir):
                     "reason": f"legacy {extension} format; save it as {LEGACY[extension]} and run again",
                 })
             elif extension in TEXT_EXTENSIONS:
-                (raw_dir / path.name).write_bytes(path.read_bytes())
-                manifest["files"].append({"source": path.name, "type": "text", "output": f"raw/{path.name}"})
+                name = claim(used, path.stem, path.suffix) + path.suffix
+                shutil.copyfile(path, raw_dir / name)
+                manifest["files"].append({"source": path.name, "type": "text", "output": f"raw/{name}"})
             elif extension.lstrip(".") in RASTER:
-                manifest["files"].append(copy_loose_image(path, images_dir))
+                manifest["files"].append(copy_loose_image(path, images_dir, used))
             else:
                 manifest["skipped"].append({"file": path.name, "reason": f"unsupported extension {extension}"})
         except Exception as error:
