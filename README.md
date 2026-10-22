@@ -50,7 +50,7 @@ The plugin manifest has no version, so an install tracks the commit of the marke
 | `server-rules` | Triggers when you design, write, or review Java game server feature code | A rule id or a topic | The rule with a reason, a Java do and don't, and a reviewer check. Writes no files. |
 | `server-profile` | Explicit only (`/game-server:server-profile`) | The target server repository, read-only | `docs/game-server/profile.md`, which records how the core provides each capability and which gaps block multi-node or blue-green safety |
 | `gdd-intake` | Triggers when you hand over a GDD folder, slides, docs, a balance sheet, or a feature prompt | A folder of pptx, docx, xlsx, PDF, Markdown, or images, or a prompt | `docs/game-server/features/<feature>/design.md` with sourced requirements and open questions, plus draft config JSON in the `config` folder beside it |
-| `feature-spec` | Triggers when you want a server design or plan for a feature | `design.md` or a prompt, plus the profile | `docs/game-server/features/<feature>/spec.md`. On request, also a tickets file at `docs/intents/<feature>-tickets.md` for nstack Spec build, or a task list at `docs/game-server/features/<feature>/tasks.md` for plain Claude Code |
+| `feature-spec` | Triggers when you want a server design or plan for a feature | `design.md` or a prompt, plus the profile | `docs/game-server/features/<feature>/spec.md`. On request, also a build plan: a task list at `docs/game-server/features/<feature>/tasks.md`, or a tickets file at `docs/intents/<feature>-tickets.md` for a workflow that reads tickets |
 | `feature-build` | Triggers when you implement a feature, command, or spec slice | The profile, the spec, and one slice | Java code and unit tests for the slice, written through the core APIs the profile records, and a slice report |
 | `feature-review` | Triggers when you review feature code or a diff | The code, the profile, the spec, and the design | A findings report with severity, rule id, `file:line`, and a failure scenario, plus a trace table from each design id to code and tests. It runs the feature linter first. |
 
@@ -60,16 +60,13 @@ The plugin manifest has no version, so an install tracks the commit of the marke
 
 1. **Profile.** Run `server-profile` once per server repository, and again when the core changes. The spec, build, and review skills stop without it.
 2. **Intake.** Run `gdd-intake` on the GDD folder or the prompt. Answer the open questions it lists.
-3. **Spec.** Run `feature-spec` on the design. If the spec lists a core blocker, the skill stops and you decide. Confirm the spec, then ask for the tickets file or the task list.
-4. **Build.** Run `feature-build` once per slice, each in a fresh context.
+3. **Spec.** Run `feature-spec` on the design. If the spec lists a core blocker, the skill stops and you decide. Confirm the spec. For a large feature, ask for a build plan.
+4. **Build.** Run `feature-build` on the spec, one slice at a time for a large feature.
 5. **Review.** Run `feature-review` over the finished branch.
 
 `server-rules` is not a step. The other skills load it when they need a rule.
 
-The usage guides walk through this order.
-
-- [Use the skills with nstack](docs/usage-nstack.md)
-- [Use the skills in a plain Claude Code chat](docs/usage-plain.md)
+The skills work in a plain chat, across sessions, or under any workflow plugin. [Use the skills](docs/usage.md) walks through this order.
 
 ## Check this repository
 
