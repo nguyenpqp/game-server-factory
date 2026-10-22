@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check a game server profile against the profile template.
 
-Usage: check_profile.py [--blocked-rules] <profile.md>
+Usage: check_profile.py [--blocked-rules] [--decisions <decisions.md>] <profile.md>
 
 Prints `path:line: message` for each failure and exits 1 if any failure exists.
 The required frontmatter keys and capability headings are read from
@@ -14,20 +14,30 @@ index whose `needs` line names it, and for a partial one, the rule ids on its
 
 A `blocker` line that names a rule whose `needs` line in the rule index does not
 name that capability prints a warning to stderr. The exit code does not change.
+
+With `--decisions`, the script also checks a project decisions file, in the format of
+`feature-spec/references/decisions-template.md`, against the profile and the rule
+index. A decision whose capability is present prints a warning to stderr.
 """
 import argparse
+import datetime
 import re
 import sys
 from collections import namedtuple
 from pathlib import Path
 
 Finding = namedtuple("Finding", "path line message")
+Decision = namedtuple("Decision", "line id capability status rules fact bound by date")
 
 SKILLS = Path(__file__).resolve().parents[2]
 TEMPLATE = SKILLS / "server-profile" / "references" / "profile-template.md"
 RULE_INDEX = SKILLS / "server-rules" / "references" / "index.md"
 
 STATUSES = ("present", "partial", "missing")
+ACCEPTABLE_STATUSES = ("partial", "missing")
+DECISION_COLUMNS = ("Id", "Capability", "Profile status", "Rules", "Deployment fact",
+                    "How it bounds the failure", "Accepted by", "Date")
+RULE_BLOCKING = "PERF-01"
 FIELDS_WHEN_PRESENT = ("api", "file", "snippet")
 FIELDS_WHEN_NOT_PRESENT = ("blocker", "proposal")
 OPTIONAL_KEYS = {"lint.command_method", "lint.allowed_import"}
@@ -39,6 +49,9 @@ FIELD_LINE = re.compile(r"^-\s+(\w+):\s*(.*)$")
 RULE_ID = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST|DES|MOD|SYNC|LOG)-\d{2}\b")
 RULE_HEADING = re.compile(r"^###\s+(" + RULE_ID.pattern + ")")
 KEY_LINE = re.compile(r"^(\s*)([A-Za-z_]\w*):(.*)$")
+DECISION_ID = re.compile(r"^D\d+$")
+DECISION_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+SEPARATOR_CELL = re.compile(r"^:?-+:?$")
 
 
 def unfenced(lines):
@@ -210,17 +223,119 @@ def blocked_rules(statuses, blockers, index=RULE_INDEX):
     return blocked
 
 
+def row_cells(line):
+    if not line.lstrip().startswith("|"):
+        return None
+    cells = re.split(r"(?<!\\)\|", line.strip())[1:]
+    if cells and not cells[-1].strip():
+        cells = cells[:-1]
+    return [cell.strip().replace("\\|", "|") for cell in cells]
+
+
+def tables(numbered_lines):
+    table = []
+    for number, line in numbered_lines:
+        cells = row_cells(line)
+        if cells is not None:
+            table.append((number, cells))
+        elif table:
+            yield table
+            table = []
+    if table:
+        yield table
+
+
+def read_decisions(path):
+    try:
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        return [Finding(path, 1, "file not found")], []
+    table = next((t for t in tables(unfenced(lines)) if tuple(t[0][1]) == DECISION_COLUMNS), None)
+    if table is None:
+        return [Finding(path, 1, f"no table with the columns {' | '.join(DECISION_COLUMNS)}")], []
+    findings, decisions = [], []
+    for number, cells in table[1:]:
+        if all(SEPARATOR_CELL.match(cell) for cell in cells):
+            continue
+        if len(cells) == len(DECISION_COLUMNS):
+            decisions.append(Decision(number, *cells))
+        else:
+            findings.append(Finding(path, number, f"row has {len(cells)} cells, expected {len(DECISION_COLUMNS)}"))
+    return findings, decisions
+
+
+def valid_date(text):
+    if not DECISION_DATE.match(text):
+        return False
+    try:
+        datetime.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+
+
+def decision_errors(decision, caps, needs, status, first_line):
+    label, cap = decision.id or "row", decision.capability
+    errors = []
+    if not DECISION_ID.match(decision.id):
+        errors.append(f"id '{decision.id}' is not D followed by a number")
+    elif decision.id in first_line:
+        errors.append(f"{label} repeats the id on line {first_line[decision.id]}")
+    if cap not in caps:
+        errors.append(f"{label} names {cap or 'no capability'}, which is not a capability of the profile template")
+    if decision.status not in ACCEPTABLE_STATUSES:
+        errors.append(f"{label} has profile status '{decision.status}' (use partial or missing)")
+    rules = [token.strip() for token in decision.rules.split(",") if token.strip()]
+    if not rules:
+        errors.append(f"{label} names no rule id")
+    for rule in dict.fromkeys(rules):
+        if rule == RULE_BLOCKING:
+            errors.append(f"{label} names {rule}, which is accepted per call site in each spec, never in decisions")
+        elif rule not in needs:
+            errors.append(f"{label} names {rule}, which is not in the rule index")
+        elif cap in caps and cap not in needs[rule]:
+            errors.append(f"{label} names {rule}, whose needs line in the rule index does not name {cap}")
+    for column, value in (("Deployment fact", decision.fact), ("How it bounds the failure", decision.bound),
+                          ("Accepted by", decision.by)):
+        if not value:
+            errors.append(f"{label} has an empty {column}")
+    if not valid_date(decision.date):
+        errors.append(f"{label} has date '{decision.date}' (use YYYY-MM-DD)")
+    if status in ACCEPTABLE_STATUSES and decision.status in ACCEPTABLE_STATUSES and decision.status != status:
+        errors.append(f"{label} is stale: it records {cap} as {decision.status} but the profile says {status}, "
+                      "so the developer must re-decide it")
+    return errors
+
+
+def check_decisions(path, statuses, index=RULE_INDEX):
+    _, caps = load_template()
+    needs = rule_needs(index)
+    findings, decisions = read_decisions(path)
+    warnings, first_line = [], {}
+    for decision in decisions:
+        status = statuses.get(decision.capability)
+        findings += [Finding(path, decision.line, error)
+                     for error in decision_errors(decision, caps, needs, status, first_line)]
+        first_line.setdefault(decision.id, decision.line)
+        if status == "present":
+            warnings.append(Finding(path, decision.line, f"{decision.id or 'row'} names {decision.capability}, "
+                                    "which is present in the profile, so the decision is no longer needed"))
+    return sorted(findings, key=lambda finding: finding.line), warnings
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Check a game server profile.")
     parser.add_argument("profile")
     parser.add_argument("--blocked-rules", action="store_true")
+    parser.add_argument("--decisions")
     args = parser.parse_args(argv)
     findings, statuses, blockers, headings = check_profile(args.profile)
-    for finding in findings:
+    decision_findings, decision_warnings = check_decisions(args.decisions, statuses) if args.decisions else ([], [])
+    for finding in findings + decision_findings:
         print(f"{finding.path}:{finding.line}: {finding.message}")
-    for warning in blocker_warnings(args.profile, blockers, headings):
+    for warning in blocker_warnings(args.profile, blockers, headings) + decision_warnings:
         print(f"warning: {warning.path}:{warning.line}: {warning.message}", file=sys.stderr)
-    if findings:
+    if findings or decision_findings:
         return 1
     if args.blocked_rules:
         for cap, rules in blocked_rules(statuses, blockers).items():

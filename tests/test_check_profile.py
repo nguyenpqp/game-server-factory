@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "plugins/game-server/skills/server-profile/scripts/check_profile.py"
 FIXTURES = ROOT / "tests/fixtures/profile"
 TEMPLATE = ROOT / "plugins/game-server/skills/server-profile/references/profile-template.md"
+DECISIONS_TEMPLATE = ROOT / "plugins/game-server/skills/feature-spec/references/decisions-template.md"
 
 check = load_script(SCRIPT)
 
@@ -30,6 +31,13 @@ def line_of(path, text):
         if text in line:
             return number
     raise AssertionError(f"{text!r} not in {path}")
+
+
+def run_decisions(text, *flags, profile=FIXTURES / "valid.md"):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp, "decisions.md")
+        path.write_text(text, encoding="utf-8")
+        return (path, *run(*flags, "--decisions", path, profile))
 
 
 class CheckProfileTest(unittest.TestCase):
@@ -156,6 +164,158 @@ class CheckProfileTest(unittest.TestCase):
         code, out, _ = run("--blocked-rules", FIXTURES / "missing-key.md")
         self.assertEqual(code, 1)
         self.assertEqual(len(out), 1, out)
+
+
+class CheckDecisionsTest(unittest.TestCase):
+    HEADER = re.search(r"^\| Id \|.*$", DECISIONS_TEMPLATE.read_text(encoding="utf-8"), re.M).group(0)
+    COLUMNS = check.DECISION_COLUMNS
+    GOOD = dict(zip(COLUMNS, ("D1", "CAP-LEASE", "missing", "MN-07", "One node per realm",
+                              "No second node runs the job", "An", "2026-10-22")))
+
+    def file(self, *rows):
+        lines = ["# Project decisions", "", self.HEADER, "| " + " | ".join(["---"] * 8) + " |"]
+        for row in rows:
+            cells = {**self.GOOD, **row}
+            lines.append("| " + " | ".join(cells[column] for column in self.COLUMNS) + " |")
+        return "\n".join(lines) + "\n"
+
+    def messages(self, *rows, **kw):
+        path, code, out, err = run_decisions(self.file(*rows), **kw)
+        self.assertEqual(code, 1, out)
+        for line in out:
+            self.assertRegex(line, rf"^{re.escape(str(path))}:\d+: ")
+        return path, out
+
+    def one_error(self, row, *words, line=5, before=()):
+        path, out = self.messages(*before, row)
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith(f"{path}:{line}: "), out)
+        for word in words:
+            self.assertIn(word, out[0])
+
+    def test_valid_decisions_pass_silently(self):
+        rows = [{}, {"Id": "D2", "Capability": "CAP-DRAIN", "Rules": "BG-10, BG-13"},
+                {"Id": "D3", "Capability": "CAP-BOT", "Profile status": "partial", "Rules": "TEST-10"}]
+        _, code, out, err = run_decisions(self.file(*rows))
+        self.assertEqual((code, out, err), (0, [], []))
+
+    def test_missing_decisions_file(self):
+        path = FIXTURES / "no-decisions.md"
+        code, out, _ = run("--decisions", path, FIXTURES / "valid.md")
+        self.assertEqual((code, out), (1, [f"{path}:1: file not found"]))
+
+    def test_file_without_the_template_table(self):
+        path, code, out, _ = run_decisions("# Project decisions\n\nNothing yet.\n")
+        self.assertEqual(code, 1)
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith(f"{path}:1: no table"), out)
+
+    def test_columns_in_another_order_are_not_the_table(self):
+        swapped = self.HEADER.replace("Capability | Profile status", "Profile status | Capability")
+        path, code, out, _ = run_decisions(self.file().replace(self.HEADER, swapped))
+        self.assertEqual(code, 1)
+        self.assertTrue(out[0].startswith(f"{path}:1: no table"), out)
+
+    def test_template_header_matches_the_checker(self):
+        self.assertEqual(tuple(check.row_cells(self.HEADER)), check.DECISION_COLUMNS)
+
+    def test_escaped_pipe_stays_inside_its_cell(self):
+        _, code, out, _ = run_decisions(self.file({"Deployment fact": "One node per realm \\| stop then start"}))
+        self.assertEqual((code, out), (0, []))
+
+    def test_id_must_be_d_and_digits(self):
+        self.one_error({"Id": "X1"}, "X1", "D")
+
+    def test_repeated_id(self):
+        self.one_error({"Capability": "CAP-DRAIN", "Rules": "BG-10"}, "D1", "repeats", "line 5",
+                       line=6, before=({},))
+
+    def test_unknown_capability(self):
+        self.one_error({"Capability": "CAP-NOPE"}, "CAP-NOPE", "capability")
+
+    def test_recorded_status_must_be_partial_or_missing(self):
+        self.one_error({"Profile status": "present"}, "present", "partial or missing")
+
+    def test_rules_cell_without_a_rule_id(self):
+        self.one_error({"Rules": ""}, "D1", "no rule id")
+
+    def test_rule_not_in_the_index(self):
+        self.one_error({"Rules": "MN-07, MN-99"}, "MN-99", "rule index")
+
+    def test_rule_whose_needs_line_omits_the_capability(self):
+        self.one_error({"Rules": "MN-07, MN-02"}, "MN-02", "CAP-LEASE", "needs")
+
+    def test_perf_01_is_never_accepted_in_decisions(self):
+        self.one_error({"Capability": "CAP-BOT", "Profile status": "partial", "Rules": "PERF-01"},
+                       "PERF-01", "per call site", "never in decisions")
+
+    def test_empty_cells(self):
+        for column in ("Deployment fact", "How it bounds the failure", "Accepted by"):
+            with self.subTest(column=column):
+                self.one_error({column: ""}, "empty", column)
+
+    def test_malformed_dates(self):
+        for date in ("", "22-10-2026", "2026-1-2", "2026-02-30", "soon"):
+            with self.subTest(date=date):
+                self.one_error({"Date": date}, "YYYY-MM-DD")
+
+    def test_stale_decision_must_be_re_decided(self):
+        self.one_error({"Profile status": "partial"}, "stale", "partial", "missing", "re-decide")
+
+    def test_present_capability_warns_and_exits_zero(self):
+        path, code, out, err = run_decisions(self.file({"Capability": "CAP-OWNERSHIP", "Rules": "MN-02"}))
+        self.assertEqual((code, out), (0, []))
+        self.assertEqual(len(err), 1, err)
+        self.assertTrue(err[0].startswith(f"warning: {path}:5: "), err)
+        self.assertIn("CAP-OWNERSHIP", err[0])
+        self.assertIn("no longer needed", err[0])
+
+    def test_present_capability_with_a_bad_cell_still_fails(self):
+        _, code, out, err = run_decisions(self.file({"Capability": "CAP-OWNERSHIP", "Rules": "MN-02", "Date": ""}))
+        self.assertEqual(code, 1)
+        self.assertEqual(len(out), 1, out)
+        self.assertEqual(len(err), 1, err)
+
+    def test_each_failing_row_reports_its_own_line(self):
+        path, out = self.messages({"Date": "soon"}, {"Id": "D2", "Capability": "CAP-DRAIN", "Rules": "MN-07"})
+        self.assertEqual(len(out), 2, out)
+        self.assertTrue(out[0].startswith(f"{path}:5: "), out)
+        self.assertTrue(out[1].startswith(f"{path}:6: "), out)
+
+    def test_row_with_the_wrong_cell_count(self):
+        text = self.file() + "| D2 | CAP-DRAIN |\n"
+        path, code, out, _ = run_decisions(text)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith(f"{path}:5: "), out)
+
+    def test_decisions_do_not_change_profile_checking(self):
+        code, out, _ = run("--decisions", FIXTURES / "does-not-exist.md", FIXTURES / "missing-key.md")
+        self.assertEqual(code, 1)
+        self.assertIn(f"{FIXTURES / 'missing-key.md'}:1: missing frontmatter key lint.env_live_check", out)
+
+    def test_blocked_rules_still_prints_with_valid_decisions(self):
+        _, code, out, _ = run_decisions(self.file(), "--blocked-rules")
+        self.assertEqual(code, 0, out)
+        self.assertIn("CAP-LEASE (missing): MN-07", out)
+
+    def test_blocked_rules_is_silent_when_the_decisions_fail(self):
+        _, code, out, _ = run_decisions(self.file({"Date": "soon"}), "--blocked-rules")
+        self.assertEqual(code, 1)
+        self.assertEqual(len(out), 1, out)
+
+    def test_blocker_warning_still_prints_with_decisions(self):
+        text = (FIXTURES / "valid.md").read_text(encoding="utf-8").replace(
+            "- blocker: BG-07 cannot be met for part of the cases.",
+            "- blocker: BG-07 and MN-10 cannot be met for part of the cases.",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = Path(tmp, "profile.md")
+            profile.write_text(text, encoding="utf-8")
+            _, code, out, err = run_decisions(self.file(), profile=profile)
+        self.assertEqual((code, out), (0, []))
+        self.assertEqual(len(err), 1, err)
+        self.assertIn("MN-10", err[0])
 
 
 if __name__ == "__main__":
