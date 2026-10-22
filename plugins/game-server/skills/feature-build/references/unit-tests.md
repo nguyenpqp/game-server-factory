@@ -121,6 +121,7 @@ Write these cases for every command.
 - Each random outcome with the RNG scripted (TEST-02).
 - A replay of one request id that asserts one effect (TEST-09).
 - A grant failure that asserts the refund, for each command that takes a cost (AUTH-07).
+- For a claim or grant command, a claim in each terminal state of the feature, such as finished, expired, or closed, that asserts the error code and no grant (AUTH-06).
 - A request from an old client that lacks the new fields, decoded through `parse`, that asserts the old behavior (TEST-07). When the feature's minimum client is newer than the session's, assert `CLIENT_TOO_OLD` and no change (BG-07).
 
 ## Metric rows
@@ -163,7 +164,7 @@ void ignoresAKeyItDoesNotKnow() {
 }
 ```
 
-One test loads a valid file. One test per validation rule loads a file that breaks only that rule, and asserts the file and the key in the error (TEST-05, CFG-02). One test loads a file with an extra key and asserts that it loads, so an old server reads a newer file (BG-08).
+One test loads a valid file. One test per validation rule loads a file that breaks only that rule, and asserts the file and the key in the error (TEST-05, CFG-02). One test loads a file with an extra key and asserts that it loads, so an old server reads a newer file (BG-08). When the config names reward types, one test loads a reward type that `validate` must reject, such as a capped or unlogged one, and asserts the key in the error (CFG-02).
 
 ## Stored-data compatibility
 

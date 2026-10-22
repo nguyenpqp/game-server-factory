@@ -120,6 +120,7 @@ static Outcome process(EventShopState state, EventShopConfig cfg, Inventory inv,
 ```
 
 - The checks run in the order of the spec's Checks table, and each returns its own error code (AUTH-06, AUTH-10). A rejected command returns before any change, so its state is the state it started with.
+- A claim or grant command checks the feature's terminal state, such as finished, expired, or closed, before it grants anything (AUTH-06). Check it even when another check seems to cover it, such as a list of claimed ids. A config change, such as a new reward id, can open a path that the other check misses.
 - The core takes `now` and, when it draws random numbers, a `GameRandom` parameter. It never reads a clock or a random source itself (AUTH-02, AUTH-03). `ServerClock.dayOf` is a pure conversion with the day-reset timezone from CAP-CLOCK, and it reads no clock.
 - The client version gate uses the version that the session reported at login (BG-07). The real API comes from CAP-CLIENTVER.
 - The config lookup `cfg.item(id)` is a map read from an index built at load (PERF-05). The price, the limit, and the reward come from config (CFG-05).

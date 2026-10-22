@@ -96,7 +96,7 @@ Run the four steps in the template. In step 1, leave out a rule that the spec ci
 
 For each blocking row, cut the profile entry's `proposal` down to what this feature needs. Write the players' failure in one sentence.
 
-A `critical` rule may be accepted only with a reason that states the deployment fact that makes the risk acceptable, such as "one node per realm". Without that fact the row counts as `open`. List each accepted critical rule id with its reason on the header's `Accepted risks` line. Write `None.` there when there is none.
+A `critical` rule may be accepted only with a reason that names the deployment fact and says how that fact prevents or bounds the failure in the row's `What fails for players` cell, such as "one node per realm, so no second node can load the player and save over the claim". A reason that only cites a fact, without that link, counts as `open`. Ask the developer for the link. List each accepted critical rule id with its reason on the header's `Accepted risks` line. Write `None.` there when there is none.
 
 When any row counts as `open`:
 

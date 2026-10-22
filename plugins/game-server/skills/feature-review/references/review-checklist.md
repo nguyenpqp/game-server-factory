@@ -24,7 +24,7 @@ Read each command handler and the core method it calls, in order. Trace every re
 | AUTH-03 | critical | yes | Any random source other than the injected one. Look for seeds taken from the request, and for a roll done twice so a client can retry for a better result. |
 | AUTH-04 | critical | no | A request decoded and used before a range, length, enum, or null check. A list field with no size cap. A string used as a key with no length cap. |
 | AUTH-05 | critical | no | An item, slot, or target id from the request used without a check that the acting user owns it or may reach it. A friend or guild member id used without a membership check. |
-| AUTH-06 | critical | no | A state change that runs before the active, unlocked, state-transition, or cooldown check. A check that reads client-sent state. |
+| AUTH-06 | critical | no | A state change that runs before the active, unlocked, state-transition, or cooldown check. A check that reads client-sent state. A claim or grant command that does not check the feature's terminal state, such as finished, expired, or closed, before it grants, even when a claimed list seems to cover it. |
 | AUTH-07 | critical | no | Several costs taken one by one with no up-front check. A cost taken before a later step that can fail, with no refund on that failure. |
 | AUTH-08 | critical | no | A grant, purchase, or claim command with no request id, or a request id stored after the grant. A retry path that can run the grant twice. |
 | AUTH-09 | important | no | A command that loads other users or the database, or fans out, with no per-user limit. A limit that still applies the effect once exceeded. |
@@ -88,7 +88,7 @@ Read the config file, its loader, its validator, and every place that reads it.
 | Rule | Severity | Lint | Look for |
 | --- | --- | --- | --- |
 | CFG-01 | important | no | Feature settings added to a shared config file. |
-| CFG-02 | critical | no | A config field read and checked on first use. A validator that logs and continues on an invalid file. |
+| CFG-02 | critical | no | A config field read and checked on first use. A validator that logs and continues on an invalid file. A reward type allowlist that accepts a type whose grant can be partial, capped, silently empty, or written without a metric row and trace id (MET-03, MET-04). |
 | CFG-03 | important | no | A config object that is mutated in place, or read twice in one command so a reload can change it in between. |
 | CFG-04 | important | no | A feature config with no `isActive` flag, or a time-bound feature whose start and end are not checked against server time. |
 | CFG-05 | important | no | A cost, reward, rate, limit, or duration written as a constant in code. |
@@ -105,7 +105,7 @@ Follow one action from its first line to each return and each catch.
 | MET-01 | important | partial | A command path with no user action row, or with a row only on success. Two rows for one action. The linter finds a command class with no metric call. Check each failure branch yourself. |
 | MET-02 | important | partial | A command that mints no trace id, or that mints a second one. A metric row written with no trace id. The linter finds a command class with no trace id call. |
 | MET-03 | important | no | A currency or inventory call with no trace id argument, or with a new one. |
-| MET-04 | important | no | A source or sink with no reason constant, or a reason shared with another feature action. |
+| MET-04 | important | no | A source or sink with no reason constant, or a reason shared with another feature action. A grant API that writes a change row only when the grant fails. |
 | MET-05 | important | no | A multi-step flow with one metric action for all steps. |
 | MET-06 | important | no | A success measure in the spec with no KPI query. A query that names a column that does not exist. |
 | MET-07 | important | no | A new fixed column for new metric data. An extra field with no stated meaning. |

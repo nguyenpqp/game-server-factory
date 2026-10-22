@@ -410,7 +410,7 @@ The `Resolution` cell holds one value.
 | `open` | The row waits for the developer. | yes |
 | `core changed` | The developer changed the core, and the profile now shows the capability as `present`. | no |
 | `descoped` | The developer removed the feature parts that need the capability. The row names the design ids dropped. | no |
-| `accepted by <name>: <reason>` | The developer accepts the risk. The value is valid for any severity. When a rule blocked is `critical`, the reason states the deployment fact that makes the risk acceptable, such as "one node per realm", and the header's `Accepted risks` line lists the rule. A critical acceptance without that fact counts as `open`. | no |
+| `accepted by <name>: <reason>` | The developer accepts the risk. The value is valid for any severity. When a rule blocked is `critical`, the reason names the deployment fact and says how that fact prevents or bounds the failure that the row names, such as "one node per realm, so no second node can load the player and save over the claim". The header's `Accepted risks` line lists the rule. A critical acceptance that cites a fact without that link counts as `open`. | no |
 
 While any row blocks, the spec status is `blocked`. The skill that writes the spec stops and gives this section to the developer, and `feature-build` does not start. Only the developer sets a resolution. Feature code never works around a missing capability.
 
