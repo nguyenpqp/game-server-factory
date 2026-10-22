@@ -195,6 +195,8 @@ void saveKeepsFieldsFromANewerVersion() {
 
 Each stored document has a test that loads a document from before the change, and a test that loads one with a field from a newer version and asserts that a save keeps it (TEST-06, BG-02, BG-09). Run both through the project's real serializer from CAP-USERSTORE, never a test-only JSON mapper, because the serializer is what drops or keeps fields.
 
+When the document holds a nested type, the newer-version fixture also puts an unknown field inside the nested object, and the test asserts that a save keeps it (BG-02). When a stored map is keyed by an enum, one test loads a document whose map has a key that the running version does not know, and asserts that the load succeeds and a save keeps the entry (BG-01).
+
 ## HTTP callbacks and inbox entries
 
 For each endpoint, test each rejected call against its status code, with a bad signature, a stale timestamp, a caller not on the allowlist, an empty allowlist on live, and a payload that does not match the product. Then test a duplicate callback, and assert one inbox entry and a 200 answer (TEST-09, HTTP-08). For each inbox entry type, apply the same entry twice and assert one grant. Use the in-memory Redis and inbox fakes from CAP-UNITTEST when the profile names them.

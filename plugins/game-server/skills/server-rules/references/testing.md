@@ -309,3 +309,41 @@ void setUp() {
 **Check.** For each `setForTest` or global setter in a test class, find the matching restore in an `@AfterEach` or a `finally`.
 
 - needs: CAP-UNITTEST
+
+### TEST-12 Tests assert behavior through fakes that record effects, and no test covers a getter, a library's config parsing, framework behavior, a restated constant, or mock wiring.
+
+**Why.** A test that cannot fail when the behavior breaks costs review and run time and gives false confidence, and a test pinned to wiring fails on every refactor while it catches no bug.
+
+Do:
+
+```java
+@Test
+void buyTakesThePriceOnce() {
+    FakeInventory inv = new FakeInventory().give("gem", 100);
+
+    BuyShopItem.process(state, cfg, inv, request("req-00001"), CLIENT, NOW, TRACE);
+
+    assertEquals(List.of(new Change("gem", -10, "EVENT_SHOP_BUY", TRACE)), inv.changes());
+}
+```
+
+Don't:
+
+```java
+@Test
+void maxSlotsIsTen() {
+    assertEquals(10, cfg.maxSlots());   // restates the config value
+}
+
+@Test
+void buyCallsTake() {
+    BuyShopItem.process(state, cfg, inventoryMock, request("req-00001"), CLIENT, NOW, TRACE);
+    verify(inventoryMock).take(any(), any(), any());   // wiring, not the amount taken
+}
+```
+
+Don't write a test per getter or setter, a test that the JSON library parses a plain config class, or a test of the framework's delivery or save cycle. Config validation is behavior and keeps its tests (TEST-05).
+
+**Check.** For each new test, break the behavior it names and confirm that it fails, then change only the internals and confirm that it passes. A test that fails neither way, or that tests a getter, library parsing, framework behavior, a restated constant, or mock wiring, is a finding.
+
+- needs: CAP-UNITTEST

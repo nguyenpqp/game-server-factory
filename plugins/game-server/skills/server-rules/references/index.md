@@ -130,6 +130,11 @@ Each rule's reason, Java do and don't, and review check are in [multi-node.md](m
 - severity: critical
 - needs: CAP-CLOCK, CAP-USERSTORE
 
+### MN-12 Fields that must change together live in one stored document, because the store has no transaction across documents.
+
+- severity: critical
+- needs: CAP-USERSTORE
+
 ## BG: blue-green rollout and client compatibility
 
 Each rule's reason, Java do and don't, and review check are in [blue-green.md](blue-green.md).
@@ -508,6 +513,11 @@ Each rule's reason, Java do and don't, and review check are in [testing.md](test
 - needs: CAP-BOT
 
 ### TEST-11 A test that changes global state, such as the config instance, the clock, or the environment, restores it afterward.
+
+- severity: minor
+- needs: CAP-UNITTEST
+
+### TEST-12 Tests assert behavior through fakes that record effects, and no test covers a getter, a library's config parsing, framework behavior, a restated constant, or mock wiring.
 
 - severity: minor
 - needs: CAP-UNITTEST

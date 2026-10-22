@@ -37,7 +37,7 @@ Ask which node and which thread run each line. Ask what happens when two nodes r
 | Rule | Severity | Lint | Look for |
 | --- | --- | --- | --- |
 | MN-01 | critical | yes | Static fields, singletons, and `static final` maps or lists in feature code. The linter finds the field forms. Look for state hidden in a singleton or an enum field. |
-| MN-02 | critical | no | Code that reads or writes another user's live state from the acting user's thread, or that holds a user object across commands outside the actor. |
+| MN-02 | critical | no | Code that reads or writes another user's live state from the acting user's thread, or that holds a user object across commands outside the actor. State that lives only for a session, such as a session key or a per-session cache, stored in the user's document, so it survives into the next session or onto another node. A state reference read before an async hop and used after it, instead of a fresh read on the owner. A continuation that the owner drops when the session ends, used to signal a caller that outlives the session. |
 | MN-03 | critical | no | A load-modify-save of a second user's document. A reward, gift, or penalty applied to a target user in the sender's command. |
 | MN-04 | critical | no | A `set` or `replace` on a document that two users or two nodes write. A CAS loop with no attempt limit. |
 | MN-05 | critical | no | A Redis `GET`, Java arithmetic, then `SET`. A check-then-act on a counter or a board across two calls. |
@@ -46,7 +46,8 @@ Ask which node and which thread run each line. Ask what happens when two nodes r
 | MN-08 | critical | no | A counter field or an `AtomicLong` used to make ids that are stored or sent to other users. A snowflake node id read from config that two nodes can share. |
 | MN-09 | important | no | A node-local cache of shared data with no invalidation call or no stated staleness bound. |
 | MN-10 | important | no | A lookup in a node-local session map to push to a user or test if the user is online. |
-| MN-11 | critical | no | A scheduled timer, `schedule`, or `Timer` that finishes a user's effect. State that stores a remaining duration that is decremented. A ready time that is not read from a stored timestamp. |
+| MN-11 | critical | no | A scheduled timer, `schedule`, or `Timer` that finishes a user's effect. State that stores a remaining duration that is decremented. A ready time that is not read from a stored timestamp. A speed-up that stores a remaining time instead of moving the stored timestamp, such as the start back or the ready time to now. |
+| MN-12 | critical | no | Fields that one invariant ties together, split across two documents that save at different times, such as a cost in one and the purchase it paid for in another. |
 
 ## BG: Blue-green rollout and client compatibility
 
@@ -54,8 +55,8 @@ Compare the stored classes, packets, ids, and config before and after the change
 
 | Rule | Severity | Lint | Look for |
 | --- | --- | --- | --- |
-| BG-01 | critical | no | A removed, renamed, or retyped field or key in a stored class. A class rename that changes a document key. A changed enum ordinal stored as a number. |
-| BG-02 | critical | no | A serializer or loader that maps to a fixed class and drops fields it does not know. A save that rebuilds the document from the class only. |
+| BG-01 | critical | no | A removed, renamed, or retyped field or key in a stored class. A class rename that changes a document key. A changed enum ordinal stored as a number. A retired enum constant that was a key in a stored map, so an old document fails to load. |
+| BG-02 | critical | no | A serializer or loader that maps to a fixed class and drops fields it does not know. A save that rebuilds the document from the class only. A nested stored type that drops unknown fields while the top-level document keeps them. |
 | BG-03 | critical | no | An existing command id or field reused for a new meaning. A retired id handed to a new command. |
 | BG-04 | critical | no | A response or push field inserted before existing fields, retyped, or made required. A changed meaning of an existing field. |
 | BG-05 | critical | no | A new request field that is read without a default. A decoder that throws when the field is absent. |
@@ -77,7 +78,7 @@ Count the calls per command, and read every loop.
 | PERF-03 | important | no | A database or Redis call inside a `for`, `forEach`, or stream over users, items, or rows. A single `get` repeated where a multi-get exists. |
 | PERF-04 | important | no | A list put into a response or push with no cap. A push sent for every change instead of once per command. |
 | PERF-05 | important | no | A linear search through a config list on the command path. An index built per call. |
-| PERF-06 | important | no | A list or map in user state with no cap or eviction. A history that only grows. |
+| PERF-06 | important | no | A list or map in user state with no cap or eviction. A history that only grows. A counter or accumulated amount with no numeric cap, or a cap with no stated reject or clamp policy. A login or logout hook that creates a document for a user who never used the feature. |
 | PERF-07 | important | no | A loop that pushes to or changes many users inside one command. |
 | PERF-08 | important | no | A single Redis key that every active user writes on the command path. |
 
@@ -173,6 +174,7 @@ Read the tests that the diff adds or should add. Judge the tests against the rul
 | TEST-09 | important | no | An idempotent request or callback with no replay test. |
 | TEST-10 | minor | no | A command with no bot scenario, when the project has a bot. |
 | TEST-11 | minor | no | A test that sets the config instance, clock, or environment and does not restore it. |
+| TEST-12 | minor | no | A test of a getter, of the JSON library's parsing, of framework delivery or saves, or of a constant restated from config. A mock `verify` with no assertion on the effect. |
 
 ## MOD: Modularity
 
@@ -212,6 +214,7 @@ Rules about state hold only if every entry point that touches the state follows 
 | --- | --- |
 | Gameplay command | The full spec row: checks, cost, effect, metric, trace id. |
 | Login | Lazy migration and expiry of old periods run before the first command. The client reads current state through the read command, so login sends no state push (SYNC-01, SYNC-04). |
+| Logout and session close | The hook reads only state already loaded and creates no document for a user who never used the feature. Session-only state is dropped, not saved. A continuation still waiting on I/O can be dropped, so nothing outside the session waits on it. |
 | Offline load | A load of a document for a user who is not online runs the same migration and keeps unknown fields. |
 | Periodic job or tick | The lease is held, the lease token is checked before each write, and the job reads stored timestamps. |
 | Cheat command | The live check, the domain method, the metric row. |

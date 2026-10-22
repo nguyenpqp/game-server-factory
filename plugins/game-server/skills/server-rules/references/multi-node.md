@@ -253,3 +253,31 @@ scheduler.schedule(() -> plot.setReady(true), crop.growMs(), MILLISECONDS);
 **Check.** Find every per-user timer or delayed task in the feature. Each one becomes a stored timestamp checked on read.
 
 - needs: CAP-CLOCK, CAP-USERSTORE
+
+### MN-12 Fields that must change together live in one stored document, because the store has no transaction across documents.
+
+**Why.** Each document saves on its own, so a crash or a failed write between two saves keeps one change and loses the other, such as a cost recorded while the item it bought is missing.
+
+Do:
+
+```java
+// The plot and its harvest record change together, so they share one document.
+GardenState garden = actor.state(GardenState.class);
+garden.harvest(plotId, now);
+garden.markChanged();
+```
+
+Don't:
+
+```java
+plots.clear(plotId);              // saved with PlotState
+harvests.add(plotId, now);        // saved with HarvestState, at another time
+plots.markChanged();
+harvests.markChanged();
+```
+
+Don't split one invariant across documents to keep each one small. Split a document only when each part stays consistent on its own.
+
+**Check.** For each command that changes more than one stored document, ask what a crash after the first save leaves behind. When it breaks an invariant or loses player value, the fields belong in one document.
+
+- needs: CAP-USERSTORE
