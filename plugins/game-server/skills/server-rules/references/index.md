@@ -130,7 +130,7 @@ Each rule's reason, Java do and don't, and review check are in [multi-node.md](m
 - severity: critical
 - needs: CAP-CLOCK, CAP-USERSTORE
 
-### MN-12 Fields that must change together live in one stored document, or in documents that CAP-USERSTORE saves in one write, because the store has no transaction across documents.
+### MN-12 Fields that must change together live in one stored document, or in documents that CAP-USERSTORE saves in one atomic write, because documents that save on their own can be split by a crash.
 
 - severity: critical
 - needs: CAP-USERSTORE

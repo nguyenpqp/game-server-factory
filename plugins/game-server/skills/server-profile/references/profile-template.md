@@ -225,7 +225,7 @@ Must provide:
 - A serializer that keeps unknown fields on load and writes them back on save, for every document that two server versions can write. Record which documents keep them and how deep, top level only or nested.
 - A hook on the owner's executor that runs after load and before the first command, where lazy migration runs.
 - A changed flag and a save cycle that reports a failed write and keeps the change for the next attempt.
-- A save that writes every changed document of one player, the inventory included, in one write that lands whole or not at all, such as one document per player or a batch that the store applies all or nothing. Record which form the project uses.
+- A save that writes every changed document of one player, the inventory balances included, in one write that lands whole or not at all, such as one document per player or a multi-document transaction. A bulk or batch upsert is not atomic. Record which form the project uses.
 
 Typical partial: the serializer drops unknown fields, keeps them only at the top level, or keeps them only on the shared-document write path, the key contains the class name, a failed async write is lost because the changed flag was already cleared, or each document of a player saves on its own, so a crash keeps a grant and loses the record of it. That last gap blocks MN-12.
 

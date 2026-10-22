@@ -30,6 +30,8 @@ The profile shows every capability the spec needs as `present`, with two excepti
 - CAP-CLIENTVER was `partial`. The handshake carried a client version, but the server dropped it after login.
 - CAP-BOT is `missing`. The spec cites no rule that needs it, so it is not a blocker, and the Test plan has no bot scenario.
 
+Its CAP-USERSTORE entry records that the save cycle writes every changed document of a player, the inventory balances included, in one Couchbase transaction, so a claim's reward and StreakState land together.
+
 ## How the blocker resolved
 
 The first draft cited BG-06 and BG-07, and the `blocker` line of the partial CAP-CLIENTVER entry names both. The skill wrote the Core blockers row with resolution `open`, set `Status: blocked`, and stopped. The developer kept the login version on the session and added a minimum version check to the core, then updated the profile entry to `present`. The skill set the resolution to `core changed`, wrote the Test plan and Design coverage, and asked for confirmation. The developer confirmed, and the status became `ready`.
@@ -331,7 +333,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | Concern | Where it lives | Writers | How it stays safe | What fails without it | Rules |
 | --- | --- | --- | --- | --- | --- |
 | Static state | The config snapshot reference only | The config loader | One reference swap at reload | A node-local value differs between nodes | MN-01 |
-| The player's own state | StreakState | The owner actor | Only the owner actor touches it, and CAP-USERSTORE saves it with the inventory in one write | Two nodes overwrite each other's saves, or a crash keeps the reward without the claim, and a claim is lost or granted twice | MN-02, MN-12 |
+| The player's own state | StreakState | The owner actor | Only the owner actor touches it, and CAP-USERSTORE saves it with the inventory in one transaction | Two nodes overwrite each other's saves, or a crash keeps the reward without the claim, and a claim is lost or granted twice | MN-02, MN-12 |
 | Other users' state | The StreakState of an admin's target | AdminSetStreak | The command runs on the target's owner through cross-node delivery | An admin write and a claim on another node overwrite each other | MN-03, ADMIN-02 |
 | Shared documents | StreakState while its user is offline | AdminSetStreak, through the CAP-ADMIN offline path | Holds the user's ownership slot, then CAS with at most 3 attempts | Two support writes at once lose one repair, or a login loads before the repair and saves over it | MN-04, ADMIN-02 |
 | Cluster-wide state | none | none | The feature keeps no Redis state | none | MN-05, MN-06, PERF-08 |

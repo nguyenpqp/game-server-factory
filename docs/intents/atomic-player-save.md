@@ -6,11 +6,11 @@ MN-12 puts fields that change together in one document, because the store has no
 
 ## Outcome
 
-- CAP-USERSTORE must provide a save that writes every changed document of one player in one write that lands whole or not at all, such as one document per player or a batch the store applies all or nothing. A core whose documents save on their own is `partial`, and its blocker names MN-12.
+- CAP-USERSTORE must provide a save that writes every changed document of one player in one write that lands whole or not at all, such as one document per player or a multi-document transaction. A bulk upsert is not atomic, and neither are balances kept in another store. A core whose documents save on their own is `partial`, and its blocker names MN-12.
 - The scan guide says how to find that save and when it is partial.
-- MN-12 says that a change spanning the core's documents and the feature's own, such as a grant and the record of it, relies on that save, so a partial CAP-USERSTORE puts MN-12 in Core blockers.
-- `feature-spec`, the spec template, `command-shape.md`, and the review checklist say the same: fields that change together go in one document or in documents that CAP-USERSTORE saves in one write.
-- The worked example's multi-node row for the player's own state says the claim's grant and StreakState save in one write.
+- MN-12 says that a change spanning the core's documents and the feature's own, such as a grant and the record of it, relies on that save, so a CAP-USERSTORE blocker line that names MN-12 puts MN-12 in Core blockers.
+- `feature-spec`, the spec template, `command-shape.md`, and the review checklist say the same: fields that change together go in one document or in documents that CAP-USERSTORE saves in one atomic write. `command-shape.md` claims the one write only when the profile shows it.
+- The worked example's profile records the transaction form, and its multi-node row for the player's own state cites MN-12.
 - `python3 -m unittest discover -s tests` and `python3 scripts/validate_plugin.py --denylist <local denylist>` pass.
 
 ## Surfaces
