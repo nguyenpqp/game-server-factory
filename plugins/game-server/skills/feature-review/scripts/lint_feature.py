@@ -36,16 +36,17 @@ Checks, with the rule each reports. A check whose profile value is empty is skip
 linter does not.
 
 Comments and string, text block, and character literals are blanked before any
-pattern runs, so a commented-out call is not a finding. Import and package lines are
-skipped. Files under `generated_paths` and `test_root` are skipped, even when named
+pattern runs, so a commented-out call is not a finding. Braces inside annotation
+arguments are blanked too. Import and package lines are skipped. Files under `generated_paths` and `test_root` are skipped, even when named
 on the command line. These paths and `feature_root` are relative to the repository
 root, the directory that holds `docs/game-server/profile.md`. A profile at any other
 place is a usage error.
 
-With `--diff <base>`, the linter runs `git diff -U0 <base>` from the repository root
-and keeps only the findings on lines that the diff adds. A file git does not track is
-not in that diff, so its findings are dropped. A finding on a class line, such as
-MET-01, stays only when the class line itself is new.
+With `--diff <base>`, the linter runs `git diff -U0 <base>` on the named files from the
+repository root, lints only the files in that diff, and keeps only the findings on
+lines that the diff adds. A file git does not track is not in that diff, so it is not
+linted. A finding on a class line, such as MET-01, stays only when the class line
+itself is new. The note about no command class then covers only the diffed files.
 """
 import argparse
 import json
@@ -69,12 +70,10 @@ LINT_KEYS = (
     "time_call", "forbidden_time", "random_call", "forbidden_random", "env_live_check",
     "metric_call", "trace_id_call", "command_method", "cheat_marker", "blocking_calls",
 )
-LIST_KEYS = {"forbidden_time", "forbidden_random", "blocking_calls"}
 DEFAULT_COMMAND_METHOD = r"handle\w*"
 
 TYPE_KEYWORD = re.compile(r"(?<![.\w@])(?:class|interface|enum|record)\s+([A-Za-z_]\w*)")
 STATIC_KEYWORD = re.compile(r"\bstatic\b")
-ANNOTATION = re.compile(r"@\w+(?:\.\w+)*\s*(?:\([^()]*\))?")
 ANNOTATION_ARGS = re.compile(r"@\w+(?:\.\w+)*\s*\(")
 SNAPSHOT_HOLDER = re.compile(r"\bAtomicReference\s*<\s*([\w.]+)\s*>")
 GENERICS = re.compile(r"<[^<>]*>")
@@ -84,6 +83,7 @@ METHOD_DECLARATION = re.compile(
     r"(?<![\w.])(?!(?:return|new|else|throw|case)\b)[\w<>\[\],.?]+\s+([A-Za-z_]\w*)\s*\("
 )
 SKIPPED_LINE = re.compile(r"^\s*(?:import|package)\b")
+LITERAL_START = re.compile(r"//|/\*|\"\"\"|[\"']")
 TYPE_WORDS = {"class", "interface", "enum", "record"}
 MODIFIERS = {
     "public", "protected", "private", "static", "final", "volatile", "transient",
@@ -197,7 +197,7 @@ class Settings:
             raise UsageError(f"{profile_path}: no lint block")
         self.patterns = {}
         for key in LINT_KEYS:
-            value = raw.get(key, [] if key in LIST_KEYS else "")
+            value = raw.get(key, "")
             if key == "command_method" and key not in raw:
                 value = DEFAULT_COMMAND_METHOD
             values = value if isinstance(value, list) else [value]
@@ -221,13 +221,16 @@ class Settings:
     def one(self, key):
         return self.patterns[key][0] if self.patterns[key] else None
 
-    def under(self, path, root):
-        parts = Path(root.strip("/")).parts
+    def relative_parts(self, path):
         try:
-            relative = Path(path).resolve().relative_to(self.repo_root).parts
+            return Path(path).resolve().relative_to(self.repo_root).parts
         except ValueError:
-            return False
-        return bool(parts) and relative[:len(parts)] == parts
+            return None
+
+
+def under(parts, root):
+    prefix = Path(root.strip("/")).parts
+    return bool(prefix and parts) and parts[:len(prefix)] == prefix
 
 
 def mask(text):
@@ -239,30 +242,37 @@ def mask(text):
             if out[k] != "\n":
                 out[k] = " "
 
-    while i < n:
-        if text.startswith("//", i):
+    while match := LITERAL_START.search(text, i):
+        i, token = match.start(), match.group()
+        if token == "//":
             end = text.find("\n", i)
             end = n if end < 0 else end
             blank(i, end)
             i = end
-        elif text.startswith("/*", i):
+        elif token == "/*":
             end = text.find("*/", i + 2)
             end = n if end < 0 else end + 2
             blank(i, end)
             i = end
-        elif text.startswith('"""', i):
+        elif token == '"""':
             end = i + 3
             while end < n and not text.startswith('"""', end):
                 end += 2 if text[end] == "\\" else 1
             blank(i + 3, end)
             i = min(end + 3, n)
-        elif text[i] in "\"'":
-            quote, end = text[i], i + 1
-            while end < n and text[end] != quote and text[end] != "\n":
+        else:
+            end = i + 1
+            while end < n and text[end] != token and text[end] != "\n":
                 end += 2 if text[end] == "\\" else 1
             blank(i + 1, end)
             i = end + 1
-        else:
+    masked = "".join(out)
+    for match in ANNOTATION_ARGS.finditer(masked):
+        depth, i = 1, match.end()
+        while i < n and depth:
+            depth += {"(": 1, ")": -1}.get(masked[i], 0)
+            if masked[i] in "{}":
+                out[i] = " "
             i += 1
     return "".join(out)
 
@@ -274,19 +284,6 @@ class TypeSpan:
         self.signature_at = signature_at
         self.body_start = -1
         self.body_end = -1
-
-
-def without_annotation_braces(masked):
-    out = list(masked)
-    for match in ANNOTATION_ARGS.finditer(masked):
-        depth, i = 1, match.end()
-        while i < len(masked) and depth:
-            char = masked[i]
-            depth += {"(": 1, ")": -1}.get(char, 0)
-            if char in "{}":
-                out[i] = " "
-            i += 1
-    return "".join(out)
 
 
 def is_declaration(masked, match):
@@ -350,7 +347,7 @@ def check_static(path, masked, spans):
         if stop.group() in "({":
             continue
         end = stop.start()
-        header = ANNOTATION.sub("", masked[start:end])
+        header = masked[start:end]
         holder = SNAPSHOT_HOLDER.search(header)
         while True:
             header, count = GENERICS.subn("", header)
@@ -416,9 +413,9 @@ def declares_command_method(masked, span, spans, method):
     return False
 
 
-def check_commands(path, masked, spans, settings):
+def check_commands(path, parts, masked, spans, settings):
     method = settings.one("command_method")
-    if not method or not settings.under(path, settings.feature_root):
+    if not method or not under(parts, settings.feature_root):
         return [], False
     metric, trace = settings.one("metric_call"), settings.one("trace_id_call")
     findings, found = [], False
@@ -435,14 +432,14 @@ def check_commands(path, masked, spans, settings):
     return findings, found
 
 
-def lint_file(path, settings):
+def lint_file(path, parts, settings):
     try:
         text = Path(path).read_text(encoding="utf-8", errors="replace")
     except OSError as error:
         raise UsageError(f"{path}: cannot read: {error.strerror}") from error
     masked = mask(text)
-    spans = type_spans(without_annotation_braces(masked))
-    commands, found = check_commands(path, masked, spans, settings)
+    spans = type_spans(masked)
+    commands, found = check_commands(path, parts, masked, spans, settings)
     return found, (
         scan_lines(path, masked, settings.patterns["forbidden_time"], RULE_TIME,
                    "server time must be injected, found")
@@ -465,16 +462,18 @@ def collect(paths, settings):
             files.append(path)
         else:
             raise UsageError(f"{raw}: no such file or directory")
-    return [f for f in files if not any(settings.under(f, root) for root in settings.skipped_roots)]
+    files = [(str(f), settings.relative_parts(f)) for f in files]
+    return [(f, parts) for f, parts in files if not any(under(parts, root) for root in settings.skipped_roots)]
 
 
-def added_lines(repo_root, base):
+def added_lines(repo_root, base, files):
     if base.startswith("-"):
         raise UsageError(f"--diff {base}: the base must be a commit, not an option")
     try:
         result = subprocess.run(
             ["git", "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false",
-             "diff", "--relative", "--no-color", "-U0", base, "--"],
+             "diff", "--relative", "--no-color", "-U0", base, "--",
+             *(str(repo_root.joinpath(*parts)) for parts in files)],
             cwd=repo_root, capture_output=True, text=True,
         )
     except OSError as error:
@@ -488,16 +487,8 @@ def added_lines(repo_root, base):
         elif line.startswith("@@") and path is not None:
             match = re.match(r"@@ -\S+ \+(\d+)(?:,(\d+))? @@", line)
             start, count = int(match.group(1)), int(match.group(2) or 1)
-            added.setdefault(path, set()).update(range(start, start + count))
+            added.setdefault(tuple(path.split("/")), set()).update(range(start, start + count))
     return added
-
-
-def on_added_line(finding, added, repo_root):
-    try:
-        relative = Path(finding.path).resolve().relative_to(repo_root).as_posix()
-    except ValueError:
-        return False
-    return finding.line in added.get(relative, ())
 
 
 def main(argv=None):
@@ -508,14 +499,17 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         settings = Settings(args.profile)
+        files = collect(args.paths, settings)
+        if args.diff:
+            added = added_lines(settings.repo_root, args.diff, [parts for _, parts in files if parts])
+            files = [(path, parts) for path, parts in files if parts in added]
         findings, any_command = [], False
-        for file in collect(args.paths, settings):
-            found, file_findings = lint_file(str(file), settings)
+        for path, parts in files:
+            found, file_findings = lint_file(path, parts, settings)
+            if args.diff:
+                file_findings = [f for f in file_findings if f.line in added[parts]]
             findings += file_findings
             any_command = any_command or found
-        if args.diff:
-            added = added_lines(settings.repo_root, args.diff)
-            findings = [f for f in findings if on_added_line(f, added, settings.repo_root)]
     except UsageError as error:
         print(error, file=sys.stderr)
         return 2
