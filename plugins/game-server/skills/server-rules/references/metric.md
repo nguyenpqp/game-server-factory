@@ -26,7 +26,7 @@ if (error == ErrorCode.SUCCESS) {
 }
 ```
 
-**Check.** Trace each return path of the command and confirm it passes one `userAction` call with the result code. The feature-review linter flags command classes with no metric call.
+**Check.** Trace each return path of the command and confirm it passes one `userAction` call with the result code.
 
 - needs: CAP-METRIC, CAP-ERRORS
 
@@ -49,7 +49,7 @@ MetricLogger.userAction(user, "craft", error, TraceIds.next(), extras);
 MetricLogger.system("craft_queue", TraceIds.next(), queueExtras);
 ```
 
-**Check.** Confirm the command calls `TraceIds.next()` once and passes that value to every row. The feature-review linter flags command classes with no trace id.
+**Check.** Confirm the command calls `TraceIds.next()` once and passes that value to every row.
 
 - needs: CAP-TRACEID, CAP-METRIC
 

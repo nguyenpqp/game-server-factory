@@ -52,13 +52,13 @@ final class CheatSetStreak {
 }
 ```
 
-**Check.** Confirm each cheat `process` starts with the profile's live check. The feature-review linter flags cheat classes without it.
+**Check.** Confirm each cheat `process` starts with the profile's live check.
 
 - needs: CAP-ENV
 
 ### CHEAT-03 Cheat commands live in their own handler and classes, apart from gameplay commands, and each cheat class carries the profile's cheat marker.
 
-**Why.** A cheat branch inside a gameplay handler cannot be left out on live, and the linter cannot find an unmarked cheat.
+**Why.** A cheat branch inside a gameplay handler cannot be left out on live, and a review cannot find an unmarked cheat.
 
 Do:
 

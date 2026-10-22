@@ -22,7 +22,7 @@ import com.example.game.feature.inventory.InventoryConfig;    // its config, rea
 
 Don't reach the other feature's state through a shared helper either. A static lookup of its service from a handler hides the same coupling behind one more call.
 
-**Check.** List the imports of every file in the feature. Each one names the feature's own package, a shared package, a contract package, or a library. The feature-review linter flags an import of another feature's package when the profile sets `lint.allowed_import`. Look also for names used fully qualified in code, which the linter does not see.
+**Check.** List the imports of every file in the feature. Each one names the feature's own package, a shared package, a contract package, or a library. The profile's `lint.allowed_import` names the imports that may cross features. Look also for names used fully qualified in code, which an import list does not show.
 
 - needs: CAP-MODULE
 

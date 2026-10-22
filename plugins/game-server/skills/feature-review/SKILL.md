@@ -1,6 +1,6 @@
 ---
 name: feature-review
-description: Review Java game server feature code or a diff against the feature design and the plugin's rule ids. Use when asked to review, audit, or check a game server feature, pull request, or diff for conformance to the design or GDD, anti-cheat and server authority, multi-node safety, blue-green rollout, old client compatibility, performance, feature config, metrics, cheat commands, admin commands, HTTP callbacks, tests, feature boundaries, or client sync. Traces every design requirement to code and tests and checks the design's numbers and settled decisions, runs a linter for the deterministic breaks, reviews the rest rule by rule against the feature spec, and reports findings with severity, rule id, file and line, and a concrete failure scenario.
+description: Review Java game server feature code or a diff against the feature design and the plugin's rule ids. Use when asked to review, audit, or check a game server feature, pull request, or diff for conformance to the design or GDD, anti-cheat and server authority, multi-node safety, blue-green rollout, old client compatibility, performance, feature config, metrics, cheat commands, admin commands, HTTP callbacks, tests, feature boundaries, or client sync. Traces every design requirement to code and tests and checks the design's numbers and settled decisions, sweeps the added lines for call-shaped breaks, reviews the rest rule by rule against the feature spec, and reports findings with severity, rule id, file and line, and a concrete failure scenario.
 ---
 
 # Feature review
@@ -10,7 +10,7 @@ Review feature code against the feature design, the rule index, the project prof
 ## Inputs
 
 - The code to review: a diff, a branch, or a list of paths. If none is given, review the diff of the current branch against its base branch.
-- The profile, `docs/game-server/profile.md`, from the `server-profile` skill. It holds the lint patterns and the capability entries. If it is missing, stop and ask the developer to run `server-profile`. Do not guess the project's calls.
+- The profile, `docs/game-server/profile.md`, from the `server-profile` skill. It holds the project's `lint` call patterns and the capability entries. If it is missing, stop and ask the developer to run `server-profile`. Do not guess the project's calls.
 - The spec, `docs/game-server/features/<feature>/spec.md`, from the `feature-spec` skill. If it is missing, review against the rules alone and say so at the top of the report.
 - The design, `docs/game-server/features/<feature>/design.md`, from the `gdd-intake` skill, at the path on the spec header's `Design` line. When that line says `prompt`, the prompt and the requirements the spec lists under it are the design. If the design is missing, review the code against the spec and say so at the top of the report.
 - The rule index from the `server-rules` skill. Open the rule text before you report a finding on it.
@@ -18,13 +18,15 @@ Review feature code against the feature design, the rule index, the project prof
 ## Steps
 
 1. **Scope.** List the changed files: Java sources, tests, config files, and docs. Read each changed source file in full, then the code it calls and the code that registers it. A diff hunk alone hides the checks around it.
-2. **Run the linter first.**
+2. **Sweep the added lines for call-shaped breaks first.** Some rules break in a way that a reader spots from one call. Find them before the slower group walk. Read the lines that the feature adds since its base, `git diff <base>`, where `<base>` is the commit the feature started from, such as `$(git merge-base HEAD <base branch>)`. Old code in a shared file the feature touched does not count. The profile's `lint` keys say how this project spells each call. Treat them as examples, and look for other calls that do the same job.
+   - A clock or random read outside the injected clock and RNG (AUTH-02, AUTH-03).
+   - A mutable static field that holds game or user state (MN-01).
+   - A blocking call on the user actor thread (PERF-01). A call in an HTTP endpoint class runs on an HTTP worker thread and is not a finding. A call that the spec's `Accepted blocking calls` table names is accepted. It is a finding only when its bound does not hold.
+   - A command class with no metric row or no trace id (MET-01, MET-02).
+   - A cheat class that does not check that the server is not live (CHEAT-02).
+   - An import of another feature's package that `lint.allowed_import` does not allow (MOD-01).
 
-   ```bash
-   python3 ${CLAUDE_SKILL_DIR}/scripts/lint_feature.py --profile docs/game-server/profile.md --diff <base> <paths>
-   ```
-
-   Pass the changed Java files or the feature package directory. `<base>` is the commit the feature started from, such as `$(git merge-base HEAD <base branch>)`. With `--diff`, the linter keeps only the findings on lines that `git diff -U0 <base>` adds, so old code in a shared file the feature touched does not fill the report. A file git does not track is not in that diff, so `git add` new files first. A finding on a class line, such as MET-01, stays only when that line is new, so check the command classes the diff changes by hand. Each output line is `path:line: RULE-ID message`. Exit code 1 means findings, 2 means the profile, a path, or the `--diff` base could not be used. Treat each line as a finding after you check it against the code. The linter finds calls to forbidden time and random sources (AUTH-02, AUTH-03), mutable static fields (MN-01), cheat classes with no live check (CHEAT-02), command classes with no metric call or trace id (MET-01, MET-02), blocking calls (PERF-01), and imports of another feature's package (MOD-01). A command class is a class under `feature_root` that declares a method whose name matches the profile's `lint.command_method`, or `handle\w*` when the key is absent. When no checked class is a command class, the linter prints a note to stderr, and MET-01 and MET-02 need a check by hand. The linter finds only what a pattern can find, so a clean run says nothing about the other rules. It reads the profile's `lint` patterns, and an empty pattern turns its check off. MOD-01 is also off when the profile has no `lint.allowed_import` key. Name the checks that were off in the report.
+   A clean sweep says nothing about the other rules. When a `lint` key is empty, the profile found no such call, so judge that rule from the code alone. Name those rules in the report.
 3. **Check design conformance.** Open the DES section of `references/review-checklist.md`. Read the code against `design.md` itself, not only against the spec. Skip this step only when there is no design.
    - Build a trace table with one row per id in the design, open questions included. Take the ids from `design.md`, not from the spec's Design coverage, so an id the spec dropped still gets a row. Each row has the design id, the spec row, the code `file:line`, the test, a status, and `source agrees`.
    - Fill `source agrees` from the GDD. Open the source the row cites, `S<n>` with its slide, page, heading, or sheet range, in the converted text under `.gdd-intake/<feature>/raw/`. The Sources table names the converted file. Write `yes` when the row says what the source says, `no` when its rule, number, or end condition contradicts the source, and `no source` when the row cites only the prompt or an answer. The raw folder is gitignored, so it may be missing. When it is, write `no source` on every row, say so in the report, and check against `design.md` alone.
@@ -65,7 +67,7 @@ Review feature code against the feature design, the rule index, the project prof
    ## Review of <feature or branch>
 
    Scope: <files reviewed>. Design: <path, "prompt", or "none">. GDD text: <raw folder or "missing">. Spec: <path or "none">. Profile: <path>.
-   Lint: <n findings, exit code>. Checks off in the profile: <list or "none">.
+   Sweep: <n findings>. Rules with an empty `lint` key: <list or "none">.
    Groups skipped: <list with reasons or "none">.
 
    ### Findings

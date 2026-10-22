@@ -23,7 +23,7 @@ private static final Map<Long, Integer> todayClaims = new ConcurrentHashMap<>();
 
 A shared pool, such as free seats or stock, belongs in Redis for its whole life. A node that checks the pool out into memory at boot and writes it back at shutdown hands the same seat to two players.
 
-**Check.** List every `static` field in the feature package. Each one is `final` and immutable, or it is the config snapshot reference. The feature-review linter flags static mutable collections. A boot step that loads shared data into memory for later write-back is a finding.
+**Check.** List every `static` field in the feature package. Each one is `final` and immutable, or it is the config snapshot reference. A boot step that loads shared data into memory for later write-back is a finding.
 
 - needs: none
 

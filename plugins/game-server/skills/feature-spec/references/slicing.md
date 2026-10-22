@@ -32,7 +32,7 @@ Two slices that write the same file need a blocking edge between them, or the ta
 
 ## Line endings
 
-When a slice changes an existing file, record that file's line endings in the slice. Count its CR bytes with `tr -cd '\r' < <file> | wc -c` and its lines with `wc -l < <file>`. 0 CRs means LF, a CR count equal to the line count means CRLF, and any other count means mixed. Write both counts for a mixed file, because a mixed file keeps each line's own ending.
+When a slice changes an existing file, record that file's line endings in the slice as LF, CRLF, or mixed. `git ls-files --eol <file>` prints them as `w/lf`, `w/crlf`, or `w/mixed`. A mixed file keeps each line's own ending, so `feature-build` checks after each edit that the value did not change.
 
 ## Task fields
 

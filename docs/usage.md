@@ -109,7 +109,7 @@ The skill checks its gates before it writes any code.
 
 A failed gate stops the skill with the exact change you need. The skill never edits generated files or core code by hand. When the ids are missing, the slice that adds them edits the generator source and runs the profile's regenerate command.
 
-When the gates pass, the skill writes the failing tests first, then the code, then the registration and the metric calls. It runs the slice's check command and fixes the code until the check passes. Its report lists the files, the tests, the check result, and a self-check against the profile's lint patterns.
+When the gates pass, the skill writes the failing tests first, then the code, then the registration and the metric calls. It runs the slice's check command and fixes the code until the check passes. Its report lists the files, the tests, the check result, and a sweep of the added lines for the breaks a reviewer finds first.
 
 If the build tool is not installed, the skill still writes the tests and the code, and reports the check as unrun with the code not compiled. Treat an unrun check as unrun, not as passed, and run it on a machine that has the tool.
 
@@ -123,44 +123,32 @@ Use feature-review on the daily-streak branch against main.
 
 The skill runs in three passes.
 
-1. **Linter.** It runs `lint_feature.py` over the changed Java files (see [Run the checks yourself](#run-the-checks-yourself)). The linter reports forbidden time and random calls, static mutable state, cheat classes without the live environment check, commands without a metric call or trace id, blocking calls, and imports of another feature's package. A check whose profile pattern is empty is off, and the report names it.
+1. **Sweep.** It reads the lines the branch adds for breaks that one call shows: forbidden time and random calls, static mutable state, cheat classes without the live environment check, commands without a metric row or trace id, blocking calls on the user actor thread, and imports of another feature's package. The profile's `lint` keys tell it how your project spells those calls.
 2. **Design conformance.** It traces every design id to a spec row, code, and a test, and marks each one matched, partial, divergent, missing, descoped, or client only. It checks every number and settled decision in the design against the code, and checks each design row against the GDD text it cites, in `.gdd-intake/<feature>/raw/` when that folder exists.
 3. **Rule groups.** It walks the rulebook group by group.
 
-Each finding has a severity, a rule id, `file:line`, and a failure scenario that says who does what and what the player or operator sees. A critical finding needs a trigger that can really happen, or the skill lowers it. The skill does not fix anything. Hand the findings to `feature-build`, one at a time or as a batch, and rerun the linter after the fix.
+Each finding has a severity, a rule id, `file:line`, and a failure scenario that says who does what and what the player or operator sees. A critical finding needs a trigger that can really happen, or the skill lowers it. The skill does not fix anything. Hand the findings to `feature-build`, one at a time or as a batch, and rerun the review after the fix.
 
 ```
-Use feature-build to fix finding 2 of the review above, then rerun feature-review's linter.
+Use feature-build to fix finding 2 of the review above, then rerun feature-review on the fixed files.
 ```
 
 A clean review covers the server rules and the design. It does not replace a general code review.
 
-## Run the checks yourself
-
-Every check the skills run is a Python 3 script you can run from the repository root.
-
-```bash
-python3 <plugin>/skills/server-profile/scripts/check_profile.py docs/game-server/profile.md
-python3 <plugin>/skills/server-profile/scripts/check_profile.py --blocked-rules docs/game-server/profile.md
-python3 <plugin>/skills/server-profile/scripts/check_profile.py --decisions docs/game-server/decisions.md docs/game-server/profile.md
-python3 -I <plugin>/skills/gdd-intake/scripts/lint_design.py docs/game-server/features/daily-streak/design.md
-python3 <plugin>/skills/feature-review/scripts/lint_feature.py --profile docs/game-server/profile.md --diff $(git merge-base HEAD main) <paths>
-```
-
-Give `lint_feature.py` the changed Java files or the feature package directory. With `--diff`, it reports only the lines the branch adds since its base, so old code in a shared file does not count. The profile must sit at `docs/game-server/profile.md`. Each script prints `path:line: message` and exits 1 when it finds anything.
+The skills check their own work by reading, with no check scripts. The one script in the plugin is the `gdd-intake` converter, which turns docx, pptx, xlsx, and PDF files into text that the agent reads.
 
 ## With subagents or a workflow
 
 The skills work the same under any workflow, with a few limits.
 
 - **Explicit skills.** `server-profile` never starts from a description match, so a subagent will not load it on its own. Run it in your main session, or name its `SKILL.md` path in the brief.
-- **Skill paths.** A subagent may not load a skill by name. Give it the absolute paths `<plugin>/skills/<skill>/SKILL.md` to read, and add `<plugin>/skills/server-rules/SKILL.md` for spec, build, and review work. `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` appear in the skill text, but Claude Code fills them in only when a skill loads. They are not shell variables, so a brief or a person running a script uses the real path.
+- **Skill paths.** A subagent may not load a skill by name. Give it the absolute paths `<plugin>/skills/<skill>/SKILL.md` to read, and add `<plugin>/skills/server-rules/SKILL.md` for spec, build, and review work. `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` appear in the skill text, but Claude Code fills them in only when a skill loads. They are not shell variables, so a brief uses the real path.
 - **Questions.** Only your main session can ask you something. A subagent that hits a stop, such as a core blocker or an open Blocker question, should write what it has, set the status, and return the stop.
 - **Commits.** A subagent in its own worktree sees only what is committed, so commit the profile, the design, and the spec before you start one.
 
 ## Keep the files current
 
 - The profile, design, and spec are plain files in your repository. Edit them like any other file.
-- After a core change, rerun `server-profile`, check `decisions.md` against the new profile (see [Run the checks yourself](#run-the-checks-yourself)), then rerun the Core blockers step of every spec not yet built. `profile_version` is the version of the profile template, so it does not catch a core change.
-- When a design rule changes, edit `design.md`, rerun its lint, and ask `feature-spec` to update the spec rows that cite the changed ids.
+- After a core change, rerun `server-profile`, then rerun the Core blockers step of every spec not yet built. That step checks each decision in `decisions.md` against the new profile. `profile_version` is the version of the profile template, so it does not catch a core change.
+- When a design rule changes, edit `design.md`, check it against the design template, and ask `feature-spec` to update the spec rows that cite the changed ids.
 - `server-rules` loads on its own when a skill needs a rule. To read the rules yourself, start from `<plugin>/skills/server-rules/references/index.md`.

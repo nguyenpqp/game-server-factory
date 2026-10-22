@@ -49,7 +49,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 
 - Search for executors. `rg -n "newSingleThreadExecutor|Executors\.new|ExecutorService|EventLoopGroup|DefaultEventExecutor|Disruptor|ScheduledExecutorService"`.
 - Find how a user maps to a thread, usually `hash(userId) % n`. Find the call that submits work to another user's executor.
-- Read the login path for blocking database reads. `rg -n "\.get\(\)|\.join\(\)|\.await\(|\.sync\(\)|Thread\.sleep"` inside classes on that path. The results feed `lint.blocking_calls`. Leave a synchronous Redis call out of it when the CAP-REDIS entry records that call as the project's pattern, with its timeout and circuit breaker, so the linter does not flag every feature that uses it.
+- Read the login path for blocking database reads. `rg -n "\.get\(\)|\.join\(\)|\.await\(|\.sync\(\)|Thread\.sleep"` inside classes on that path. The results feed `lint.blocking_calls`. Leave a synchronous Redis call out of it when the CAP-REDIS entry records that call as the project's pattern, with its timeout and circuit breaker, so a review does not flag every feature that uses it.
 
 ### CAP-OWNERSHIP
 
@@ -186,7 +186,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 - Count imports across features. For each package under `feature_root`, run `rg -n "^import .*\.<feature root package>\.\w+\." <feature dir>` and keep the hits that name another feature's package.
 - Find contract packages, such as interfaces that one feature implements and others call. `rg -n "interface \w+(Contract|Api|Port|Service)\b"`. A package of such interfaces and their value types, outside every feature package, is a contract package.
 - Find events. `rg -n "publish\(|emit\(|EventBus|@Subscribe|addListener"`. Read whether a handler runs before or after the reply, in which order, and whether a failed or undeliverable event is dropped.
-- Set `lint.allowed_import` to the prefix of the contract packages. Leave it empty only when the project has no contract package, because every import across features is then a finding with no fix to point to. CAP-MODULE is then `partial` or `missing`, and the linter skips MOD-01.
+- Set `lint.allowed_import` to the prefix of the contract packages. Leave it empty only when the project has no contract package, because every import across features is then a finding with no fix to point to. CAP-MODULE is then `partial` or `missing`, and a review judges MOD-01 from the code alone.
 
 ### CAP-GENERATED
 

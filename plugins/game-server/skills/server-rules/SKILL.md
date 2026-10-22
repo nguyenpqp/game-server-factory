@@ -9,7 +9,7 @@ description: >
   clients, feature boundaries, or client sync. It holds the fixed rule ids (AUTH, MN, BG,
   PERF, CFG, MET, CHEAT, ADMIN, HTTP, TEST, DES, MOD, SYNC, LOG) with a severity, a Java do and
   don't, and a review check for each rule.
-  Specs, builds, reviews, and the feature linter cite these ids.
+  Specs, builds, and reviews cite these ids.
 ---
 
 # Server rules

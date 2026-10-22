@@ -58,7 +58,7 @@ public final class EventShopConfig {
 ```
 
 - `current` is the only mutable static field in the feature (MN-01). `load` builds a whole new snapshot and swaps the reference once, so a reload never leaves a half-built config visible.
-- The linter exempts this field from MN-01 by its type: a `volatile` static field whose type ends with `Config`, or an `AtomicReference<T>` whose `T` ends with `Config`. Name the snapshot class with the `Config` suffix.
+- This field is the one mutable static that MN-01 allows. Name the snapshot class with the `Config` suffix, so a reader sees at once that the field holds the config snapshot.
 - Every field is `final`, and every collection is a copy made with `Map.copyOf` or `List.copyOf`. Nothing hands out a mutable view.
 - `isActive(now)` combines the `isActive` flag with the time window, against the `now` that the command passed in (CFG-04, AUTH-06). A feature with no window drops `startMs` and `endMs`.
 - `item(id)` is a map read from an index built at load (PERF-05). Stored data and client packets name entries by this stable id, never by list position (CFG-06).

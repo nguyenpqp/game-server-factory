@@ -42,7 +42,7 @@ Don't:
 boolean ready = System.currentTimeMillis() >= plot.readyAt();
 ```
 
-**Check.** Search the feature package for `currentTimeMillis`, `Instant.now`, `LocalDate.now`, and `new Date()`. The feature-review linter flags them.
+**Check.** Search the feature package for `currentTimeMillis`, `Instant.now`, `LocalDate.now`, `new Date()`, and the other calls in the profile's `lint.forbidden_time`.
 
 - needs: CAP-CLOCK
 

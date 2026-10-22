@@ -5,14 +5,14 @@
 Three skills run check scripts, and the review fixes added two more. A script freezes one project's shape into the skill. Game designs and server codebases vary a lot, so a fixed check either rejects a valid design or misses what it was not written for. The owner wants each skill to describe what correct work looks like, and the agent to check its own work against that description.
 
 - `server-profile` runs `check_profile.py` to check the profile and to list the rules each capability blocks.
-- `gdd-intake` runs `lint_design.py` on every design draft.
+- `gdd-intake` runs `lint_design.py` on every design draft, and `emit_json.py` to draft config JSON from the design's config tables.
 - `feature-spec` runs `check_profile.py --decisions` before it applies a project decision.
 - `feature-review` runs `lint_feature.py`, and its checklist has a column for what the linter covers.
 
 ## Outcome
 
-- The plugin ships two scripts, both `gdd-intake` converters. `convert_office.py` turns office files into text. `emit_json.py` turns the design's config tables into draft JSON, and it holds the design parsing that it used to import from `lint_design.py`.
-- `check_profile.py`, `lint_design.py`, and `lint_feature.py` are gone, with their tests and fixtures.
+- The plugin ships one script, the `gdd-intake` converter `convert_office.py`. It turns docx, pptx, xlsx, and PDF files into text that the agent reads. An xlsx file gives one CSV per sheet and a Markdown notes file.
+- `check_profile.py`, `lint_design.py`, `lint_feature.py`, and `emit_json.py` are gone, with their tests and fixtures. The agent writes the draft config JSON itself, from the key table and the sheet ranges it cites.
 - Each step that ran one of them now says what the agent checks, why, and where to read it. The check names its purpose, so the agent can apply it to a design or codebase that the template did not foresee.
 - A PERF-01 acceptance names its call sites. The spec lists each accepted blocking call in an `Accepted blocking calls` table, and `feature-build` and `feature-review` treat any other blocking call as a PERF-01 break. A rule that step 1 of Core blockers leaves out goes on a `Left out:` line with its reason.
 - `feature-build` and `slicing.md` check line endings with `git ls-files --eol`, one plain command, in place of the `tr` and `wc` pipeline.
@@ -21,7 +21,7 @@ Three skills run check scripts, and the review fixes added two more. A script fr
 ## Surfaces
 
 - Agents and developers who run the six skills on a target game server repository.
-- `server-profile`, `gdd-intake`, `feature-spec`, `feature-build`, and `feature-review` skill files and references, `docs/usage.md`, the `gdd-intake` scripts, and the tests in this repository.
+- `server-profile`, `gdd-intake`, `feature-spec`, `feature-build`, and `feature-review` skill files and references, `docs/usage.md`, the `gdd-intake` scripts, `README.md`, and the tests in this repository.
 
 ## Constraints
 
@@ -41,7 +41,7 @@ Three skills run check scripts, and the review fixes added two more. A script fr
 
 ### The owner's
 
-- No check scripts in the skills. Only the `gdd-intake` converters stay.
+- No check scripts in the skills. Only the `gdd-intake` converter that turns the GDD files into agent-friendly text stays. `emit_json.py` goes too.
 - A skill gives guidelines, and the agent checks its own work. Scripts hard-code the skill.
 - Skills must stay flexible, because game designs vary a lot.
 - PERF-01 is accepted per call site in each spec, never in `decisions.md`.

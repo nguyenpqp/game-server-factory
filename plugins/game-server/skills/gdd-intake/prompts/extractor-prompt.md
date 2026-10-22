@@ -13,7 +13,6 @@ The brief gives absolute paths for these.
 - Feature name and scope: `server-only`, `full-stack`, or `logic-only`.
 - Template. `../references/design-template.md`. Read it fully before you write.
 - Design path. Where to write `design.md`.
-- Lint script. If you can run commands, run it on your output.
 
 ## Method
 
@@ -73,7 +72,7 @@ Follow the template section by section. These rules come from past runs.
 - Write TBD, TODO, and FIXME only inside Open questions, and prefer plain wording there.
 - Do not summarize away detail. A developer reads only this file.
 - Do not invent rules. You may settle a conflict by the heuristics above, and you may propose a default. Nothing else.
-- Write each config file from the sheets. One entry per file, headed with the file name in backticks as a level 3 heading, with the key table that `../references/design-template.md` shows. Use dotted key paths. Mark lists of objects as `list[].field`. Give the Type as `integer`, `number`, `boolean`, or `string` when it is one of them. Put the sheet range in the Source column, one column per list key, so the emitter can fill the draft from the sheet. When a list key has no sheet, write every entry's value in its Example cell, in list order, as a JSON array such as `[8, 15, 30]`. Leave out derived columns such as a percentage that the server computes. Write sentinel values, such as `-1` for unlimited, into the meaning column. Write each cost and reward as two keys, one ending in `.id` for the currency or item and one ending in `.amount`, never a key that names the currency, such as `gemCost`. Write a table of rows as a list with an `id` key, even when the sheet has one row. Leave out the key of an option that is not offered rather than writing zero, and note the omission in the meaning column. Never copy a cell that packs a list, such as `gold:400;potion:3`, into one string key. Ask in Open questions how the list splits into records. Leave out a value that another table already owns.
+- Write each config file from the sheets. One entry per file, headed with the file name in backticks as a level 3 heading, with the key table that `../references/design-template.md` shows. Use dotted key paths. Mark lists of objects as `list[].field`. Give the Type as `integer`, `number`, `boolean`, or `string` when it is one of them. Put the sheet range in the Source column, one column per list key, so the draft config can be filled from the sheet. When a list key has no sheet, write every entry's value in its Example cell, in list order, as a JSON array such as `[8, 15, 30]`. Leave out derived columns such as a percentage that the server computes. Write sentinel values, such as `-1` for unlimited, into the meaning column. Write each cost and reward as two keys, one ending in `.id` for the currency or item and one ending in `.amount`, never a key that names the currency, such as `gemCost`. Write a table of rows as a list with an `id` key, even when the sheet has one row. Leave out the key of an option that is not offered rather than writing zero, and note the omission in the meaning column. Never copy a cell that packs a list, such as `gold:400;potion:3`, into one string key. Ask in Open questions how the list splits into records. Leave out a value that another table already owns.
 
 ### 7. Write the questions
 
@@ -94,7 +93,7 @@ Limits:
 
 Before you finish, check these items. Fix a failure now.
 
-- Run the lint script if you can, and fix what it prints.
+- Every `##` heading of the template is there, in its order.
 - Every `S<n>` you cite is in the Sources table.
 - No section is empty. Use `None.`.
 - Every number in the worked example matches the formulas and the sheets.

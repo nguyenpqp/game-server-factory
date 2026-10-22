@@ -18,7 +18,7 @@ When the GDD itself prescribes a server mechanism, such as "store the streak in 
 - Write every number with its unit, such as `24 h`, `3 per day`, or `500 gold`. A number that design may tune names its config key from Config tables.
 - Write TBD, TODO, and FIXME only under Open questions.
 - Write in English. Keep in-game names as the GDD spells them, and give each one a Glossary entry.
-- In Config tables, a list key with no sheet range holds every entry's value in its Example cell, in list order, as a JSON array such as `[8, 15, 30]`. The emitter writes one list entry per value.
+- In Config tables, a key path joins object fields with dots, such as `limits.perDay`. `[]` marks a list, of objects as in `rewards[].day`, or of plain values at the end as in `tags[]`. The Type column gives the JSON type. A list key with no sheet range holds every entry's value in its Example cell, in list order, as a JSON array such as `[8, 15, 30]`, and the draft file takes one list entry per value.
 
 ## Requirement ids
 

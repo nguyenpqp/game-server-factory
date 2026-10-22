@@ -18,7 +18,7 @@ Every skill works to the same fixed rulebook. The rules come from these constrai
 - **Client in sync.** Each feature has a read command that rebuilds the client's view. A reply carries server time and the stored values it changed, never derived flags. A push reports only a change the client did not make, and no value depends on it.
 - **True to the design.** The code builds every server-side requirement in the design, with the design's numbers, rules, and end conditions. It keeps every settled decision: answered questions, the defaults of skipped questions, and Core blockers resolutions. The review traces each design id to code and tests.
 
-The rules are listed with ids in `plugins/game-server/skills/server-rules/references/index.md`. Specs, reviews, and the linter cite them by id.
+The rules are listed with ids in `plugins/game-server/skills/server-rules/references/index.md`. Specs and reviews cite them by id.
 
 ## Install
 
@@ -52,7 +52,7 @@ The plugin manifest has no version, so an install tracks the commit of the marke
 | `gdd-intake` | Triggers when you hand over a GDD folder, slides, docs, a balance sheet, or a feature prompt | A folder of pptx, docx, xlsx, PDF, Markdown, or images, or a prompt | `docs/game-server/features/<feature>/design.md` with sourced requirements and open questions, plus draft config JSON in the `config` folder beside it |
 | `feature-spec` | Triggers when you want a server design or plan for a feature | `design.md` or a prompt, plus the profile | `docs/game-server/features/<feature>/spec.md`. On request, also an ordered task list at `docs/game-server/features/<feature>/tasks.md` |
 | `feature-build` | Triggers when you implement a feature, command, or spec slice | The profile, the spec, and one slice | Java code and unit tests for the slice, written through the core APIs the profile records, and a slice report |
-| `feature-review` | Triggers when you review feature code or a diff | The code, the profile, the spec, and the design | A findings report with severity, rule id, `file:line`, and a failure scenario, plus a trace table from each design id to code and tests. It runs the feature linter first. |
+| `feature-review` | Triggers when you review feature code or a diff | The code, the profile, the spec, and the design | A findings report with severity, rule id, `file:line`, and a failure scenario, plus a trace table from each design id to code and tests. It sweeps the added lines for call-shaped breaks first. |
 
 `server-profile` is explicit only because it writes into your repository from a scan. Claude never starts it on its own, and a subagent will not pick it up from its description. The other five load from their descriptions.
 
@@ -77,7 +77,7 @@ python3 -m unittest discover -s tests
 python3 scripts/validate_plugin.py --denylist /path/to/denylist.txt
 ```
 
-The unit tests cover the validator and the scripts inside the skills. A test that needs a package or program the machine lacks skips and names it.
+The unit tests cover the validator and the `gdd-intake` converter. A test that needs a package or program the machine lacks skips and names it.
 
 The validator checks the manifests, each skill's frontmatter, every relative link, every rule id and capability id against its index, and the tracked files for absolute home paths and private keys. It also scans the tracked files for terms from a denylist. The denylist is a plain text file with one term per line. The public repository must hold no internal project names, class names, hosts, or GDD content, so each maintainer keeps the list of those terms in a local file that is never committed. The validator fails if a tracked file contains any listed term, matched without regard to case. Pass the file with `--denylist` or set `GSS_DENYLIST`. Without either, the validator warns that it skipped the private-term scan.
 

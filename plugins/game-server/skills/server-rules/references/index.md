@@ -1,6 +1,6 @@
 # Rule index
 
-This index lists every rule id that the plugin's skills, specs, reviews, and linter cite. The set is fixed. A citation of an id that is not a heading here fails the plugin validator.
+This index lists every rule id that the plugin's skills, specs, and reviews cite. The set is fixed. A citation of an id that is not a heading here fails the plugin validator.
 
 ## Entry format
 

@@ -22,7 +22,7 @@ Scan a Java game server repository and write `docs/game-server/profile.md`. Ever
 3. If `docs/game-server/profile.md` already exists, read it first. Re-check every entry against the code and keep the entries that still hold.
 4. Fill the frontmatter keys first, in template order. Verify each command and regex against the code, and run `build_cmd` only when the developer allows it. An empty regex or an empty list is valid when the project has no such call, and the matching capability is then `partial` or `missing`.
 5. Fill each capability section in template order, with the same heading. Do not skip a section and do not reorder them.
-6. Run the checker and fix every line it prints until it is clean.
+6. Check the profile against the template, as [Check](#check) says.
 7. Report to the developer as described under Report.
 
 ## Fill each capability
@@ -45,20 +45,8 @@ Judge by what the code does, not by what its name suggests. A class called a lea
 
 ## Check
 
-Run the checker from the target repository root.
-
-```
-python3 ${CLAUDE_SKILL_DIR}/scripts/check_profile.py docs/game-server/profile.md
-```
-
-It exits 1 and prints `path:line: message` when a frontmatter key from the template is missing, a capability heading is missing, a status is not `present`, `partial`, or `missing`, or an entry lacks a field its status requires. Fix the profile and run it again. Do not finish while it prints anything.
+Read the finished profile against the template. The other skills find each value by its frontmatter key and each capability by its heading, so a renamed or missing one stops them later. Every frontmatter key and every capability heading from the template is there. Each status is `present`, `partial`, or `missing`, and each entry has the fields its status needs. Fix the profile until all of that holds.
 
 ## Report
 
-After the checker is clean, run it once more with the rule listing.
-
-```
-python3 ${CLAUDE_SKILL_DIR}/scripts/check_profile.py --blocked-rules docs/game-server/profile.md
-```
-
-For each capability that is not `present`, it prints the rule ids it blocks. A `missing` capability blocks every rule whose `needs:` line lists it. A `partial` one blocks only the rule ids on its `blocker` line. A warning on stderr names a `blocker` rule id whose `needs:` line does not list that capability. Move the id to a capability on that rule's `needs:` line, or drop it. Put that list in your report, one line per capability, so the developer sees which rules cannot be met until the core changes. Also report the capabilities you marked `partial` because you could not confirm them. The profile file itself stays in the format of the template, with no extra sections.
+For each capability that is not `present`, list the rule ids it blocks. A `missing` capability blocks every rule whose `needs:` line in the [rule index](../server-rules/references/index.md) lists it. A `partial` one blocks only the rule ids on its `blocker` line. A `blocker` rule id whose `needs:` line does not list that capability is misplaced. Move the id to a capability on that rule's `needs:` line, or drop it. Put that list in your report, one line per capability, so the developer sees which rules cannot be met until the core changes. Also report the capabilities you marked `partial` because you could not confirm them. The profile file itself stays in the format of the template, with no extra sections.

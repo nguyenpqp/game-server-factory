@@ -62,8 +62,8 @@ lint:
 | `test_one_cmd` | string | Command that runs one test class. `{class}` stands for the fully qualified test class name, such as `com.example.game.feature.streak.StreakClaimTest`. | CAP-BUILD |
 | `source_root` | string | Directory of production Java sources, relative to the repository root. | CAP-BUILD |
 | `test_root` | string | Directory of test Java sources, relative to the repository root. | CAP-UNITTEST |
-| `feature_root` | string | Directory that holds one package per feature, relative to the repository root. The linter scans feature code here. | CAP-COMMAND |
-| `generated_paths` | list of strings | Files or directories that a generator writes. Skills never edit them by hand, and the linter skips them. | CAP-GENERATED |
+| `feature_root` | string | Directory that holds one package per feature, relative to the repository root. Builds and reviews look for feature code here. | CAP-COMMAND |
+| `generated_paths` | list of strings | Files or directories that a generator writes. Skills never edit them by hand, and reviews skip them. | CAP-GENERATED |
 | `lint.time_call` | regex | The call that reads server time. | CAP-CLOCK |
 | `lint.forbidden_time` | list of regexes | Time calls that feature code must not make. | CAP-CLOCK |
 | `lint.random_call` | regex | The call that draws a random number from the injected RNG. | CAP-RNG |
@@ -71,9 +71,9 @@ lint:
 | `lint.env_live_check` | regex | The expression that is true when the server runs on live. | CAP-ENV |
 | `lint.metric_call` | regex | The call that writes a user action metric row. | CAP-METRIC |
 | `lint.trace_id_call` | regex | The call that mints a trace id. | CAP-TRACEID |
-| `lint.command_method` | regex | Name of the method that marks a command class: a class that declares a method whose whole name matches is a command class. Optional. When the key is absent, the linter uses `handle\w*`. | CAP-COMMAND |
+| `lint.command_method` | regex | Name of the method that marks a command class: a class that declares a method whose whole name matches is a command class. Optional. When the key is absent, `handle\w*` marks it. | CAP-COMMAND |
 | `lint.cheat_marker` | regex | Text that every cheat command class contains, such as an annotation or a base class. | CAP-CHEAT |
-| `lint.allowed_import` | regex | Prefixes of imported names that feature code may use across features, such as the contract packages. The linter matches it from the start of each imported name, and an import of another feature's package that does not match is a MOD-01 finding. Optional. When the key is absent or empty, the linter skips MOD-01. | CAP-MODULE |
+| `lint.allowed_import` | regex | Prefixes of imported names that feature code may use across features, such as the contract packages. It matches from the start of each imported name, and an import of another feature's package that does not match is a MOD-01 finding. Optional. When the key is absent or empty, a review judges MOD-01 from the code alone. | CAP-MODULE |
 | `lint.blocking_calls` | list of regexes | Calls that block the calling thread on I/O, a sleep, or a wait. Name the project's own future and sync client calls, and leave out patterns such as `\.get\(\)` that also match plain getters. | CAP-ACTOR |
 
 ### Value format
@@ -85,9 +85,9 @@ The frontmatter uses a small YAML subset, so plugin scripts parse it with the Py
 - Write an empty list as `key: []` and an empty string as `key: ''`.
 - Wrap every string in single quotes. Inside single quotes, a backslash is literal and `''` stands for one quote.
 - Write `profile_version` as a bare integer.
-- Each `lint` value is a Python regular expression that the linter searches for in Java source lines. `lint.allowed_import` is the exception. The linter matches it from the start of each imported name.
+- Each `lint` value is a regular expression for a call as it appears in a Java source line. `lint.allowed_import` is the exception. It matches from the start of each imported name.
 
-An empty `lint` value means the project has no such call. The capability that the key maps to is then `partial` or `missing`, and the linter skips the checks that need the value.
+An empty `lint` value means the project has no such call. The capability that the key maps to is then `partial` or `missing`, and a review judges the rules that need the value from the code alone.
 
 ## Capability entries
 

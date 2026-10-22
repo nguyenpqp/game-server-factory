@@ -55,7 +55,7 @@ public final class CheatSetPurchases {
 }
 ```
 
-- The class carries the profile's cheat marker, here `@CheatCommand` (CHEAT-03). The linter in `feature-review` looks for it.
+- The class carries the profile's cheat marker, here `@CheatCommand` (CHEAT-03). `feature-review` looks for it.
 - `process` takes the live flag as a parameter and rejects first, before any read or change. The shell passes `Env.isLive()`, and a unit test passes `true` to prove the rejection (CHEAT-02, TEST-04).
 - The cheat validates its input like a gameplay command, and it changes state through the document's own methods, such as `setPurchases`, so the result keeps the feature's invariants (CHEAT-06).
 - It writes a metric row under its own action name with a trace id, on success and on error, like a gameplay command (CHEAT-04).

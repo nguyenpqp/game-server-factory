@@ -10,7 +10,7 @@ A decision holds an acceptance only. A descope drops design ids of one feature, 
 
 ## Format
 
-The file has a title and one table with these columns, in this order. The separator row follows the header row. Keep every decision in that one table, with no blank line between rows. The check reports any other table in the file.
+The file has a title and one table with these columns, in this order. The separator row follows the header row. Keep every decision in that one table, with no blank line between rows, because a blank line ends a Markdown table and the rows after it are no longer part of it.
 
 ```markdown
 # Project decisions
@@ -33,9 +33,9 @@ The file has a title and one table with these columns, in this order. The separa
 
 ## When a decision applies
 
-Run `check_profile.py --decisions` on the file and the current profile first. `feature-spec` and `feature-build` give the command. A decision resolves a Core blockers row only when every item holds.
+Read the file against the format above and the current profile before you use a decision. When the title or the header row does not match the format, no decision in the file resolves anything, so ask the developer to fix the file. A decision resolves a Core blockers row only when every item holds.
 
-1. The check ends without a Python error, and it prints no finding on line 1 of `decisions.md` or on the decision's line. A finding on line 1 means the file as a whole cannot be trusted, so no decision in it resolves anything.
+1. The decision follows the format. Its id is unique, its capability and rule ids exist, its status is `partial` or `missing`, and PERF-01 is not among its rules.
 2. It names the row's capability.
 3. Its `Profile status` equals the capability's status in the current profile.
 4. Its `Rules` include every rule in the row's `Rules blocked` cell.
@@ -45,6 +45,6 @@ The row's resolution is then `accepted by <name> (D<n>): <deployment fact>, so <
 
 ## Stale decisions
 
-A decision is stale, and resolves nothing, when its `Profile status` differs from the profile or when the profile no longer blocks one of its rules. The check reports both on the decision's line. This happens after a core change and a new profile. The developer re-decides it. They update the status, the rules, and the fact, or remove the row. A decision whose capability is now `present` is no longer needed, and the developer can remove it.
+A decision is stale, and resolves nothing, when its `Profile status` differs from the profile or when the profile no longer blocks one of its rules. This happens after a core change and a new profile. Tell the developer which decision is stale and why. The developer re-decides it. They update the status, the rules, and the fact, or remove the row. A decision whose capability is now `present` is no longer needed, and the developer can remove it.
 
-The check cannot see a gap that changed while the status and the blocked rules stayed the same. After a core change, the developer rereads each decision's fact and bound against the new profile entry.
+A gap can change while the status and the blocked rules stay the same. After a core change, read each decision's fact and bound against the new profile entry, and tell the developer about one that no longer fits.
