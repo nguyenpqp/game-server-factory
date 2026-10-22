@@ -10,9 +10,9 @@ The owner has a GDD pipeline in another project whose docx and xlsx converters a
 
 - The other project's converters ship in `gdd-intake/scripts/` unchanged: `convert_docx.py`, `convert_xlsx.py`, `requirements.txt`, and the `gddlib` modules they import (`__init__`, `common`, `docx`, `markdown`, `xlsx`).
 - `convert_office.py` hands each docx and xlsx to them. Each becomes `raw/<name>.md`, named after the source file. A docx keeps headings, inline styles, lists, tables, hyperlinks, table of contents links, and images, which go to `raw/assets/`. A workbook has one `## Sheet:` section per sheet with its range and one table, and a cell with a formula shows the formula. No CSV is written.
-- docx and xlsx convert before the other inputs, so a copied text file with the same name gets `_` added. A docx and an xlsx with one name cannot both convert, and the second is reported to be renamed.
+- docx and xlsx convert before the other inputs, so a copied text file with the same name gets `_` added. Names compare without case, as on a macOS or Windows disk. A docx and an xlsx with one name cannot both convert, and the second is reported to be renamed. A symlinked docx or xlsx converts, as other inputs do.
 - The converter needs `python-docx` and `openpyxl`. When either is missing, it skips the docx and xlsx files with the install command, as it does for PDF and PyMuPDF. pptx, PDF, text, and images convert as before.
-- The other project's sync tools stay out: its manifest of source hashes, progress checkpoints, verifiers, and image description pass.
+- The other project's sync tools stay out: its manifest of source hashes, progress checkpoints, verifier scripts, and image description pass. The copied `gddlib` modules still hold the verifier and image description functions those tools call, and nothing in the plugin calls them.
 - The plugin's own docx and xlsx parsers, now unused, are removed.
 - The `gdd-intake` skill, its prompts, `README.md`, and `docs/usage.md` describe the new output and the install step. The config draft step works out the value of a formula cell.
 - The other project's docx tests run here. `python3 -m unittest discover -s tests` passes with both packages installed and without them, where the docx and xlsx tests skip. `python3 scripts/validate_plugin.py --denylist <local denylist>` passes.
@@ -34,6 +34,7 @@ The owner has a GDD pipeline in another project whose docx and xlsx converters a
 - The other project's sync tools, as listed above.
 - docx comments, headers, and footers, and the cell values behind xlsx formulas, which the copied converters do not render.
 - CSV files in the input folder, which still pass through as they are.
+- Flaws inside the copied converters, which stay as copied: a docx without pictures still gets an empty folder under `raw/assets/`, and a sheet cell's link target is not escaped.
 
 ## Decisions
 

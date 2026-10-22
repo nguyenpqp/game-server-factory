@@ -287,27 +287,28 @@ def convert_pptx(path, raw_dir, images_dir, used):
             "speaker_notes_slides": notes_slides, "images_skipped": sink.skipped}
 
 
-def convert_office_file(path, input_folder, raw_dir, images_dir, used):
-    name = path.stem + ".md"
+def convert_office_file(path, raw_dir, images_dir, used):
+    source = path.resolve()
+    name = source.stem + ".md"
     if name.lower() in used:
         raise ValueError(f"raw/{name} is taken by another input with the same name; rename one of them")
-    used.add(name.lower())
-    if path.suffix.lower() == ".docx":
-        result = convert_docx_file(input_folder, path.name, raw_dir)
+    if source.suffix.lower() == ".docx":
+        result = convert_docx_file(source.parent, source.name, raw_dir)
         details = result.details
-        return {"source": path.name, "type": "docx", "output": f"raw/{result.output}",
-                "paragraphs": details["paragraphs"], "tables": details["tables"],
-                "hyperlinks": details["hyperlinks"], "image_occurrences": details["image_occurrences"],
-                "images_extracted": details["unique_media"],
-                "assets": Path(details["asset_directory"]).relative_to(raw_dir.parent).as_posix()}
-    result = convert_xlsx_file(input_folder, path.name, raw_dir)
-    with zipfile.ZipFile(path) as archive:
-        sink = ImageSink(archive, images_dir, f"sheet_{safe_name(path.stem)}", used)
-        sink.copy_folder("xl/media/")
-    sheets = [{"sheet": s["name"], "range": s["range"], "formulas": s["formulas"],
-               "merged_ranges": len(s["merged_ranges"])} for s in result.details["sheets"]]
-    return {"source": path.name, "type": "xlsx", "output": f"raw/{result.output}", "sheets": sheets,
-            "images_extracted": sink.count, "images_skipped": sink.skipped}
+        entry = {"type": "docx", "paragraphs": details["paragraphs"], "tables": details["tables"],
+                 "hyperlinks": details["hyperlinks"], "image_occurrences": details["image_occurrences"],
+                 "images_extracted": details["unique_media"]}
+    else:
+        result = convert_xlsx_file(source.parent, source.name, raw_dir)
+        with zipfile.ZipFile(source) as archive:
+            sink = ImageSink(archive, images_dir, f"sheet_{safe_name(source.stem)}", used)
+            sink.copy_folder("xl/media/")
+        sheets = [{"sheet": s["name"], "range": s["range"], "formulas": s["formulas"],
+                   "merged_ranges": len(s["merged_ranges"])} for s in result.details["sheets"]]
+        entry = {"type": "xlsx", "sheets": sheets, "images_extracted": sink.count,
+                 "images_skipped": sink.skipped}
+    used.add(name.lower())
+    return {"source": path.name, "output": f"raw/{result.output}", **entry}
 
 
 def convert_pdf(path, raw_dir, images_dir, used):
@@ -373,7 +374,7 @@ def convert_folder(input_folder, work_dir):
             continue
         try:
             if extension in OFFICE and HAS_GDDLIB:
-                manifest["files"].append(convert_office_file(path, input_folder, raw_dir, images_dir, used))
+                manifest["files"].append(convert_office_file(path, raw_dir, images_dir, used))
             elif extension in OFFICE:
                 manifest["skipped"].append({
                     "file": path.name,
@@ -415,7 +416,7 @@ LOSSES = [
     "docx comments, headers, and footers are not converted.",
     "A merged sheet range repeats its label in each of its cells, and the sheet lists the range. "
     "A sheet cell with a formula shows the formula, not its last saved value. "
-    "A date or time cell appears in ISO 8601.",
+    "A date cell shows as `2026-01-05 00:00:00`, and a duration cell of 36 hours as `1 day, 12:00:00`.",
     "A scanned PDF has no text layer and reads as empty.",
 ]
 

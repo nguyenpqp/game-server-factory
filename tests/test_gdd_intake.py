@@ -333,6 +333,23 @@ class GddlibConvertTest(TempDirCase):
         self.assertEqual([w["file"] for w in manifest["warnings"]], ["challenge.xlsx"])
         self.assertIn("rename", manifest["warnings"][0]["error"])
 
+    def test_a_docx_that_fails_leaves_its_name_to_an_xlsx(self):
+        (self.inputs / "balance.docx").write_bytes(b"not a zip")
+        self.make_xlsx("balance.xlsx")
+        manifest = self.convert()
+        self.assertEqual([f["output"] for f in manifest["files"]], ["raw/balance.md"])
+        self.assertEqual([w["file"] for w in manifest["warnings"]], ["balance.docx"])
+
+    def test_a_symlinked_workbook_converts(self):
+        shared = self.tmp / "shared"
+        shared.mkdir()
+        self.make_xlsx("balance.xlsx")
+        (self.inputs / "balance.xlsx").rename(shared / "balance.xlsx")
+        (self.inputs / "balance.xlsx").symlink_to(shared / "balance.xlsx")
+        manifest = self.convert()
+        self.assertEqual(manifest["warnings"], [])
+        self.assertIn("## Sheet: Rewards", (self.work / "raw" / "balance.md").read_text(encoding="utf-8"))
+
     def test_a_text_file_named_like_a_converted_file_gets_its_own_name(self):
         self.make_docx("a.docx")
         (self.inputs / "A.md").write_text("# Notes\n", encoding="utf-8")

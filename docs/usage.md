@@ -135,7 +135,7 @@ Use feature-build to fix finding 2 of the review above, then rerun feature-revie
 
 A clean review covers the server rules and the design. It does not replace a general code review.
 
-The skills check their own work by reading, with no check scripts. The one script in the plugin is the `gdd-intake` converter, which turns docx, pptx, xlsx, and PDF files into Markdown that the agent reads.
+The skills check their own work by reading, with no check scripts. The only scripts in the plugin are the `gdd-intake` converters. `convert_office.py` turns docx, pptx, xlsx, and PDF files into Markdown that the agent reads. Its docx and xlsx library, `gddlib`, also runs on its own through `convert_docx.py` and `convert_xlsx.py`.
 
 ## With subagents or a workflow
 
