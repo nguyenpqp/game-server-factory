@@ -25,7 +25,6 @@ PROFILE_TEMPLATE = f"{SKILLS_DIR}/server-profile/references/profile-template.md"
 MODEL_INVOCATION_OFF_ONLY_ON = "server-profile"
 MAX_DESCRIPTION = 1024
 
-RULE_ID = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST)-\d{2}\b")
 CAP_ID = re.compile(r"\bCAP-[A-Z]+\b")
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 INLINE_CODE = re.compile(r"`([^`\n]+)`")
@@ -41,6 +40,7 @@ RULE_GROUP_FILES = {
     "CFG": "config.md", "MET": "metric.md", "CHEAT": "cheat.md", "ADMIN": "admin.md",
     "HTTP": "http.md", "TEST": "testing.md",
 }
+RULE_ID = re.compile(r"\b(?:" + "|".join(RULE_GROUP_FILES) + r")-\d{2}\b")
 RULE_PARTS = ("**Why.**", "Do:", "Don't:", "**Check.**")
 
 
@@ -192,9 +192,9 @@ def markdown_lines(text):
             yield number, line
 
 
-def check_links(root):
+def check_links(root, files):
     findings = []
-    for path, text in plugin_files(root):
+    for path, text in files:
         if path.suffix != ".md":
             continue
         rel = relative(root, path)
@@ -215,9 +215,9 @@ def check_links(root):
     return findings
 
 
-def check_skill_variables(root):
+def check_skill_variables(root, files):
     findings = []
-    for path, text in plugin_files(root):
+    for path, text in files:
         rel = relative(root, path)
         for number, line in enumerate(text.splitlines(), start=1):
             if path.name != "SKILL.md":
@@ -291,22 +291,18 @@ def check_rulebook(root):
 
 
 def heading_ids(path, id_pattern):
-    found = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("#"):
-            match = id_pattern.match(line.lstrip("#").strip())
-            if match:
-                found.add(match.group(0))
-    return found
+    lines = markdown_lines(path.read_text(encoding="utf-8"))
+    matches = (id_pattern.match(line.lstrip("#").strip()) for _, line in lines if line.startswith("#"))
+    return {match.group(0) for match in matches if match}
 
 
-def check_ids(root, id_pattern, definitions, kind):
+def check_ids(root, files, id_pattern, definitions, kind):
     defined_in = root / definitions
     if not defined_in.is_file():
         return []
     defined = heading_ids(defined_in, id_pattern)
     findings = []
-    for path, text in plugin_files(root):
+    for path, text in files:
         for number, line in enumerate(text.splitlines(), start=1):
             for token in id_pattern.findall(line):
                 if token not in defined:
@@ -394,16 +390,17 @@ def main(argv=None):
     args = parser.parse_args(argv)
     root = args.root.resolve()
     denylist = args.denylist or os.environ.get("GSS_DENYLIST")
+    files = list(plugin_files(root))
 
     findings = (
         check_marketplace(root)
         + check_plugin_manifest(root)
         + check_skills(root)
-        + check_links(root)
-        + check_skill_variables(root)
+        + check_links(root, files)
+        + check_skill_variables(root, files)
         + check_rulebook(root)
-        + check_ids(root, RULE_ID, RULE_INDEX, "rule id")
-        + check_ids(root, CAP_ID, PROFILE_TEMPLATE, "capability id")
+        + check_ids(root, files, RULE_ID, RULE_INDEX, "rule id")
+        + check_ids(root, files, CAP_ID, PROFILE_TEMPLATE, "capability id")
         + check_tracked_files(root, denylist)
     )
     for finding in findings:
