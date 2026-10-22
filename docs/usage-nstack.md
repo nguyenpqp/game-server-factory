@@ -74,7 +74,7 @@ developer. If the spec hits a stop (a core blocker or an open Blocker question),
 write what you have, set the status, and return the stop and its questions to me.
 ```
 
-The skill fills all fourteen sections of the spec and cites a rule id on every row. If Core blockers has a row that blocks, the spec is `blocked`, and the delegate returns the row with the smallest core change. The coordinator brings it to you. You pick a resolution for each row (the core changes, the requirement is descoped, or you accept the risk by name). You may accept a critical rule too, but the reason must state the deployment fact that makes the risk acceptable, such as "one node per realm". The spec header lists every accepted critical rule, and the feature-build report repeats them.
+The skill fills all fourteen sections of the spec and cites a rule id on every row. If Core blockers has a row that blocks, the spec is `blocked`, and the delegate returns the row with the smallest core change. The coordinator brings it to you. You pick a resolution for each row (the core changes, the requirement is descoped, or you accept the risk by name). You may accept a critical rule too, but the reason must name the deployment fact and say how it prevents or bounds the failure, such as "one node per realm, so two nodes never hold the same user". The spec header lists every accepted critical rule, and the feature-build report repeats them.
 
 The coordinator then shows you the spec as part of the Interview confirmation. When you confirm, the spec status becomes `ready`. Commit the spec.
 
