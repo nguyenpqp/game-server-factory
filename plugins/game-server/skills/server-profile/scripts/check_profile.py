@@ -10,6 +10,9 @@ single source. `lint.command_method` is optional. With `--blocked-rules`, a clea
 profile also prints, for each capability that is not present, the rule ids it
 blocks: for a missing capability, every rule in the rule index whose `needs` line
 names it, and for a partial one, the rule ids on its `blocker` line.
+
+A `blocker` line that names a rule whose `needs` line in the rule index does not
+name that capability prints a warning to stderr. The exit code does not change.
 """
 import argparse
 import re
@@ -142,7 +145,7 @@ def check_profile(path, template=TEMPLATE):
     try:
         lines = Path(path).read_text(encoding="utf-8").splitlines()
     except FileNotFoundError:
-        return [Finding(path, 1, "file not found")], {}, {}
+        return [Finding(path, 1, "file not found")], {}, {}, {}
     findings = []
     block = split_frontmatter(lines)
     if block is None:
@@ -155,7 +158,7 @@ def check_profile(path, template=TEMPLATE):
             if key not in present
         ]
     sections = capability_sections(lines)
-    statuses, blockers = {}, {}
+    statuses, blockers, headings = {}, {}, {}
     for cap in required_caps:
         if cap not in sections:
             findings.append(Finding(path, 1, f"missing capability heading {cap}"))
@@ -166,18 +169,37 @@ def check_profile(path, template=TEMPLATE):
         if status:
             statuses[cap] = status
             blockers[cap] = fields.get("blocker", "")
-    return findings, statuses, blockers
+            headings[cap] = heading_line
+    return findings, statuses, blockers, headings
 
 
-def blocked_rules(statuses, blockers, index=RULE_INDEX):
+def rule_needs(index=RULE_INDEX):
     needs, rule = {}, None
     for line in Path(index).read_text(encoding="utf-8").splitlines():
         heading = RULE_HEADING.match(line)
         if heading:
             rule = heading.group(1)
         elif rule and line.startswith("- needs:"):
-            for cap in re.findall(r"CAP-[A-Z]+", line):
-                needs.setdefault(cap, []).append(rule)
+            needs[rule] = re.findall(r"CAP-[A-Z]+", line)
+    return needs
+
+
+def blocker_warnings(path, blockers, headings, index=RULE_INDEX):
+    needs = rule_needs(index)
+    warnings = []
+    for cap, blocker in blockers.items():
+        for rule in dict.fromkeys(RULE_ID.findall(blocker)):
+            if cap not in needs.get(rule, []):
+                warnings.append(Finding(path, headings[cap], f"{cap} blocker names {rule}, "
+                                        f"whose needs line in the rule index does not name {cap}"))
+    return warnings
+
+
+def blocked_rules(statuses, blockers, index=RULE_INDEX):
+    needs = {}
+    for rule, caps in rule_needs(index).items():
+        for cap in caps:
+            needs.setdefault(cap, []).append(rule)
     blocked = {}
     for cap, status in statuses.items():
         if status == "missing":
@@ -192,9 +214,11 @@ def main(argv=None):
     parser.add_argument("profile")
     parser.add_argument("--blocked-rules", action="store_true")
     args = parser.parse_args(argv)
-    findings, statuses, blockers = check_profile(args.profile)
+    findings, statuses, blockers, headings = check_profile(args.profile)
     for finding in findings:
         print(f"{finding.path}:{finding.line}: {finding.message}")
+    for warning in blocker_warnings(args.profile, blockers, headings):
+        print(f"warning: {warning.path}:{warning.line}: {warning.message}", file=sys.stderr)
     if findings:
         return 1
     if args.blocked_rules:

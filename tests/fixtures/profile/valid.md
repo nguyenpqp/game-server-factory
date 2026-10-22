@@ -313,7 +313,7 @@ Object value = ExampleUnittest.call();
 Object value = ExampleBot.call();
 ```
 
-- blocker: TEST-01 cannot be met for part of the cases.
+- blocker: TEST-10 cannot be met for part of the cases.
 - proposal: Extend the existing class to cover the remaining cases.
 
 ### CAP-GENERATED Generated files

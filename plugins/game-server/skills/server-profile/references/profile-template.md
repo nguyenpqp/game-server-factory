@@ -151,7 +151,7 @@ Must provide:
 - A push to an online user by user id, whichever node the user is on.
 - An encoding in which an old client ignores fields appended after the ones it knows, such as keyed fields or a length-prefixed layout.
 
-Typical partial: pushes reach only users on the same node, or the layout is positional with no length, so an appended field breaks old parsers.
+Typical partial: the layout is positional with no length, so an appended field breaks old parsers. Its blocker names BG-04 and BG-06. A push that reaches only users on the same node is a CAP-CROSSNODE partial, because MN-10 needs CAP-CROSSNODE, not CAP-RESPONSE.
 
 ### CAP-ERRORS Error codes
 

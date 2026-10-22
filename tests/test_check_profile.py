@@ -140,6 +140,28 @@ class CheckProfileTest(unittest.TestCase):
         self.assertIn("CAP-CLIENTVER (partial): BG-07", out)
         self.assertIn("CAP-DRAIN (missing): BG-10", out)
 
+    def test_valid_profile_prints_no_warning(self):
+        code, _, err = run(FIXTURES / "valid.md")
+        self.assertEqual((code, err), (0, []))
+
+    def test_a_blocker_id_off_the_capability_needs_lines_warns(self):
+        text = (FIXTURES / "valid.md").read_text(encoding="utf-8").replace(
+            "- blocker: BG-07 cannot be met for part of the cases.",
+            "- blocker: BG-07 and MN-10 cannot be met for part of the cases.",
+        )
+        heading = line_of(FIXTURES / "valid.md", "### CAP-CLIENTVER")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "profile.md")
+            path.write_text(text, encoding="utf-8")
+            code, out, err = run("--blocked-rules", path)
+        self.assertEqual(code, 0, out)
+        self.assertIn("CAP-CLIENTVER (partial): BG-07, MN-10", out)
+        self.assertEqual(len(err), 1, err)
+        self.assertTrue(err[0].startswith(f"warning: {path}:{heading}: "), err)
+        self.assertIn("CAP-CLIENTVER", err[0])
+        self.assertIn("MN-10", err[0])
+        self.assertNotIn("BG-07", err[0])
+
     def test_blocked_rules_is_silent_when_the_profile_fails(self):
         code, out, _ = run("--blocked-rules", FIXTURES / "missing-key.md")
         self.assertEqual(code, 1)
