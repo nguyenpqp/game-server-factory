@@ -94,6 +94,9 @@ static EventShopConfig validate(RawEventShop raw) {
             throw new ConfigException(FILE, key + ".maxPerBuy", "must be 1 to dailyLimit");
         checkRecord(key + ".price", it.price);
         checkRecord(key + ".reward", it.reward);
+        if ((long) it.price.amount() * it.maxPerBuy > Integer.MAX_VALUE
+                || (long) it.reward.amount() * it.maxPerBuy > Integer.MAX_VALUE)
+            throw new ConfigException(FILE, key + ".maxPerBuy", "times the price or the reward overflows an int");
         byId.put(it.id, ShopItem.from(it));
     }
     return new EventShopConfig(raw, byId);
@@ -110,6 +113,7 @@ static void checkRecord(String key, Amount record) {
 - Validation runs at load and at reload, never on the first command. A bad file fails startup or the reload, and the message names the file and the key (CFG-02). A failed reload keeps the old snapshot.
 - Each check matches a row of the spec's Config schema. Each `Validation` cell becomes one `if`, and each `Index built at load` cell becomes one map.
 - Check every referenced id against the catalog it points into, such as item ids, so a typo fails at load.
+- Cap each config value that a request field multiplies, so the largest product fits its type, such as the price and the reward times `maxPerBuy` (AUTH-04).
 - Every cost and reward is one `{id, amount}` record, such as `"price": { "id": "gem", "amount": 10 }`, read into one record type, so a change of currency is a data edit (CFG-09). A list of records holds a cost or a reward of several items.
 - A table of rows is a list whose rows carry an `id`, even when the design has one row today. An option that is not offered is an omitted key, and validation rejects a zero amount, because zero reads as free. Every shop item here has a price and a reward, so `checkRecord` rejects a missing record, and a record that may be left out gets a null check instead. No string packs a list, such as `gold:400;potion:3`, and no key repeats a value that another table owns (CFG-10).
 - A known reward type is not enough. `validate` rejects any reward type whose grant can be partial, capped, silently empty, or written without a metric row and trace id (CFG-02, MET-03, MET-04). The profile's CAP-INVENTORY entry names the types whose grant is safe. When it does not say, allow only the types whose grant path you read, and list the reward types you allowed under Follow-ups in the slice report.

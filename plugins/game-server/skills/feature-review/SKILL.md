@@ -19,7 +19,7 @@ Review feature code against the feature design, the rule index, the project prof
 
 1. **Scope.** List the changed files: Java sources, tests, config files, and docs. Read each changed source file in full, then the code it calls and the code that registers it. A diff hunk alone hides the checks around it.
 2. **Sweep the added lines for call-shaped breaks first.** Some rules break in a way that a reader spots from one call. Find them before the slower group walk. Read the lines that the feature adds since its base, `git diff <base>`, where `<base>` is the commit the feature started from, such as `$(git merge-base HEAD <base branch>)`. Old code in a shared file the feature touched does not count. A file git does not track is not in that diff, so read new files in full too. The profile's `lint` keys say how this project spells each call. Treat them as examples, and look for other calls that do the same job.
-   - A clock or random read outside the injected clock and RNG (AUTH-02, AUTH-03).
+   - A clock or random read outside the injected clock and RNG, or a date built in the JVM's default zone (AUTH-02, AUTH-03).
    - A mutable static field that holds game or user state (MN-01).
    - A blocking call on the user actor thread (PERF-01). A call in an HTTP endpoint class runs on an HTTP worker thread and is not a finding. A call that the spec's `Accepted blocking calls` table names, by its class and its call, is accepted. It is a finding only when its bound does not hold.
    - A command class with no metric row or no trace id (MET-01, MET-02).

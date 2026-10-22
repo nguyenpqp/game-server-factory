@@ -450,6 +450,7 @@ The section names the check command and one row per test case. Each test class r
 
 - For each command, the main flow, each time and random case with the clock and the RNG injected, one negative case per row of its Checks table, and its metric rows.
 - For each command that takes a request id, and for each HTTP callback, a replay that asserts one effect.
+- For each command whose grant can throw, a grant that throws after the take, which asserts that the cost comes back, the request id is not stored, and the exception reaches the runner.
 - For each cheat, a run on live that asserts rejection and no change.
 - For the config, a valid file and each invalid case that validation rejects.
 - For each stored document, data from before the change and data with fields from a newer version.

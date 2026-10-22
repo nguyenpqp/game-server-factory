@@ -32,6 +32,8 @@ lint:
     - 'Instant\.now\('
     - 'LocalDate(Time)?\.now\('
     - 'new Date\(\)'
+    - 'ZoneId\.systemDefault\('
+    - 'TimeZone\.getDefault\('
   random_call: 'GameRandom\.next\w*\('
   forbidden_random:
     - 'new Random\('

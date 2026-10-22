@@ -20,12 +20,12 @@ Read each command handler and the core method it calls, in order. Trace every re
 | Rule | Severity | Look for |
 | --- | --- | --- |
 | AUTH-01 | critical | A request field that carries a price, amount, reward, result, or success flag. A handler that trusts a client-computed value. |
-| AUTH-02 | critical | Any read of wall time in feature code, or a core method that fetches time itself instead of taking `now`. The profile's `lint.forbidden_time` names the direct calls. Look also for time read through a helper or a stored static. |
+| AUTH-02 | critical | Any read of wall time in feature code, or a core method that fetches time itself instead of taking `now`. The profile's `lint.forbidden_time` names the direct calls. Look also for time read through a helper or a stored static. A date, a day, or an hour built without the zone from CAP-CLOCK, such as with `ZoneId.systemDefault()`. |
 | AUTH-03 | critical | Any random source other than the injected one. Look for seeds taken from the request, and for a roll done twice so a client can retry for a better result. |
-| AUTH-04 | critical | A request decoded and used before a range, length, enum, or null check. A list field with no size cap. A string used as a key with no length cap. |
+| AUTH-04 | critical | A request decoded and used before a range, length, enum, or null check. A list field with no size cap. A string used as a key with no length cap. A product or sum of a request field and a config value, such as a price times a quantity, with no bound that keeps it within its type. |
 | AUTH-05 | critical | An item, slot, or target id from the request used without a check that the acting user owns it or may reach it. A friend or guild member id used without a membership check. |
 | AUTH-06 | critical | A state change that runs before the active, unlocked, state-transition, or cooldown check. A check that reads client-sent state. A claim or grant command that does not check the feature's terminal state, such as finished, expired, or closed, before it grants, even when a claimed list seems to cover it. |
-| AUTH-07 | critical | Several costs taken one by one with no up-front check. A cost taken before a later step that can fail, with no refund on that failure. A cost taken before the shared claim it pays for. A refund after a shared write that timed out and may have landed. |
+| AUTH-07 | critical | Several costs taken one by one with no up-front check. A cost taken before a later step that can fail, with no refund on that failure. A cost taken before the shared claim it pays for. A refund after a shared write that timed out and may have landed. A call after the first change that can throw, with no catch that undoes what ran, or a request id stored after such a call. |
 | AUTH-08 | critical | A grant, purchase, or claim command with no request id, or a request id stored after the grant. A retry path that can run the grant twice. |
 | AUTH-09 | important | A command that loads other users or the database, or fans out, with no per-user limit. A limit that still applies the effect once exceeded. |
 | AUTH-10 | important | A failure branch that changes state before it returns, or returns one generic code for different failures. |
@@ -145,7 +145,7 @@ Read the admin handler, its routing to the owner, and the admin API spec.
 | ADMIN-03 | important | A mutating admin command with no audit row, or an audit row missing the target, applied change, result, or trace id. |
 | ADMIN-04 | critical | A destructive admin command with no live block and no confirmation field. |
 | ADMIN-05 | important | An admin command with no entry in the admin API spec. |
-| ADMIN-06 | important | An admin command that applies an effect before it validates the target, range, and ids. |
+| ADMIN-06 | important | An admin command that applies an effect before it validates the target, range, and ids. A required field read into a primitive, so a missing field becomes 0 or false and passes the range check. |
 | ADMIN-07 | important | A mutating admin command that applies twice when sent twice. |
 | ADMIN-08 | important | A per-user state with no admin command to read it or repair it. |
 
@@ -171,7 +171,7 @@ Read the tests that the diff adds or should add. Judge the tests against the rul
 | Rule | Severity | Look for |
 | --- | --- | --- |
 | TEST-01 | important | A core test that needs a socket, a database, or a network. A Redis script test that shares a keyspace with other tests or leaves keys behind. |
-| TEST-02 | important | A test that reads real time or real random numbers. |
+| TEST-02 | important | A test that reads real time or real random numbers, or that passes only with the JVM in one zone. |
 | TEST-03 | important | A command with a check and no negative test for it. |
 | TEST-04 | important | A cheat with no test that it is rejected on live. |
 | TEST-05 | important | A config validator with no test for a valid file or for an invalid case. |

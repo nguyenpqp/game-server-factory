@@ -35,7 +35,7 @@ void claimGrantsDayReward() {
 
 ### TEST-02 Tests inject time and random numbers, so every time window, cooldown, and random outcome has a deterministic test.
 
-**Why.** A test that reads the real clock or an unseeded RNG passes or fails by chance.
+**Why.** A test that reads the real clock or an unseeded RNG passes or fails by chance, and a test that reads the JVM's zone passes only on a machine set to that zone.
 
 Do:
 
@@ -53,7 +53,7 @@ Thread.sleep(1000);
 assertTrue(StreakCore.claim(state, config, System.currentTimeMillis()) == ErrorCode.SUCCESS);
 ```
 
-**Check.** Confirm each time boundary and each random branch in the core has a test with a fixed time or a fixed RNG.
+**Check.** Confirm each time boundary and each random branch in the core has a test with a fixed time or a fixed RNG. A day boundary test passes with the JVM in any zone, such as UTC and a zone far from the server's. A test that needs a `user.timezone` setting reads the default zone somewhere (AUTH-02).
 
 - needs: CAP-CLOCK, CAP-RNG, CAP-UNITTEST
 

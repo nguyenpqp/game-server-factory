@@ -59,6 +59,7 @@ public final class AdminSetPurchases implements AdminCommand {
 ```
 
 - `check` returns `PERMISSION_DENIED` without the spec's permission, `USER_NOT_FOUND` for an unknown user, `OUT_OF_RANGE` for a bad value, and `CONFIRM_REQUIRED` on live when `confirm` is not true. Each is an error code from the spec's API entry.
+- `parse` keeps a missing field apart from its zero value, such as a boxed `Integer` left null, and `check` rejects a missing required field with the spec's error code. A primitive default of 0 would pass the range check and set the count to zero (ADMIN-06).
 - `UserActor.submitTo` runs the change on the owner's actor, on whichever node owns the user. Its second argument runs when the user is offline. The admin's own thread never touches the target's live state (MN-02).
 - The offline path loads the stored document, runs the same migration as a login, applies the same domain method, and writes with CAS. A conflict reloads and retries, up to the bound (MN-04).
 - `SetPurchases.applyTo` calls the document's own methods, so a repair keeps the feature's invariants.

@@ -26,7 +26,7 @@ Each rule's reason, Java do and don't, and review check are in [auth.md](auth.md
 - severity: critical
 - needs: CAP-COMMAND
 
-### AUTH-02 Game logic reads time only from the server clock, passed into the core as a parameter.
+### AUTH-02 Game logic reads time only from the server clock, passed into the core as a parameter, and turns it into a date only with the zone that CAP-CLOCK names.
 
 - severity: critical
 - needs: CAP-CLOCK
@@ -36,7 +36,7 @@ Each rule's reason, Java do and don't, and review check are in [auth.md](auth.md
 - severity: critical
 - needs: CAP-RNG
 
-### AUTH-04 Every request field is checked for presence, type, range, length, and allowed values before any state change.
+### AUTH-04 Every request field is checked for presence, type, range, length, and allowed values before any state change, and its range keeps every amount computed from it within its type.
 
 - severity: critical
 - needs: CAP-COMMAND, CAP-ERRORS
@@ -51,7 +51,7 @@ Each rule's reason, Java do and don't, and review check are in [auth.md](auth.md
 - severity: critical
 - needs: CAP-CONFIG, CAP-CLOCK
 
-### AUTH-07 A command checks every cost in full before it takes any, takes it after any shared claim the action needs, and refunds what it took when a later step definitely fails.
+### AUTH-07 A command checks every cost in full before it takes any, takes it after any shared claim the action needs, and refunds what it took when a later step definitely fails or throws.
 
 - severity: critical
 - needs: CAP-INVENTORY

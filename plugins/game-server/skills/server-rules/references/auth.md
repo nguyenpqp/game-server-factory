@@ -25,24 +25,26 @@ inventory.addGold(gold, Reason.HARVEST, traceId);
 
 - needs: CAP-COMMAND
 
-### AUTH-02 Game logic reads time only from the server clock, passed into the core as a parameter.
+### AUTH-02 Game logic reads time only from the server clock, passed into the core as a parameter, and turns it into a date only with the zone that CAP-CLOCK names.
 
-**Why.** Client time and node-local calls are forgeable or skewed, and a core that reads the clock itself cannot be tested.
+**Why.** Client time and node-local calls are forgeable or skewed, and a core that reads the clock itself cannot be tested. A date built in the JVM's default zone moves the day boundary on a node or a test machine set to another zone.
 
 Do:
 
 ```java
 long now = ServerClock.now();
 Result result = HarvestCore.process(state, config, slot, now);
+LocalDate today = Instant.ofEpochMilli(now).atZone(ServerClock.zone()).toLocalDate();
 ```
 
 Don't:
 
 ```java
 boolean ready = System.currentTimeMillis() >= plot.readyAt();
+LocalDate today = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate();
 ```
 
-**Check.** Search the feature package for `currentTimeMillis`, `Instant.now`, `LocalDate.now`, `new Date()`, and the other calls in the profile's `lint.forbidden_time`.
+**Check.** Search the feature package for `currentTimeMillis`, `Instant.now`, `LocalDate.now`, `new Date()`, and the other calls in the profile's `lint.forbidden_time`. Then find each place that turns time into a date, a day, or an hour, such as `atZone`, `ofInstant`, `Calendar`, or a date format, and confirm it takes the zone from CAP-CLOCK. A call that names no zone, such as `ZoneId.systemDefault()`, `TimeZone.getDefault()`, or `Calendar.getInstance()`, uses the JVM's zone.
 
 - needs: CAP-CLOCK
 
@@ -67,9 +69,9 @@ int roll = new Random().nextInt(table.totalWeight());
 
 - needs: CAP-RNG
 
-### AUTH-04 Every request field is checked for presence, type, range, length, and allowed values before any state change.
+### AUTH-04 Every request field is checked for presence, type, range, length, and allowed values before any state change, and its range keeps every amount computed from it within its type.
 
-**Why.** An unchecked negative count or out-of-range index turns into free items or a crash on the actor thread.
+**Why.** An unchecked negative count or out-of-range index turns into free items or a crash on the actor thread. A count inside its own range can still multiply a price past the limit of its type, and the product wraps to a small or negative cost.
 
 Do:
 
@@ -87,7 +89,9 @@ int count = req.readInt("count");
 inventory.take(seedId, count, Reason.PLANT, traceId);
 ```
 
-**Check.** For each field in the decoder, find the guard that bounds it before the first mutation.
+Bound each field so that every amount computed from it fits its type with the largest config values, such as a price times the largest count. The config check at load caps the config side of that product (CFG-02). Where no bound proves that the result fits, compute it with `Math.multiplyExact` or `Math.addExact` before the first change, and return an error on the exception.
+
+**Check.** For each field in the decoder, find the guard that bounds it before the first mutation. For each amount computed from a field, such as a cost times a count, find the bound that keeps it within its type, or the exact arithmetic call.
 
 - needs: CAP-COMMAND, CAP-ERRORS
 
@@ -138,9 +142,9 @@ grantDailyReward(state, now);
 
 - needs: CAP-CONFIG, CAP-CLOCK
 
-### AUTH-07 A command checks every cost in full before it takes any, takes it after any shared claim the action needs, and refunds what it took when a later step definitely fails.
+### AUTH-07 A command checks every cost in full before it takes any, takes it after any shared claim the action needs, and refunds what it took when a later step definitely fails or throws.
 
-**Why.** Taking the first cost and then failing on the second loses player value with nothing in return. A shared write that times out may have landed, so a blind refund pays the player back for something they got.
+**Why.** Taking the first cost and then failing on the second loses player value with nothing in return. A shared write that times out may have landed, so a blind refund pays the player back for something they got. A step that throws after the take loses the cost the same way, and one that throws after the grant but before the request id is stored lets a retry grant again.
 
 Do:
 
@@ -162,7 +166,9 @@ inventory.take(wood, Reason.CRAFT, traceId);
 
 When the effect is a write to shared state, such as a guild or a sale, claim or reserve the shared side first and take the cost last. A definite failure after the take refunds. An unknown outcome logs the case for repair and does not refund.
 
-**Check.** Find the full check before the first take, and a refund on every definite failure path after it. For a shared effect, confirm the claim comes before the take, and that a timeout path logs instead of refunding.
+The runner that catches an exception only logs it, so a throw after the first change leaves the command half applied. Run the work that can throw before the first change, such as lookups, arithmetic, and building the result. After the first change, run only in-memory writes that cannot throw, such as storing the request id. A change to the player's own state that can throw, such as a grant that throws on a full storage instead of returning false, is caught at the call, which undoes what ran and rethrows, so the runner still writes the exception row. A shared write that throws has an unknown outcome, so it logs the case for repair as above and does not refund.
+
+**Check.** Find the full check before the first take, and a refund on every definite failure path after it. Then find each call after the first change that can throw, and confirm that it runs before the change instead, or that its catch undoes what ran. For a shared effect, confirm the claim comes before the take, and that a timeout path logs instead of refunding.
 
 - needs: CAP-INVENTORY
 

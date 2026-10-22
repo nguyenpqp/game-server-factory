@@ -123,11 +123,13 @@ static final short ADMIN_STREAK_SET = 9101;   // no spec entry
 
 ### ADMIN-06 An admin command validates its target, ranges, and referenced ids before any effect, as a gameplay command does.
 
-**Why.** An admin typo with no validation writes invalid state that the game cannot load.
+**Why.** An admin typo with no validation writes invalid state that the game cannot load. A required number read into a primitive turns a missing field into 0, which passes the range check and sets the state to zero.
 
 Do:
 
 ```java
+Integer streak = req.readInteger("streak");
+if (streak == null) return ErrorCode.INVALID_PARAM;
 if (!KvStore.exists(userKey(targetId))) return ErrorCode.NOT_FOUND;
 if (streak < 0 || streak > config.maxStreak()) return ErrorCode.INVALID_PARAM;
 ```
@@ -138,7 +140,7 @@ Don't:
 CrossNode.submitToOwner(targetId, s -> s.streak = req.readInt("streak"));
 ```
 
-**Check.** Confirm each admin command checks the target and every field before the first effect.
+**Check.** Confirm each admin command checks the target and every field before the first effect. A missing required field returns an error. Confirm that the decoder keeps it apart from 0, false, or an empty string, such as with a boxed type or a presence check.
 
 - needs: CAP-ADMIN, CAP-ERRORS
 
