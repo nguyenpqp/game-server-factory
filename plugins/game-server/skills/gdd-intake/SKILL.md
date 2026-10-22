@@ -27,9 +27,9 @@ Ask for the feature name if it is missing, and use it in kebab case. Ask for the
 ## Pipeline
 
 1. **Convert.** Run `python3 -I ${CLAUDE_SKILL_DIR}/scripts/convert_office.py <input folder> .gdd-intake/<feature>`. It reads docx, pptx, and xlsx with the Python standard library, copies raster images out, and copies text files as they are. Read `conversion-manifest.md` in the work folder and tell the developer what it lists. Three cases need the developer:
-   - A PDF in `export_requests` needs PyMuPDF, which may be missing. Ask the developer to export the PDF to docx or Markdown into the input folder, then run the step again.
+   - A PDF needs PyMuPDF (`python3 -m pip install pymupdf`, not `--user`, since `-I` hides user packages); without it the converter lists the PDF in `export_requests`. Ask the developer to install it, or to export the PDF to docx or Markdown into the input folder, then run the step again.
    - Legacy `.doc`, `.ppt`, and `.xls` files are skipped. Ask for a save as docx, pptx, or xlsx.
-   - Charts, SmartArt, and vector drawings are not converted. If one carries rules or numbers, ask for a PNG export into the `images` folder of the work folder.
+   - SmartArt, vector drawings, and charts outside slides are not converted. Slide charts are read as tables. If one carries rules or numbers, ask for a PNG export into the `images` folder of the work folder.
 2. **Extract.** Follow [the extractor prompt](prompts/extractor-prompt.md). It reads everything and writes the first `design.md`, with open questions and an interim default for each. Use a fresh subagent when the harness has one, because the input can be large. A subagent cannot ask the user, which is why the questions land in the file.
 3. **Lint.** Run `python3 -I ${CLAUDE_SKILL_DIR}/scripts/lint_design.py <design.md>`. It prints `path:line: message` and exits 1 on any problem. A design with open questions can pass. Do not skip this step when the draft looks right.
 4. **Questions.** See the hand-off rule below. This step ends when every question is answered, skipped by the developer, or handed to a workflow that will bring the answers back.
