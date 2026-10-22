@@ -1,8 +1,5 @@
 import base64
-import contextlib
 import csv
-import importlib.util
-import io
 import json
 import re
 import shutil
@@ -13,23 +10,17 @@ import unittest
 import zipfile
 from pathlib import Path
 
+from helpers import load_script, run_main
+
 ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "plugins" / "game-server" / "skills" / "gdd-intake"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "gdd"
 TEMPLATE = SKILL / "references" / "design-template.md"
 
 
-def load_script(name):
-    path = SKILL / "scripts" / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-convert = load_script("convert_office")
-lint_design = load_script("lint_design")
-emit_json = load_script("emit_json")
+convert = load_script(SKILL / "scripts" / "convert_office.py")
+lint_design = load_script(SKILL / "scripts" / "lint_design.py")
+emit_json = load_script(SKILL / "scripts" / "emit_json.py")
 
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
@@ -57,11 +48,8 @@ def rels(*items):
     return f'{XML}<Relationships xmlns="{PKG_REL}">{body}</Relationships>'
 
 
-def run_main(module, argv):
-    out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = module.main(argv)
-    return code, out.getvalue(), err.getvalue()
+def draft(folder, name="tiny.json"):
+    return json.loads((folder / "config" / name).read_text(encoding="utf-8"))
 
 
 class TempDirCase(unittest.TestCase):
@@ -663,9 +651,9 @@ class EmitJsonTest(TempDirCase):
         design = self.write_design()
         code, out, err = run_main(emit_json, [str(design)])
         self.assertEqual(code, 0, err)
-        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
+        data = draft(design.parent)
         self.assertEqual(
-            draft,
+            data,
             {
                 "title": "Weekly",
                 "unlockLevel": 8,
@@ -683,14 +671,14 @@ class EmitJsonTest(TempDirCase):
             emit_json, [str(design), "--sheets", str(self.work), "--out-dir", str(out_dir)]
         )
         self.assertEqual(code, 0, err)
-        draft = json.loads((out_dir / "config" / "tiny.json").read_text(encoding="utf-8"))
-        self.assertEqual(draft["unlockLevel"], 12)
+        data = draft(out_dir)
+        self.assertEqual(data["unlockLevel"], 12)
         self.assertEqual(
-            [(t["points"], t["reward"], t["premium"]) for t in draft["tiers"]],
+            [(t["points"], t["reward"], t["premium"]) for t in data["tiers"]],
             [(100, "gold", False), (250, "chest", False), (500, "gems", True)],
         )
-        self.assertEqual(draft["tiers"][0]["items"], "500 gold")
-        self.assertIsNone(draft["tiers"][1]["items"])
+        self.assertEqual(data["tiers"][0]["items"], "500 gold")
+        self.assertIsNone(data["tiers"][1]["items"])
         self.assertFalse((design.parent / "config").exists())
 
     def test_value_that_does_not_match_its_type_becomes_null_with_a_warning(self):
@@ -699,8 +687,8 @@ class EmitJsonTest(TempDirCase):
         )
         code, out, err = run_main(emit_json, [str(design)])
         self.assertEqual(code, 0)
-        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
-        self.assertIsNone(draft["limits"]["perDay"])
+        data = draft(design.parent)
+        self.assertIsNone(data["limits"]["perDay"])
         self.assertIn("limits.perDay", err)
 
     def test_a_range_that_does_not_fit_the_key_warns(self):
@@ -711,8 +699,8 @@ class EmitJsonTest(TempDirCase):
         warnings = [line for line in err.splitlines() if line.startswith("warning:")]
         self.assertTrue(any("unlockLevel" in w and "B2:B3" in w for w in warnings), err)
         self.assertTrue(any("tiers[].items" in w and "B2:D4" in w for w in warnings), err)
-        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
-        self.assertEqual(draft["unlockLevel"], 8)
+        data = draft(design.parent)
+        self.assertEqual(data["unlockLevel"], 8)
 
     def test_tables_are_read_one_at_a_time_and_fenced_lines_are_ignored(self):
         extra = (
@@ -724,18 +712,18 @@ class EmitJsonTest(TempDirCase):
         design = self.write_design(CONFIG_DESIGN + extra)
         code, out, err = run_main(emit_json, [str(design)])
         self.assertEqual(code, 0, err)
-        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
-        self.assertEqual(draft["bonus"], 2)
-        self.assertNotIn("fenced", draft)
-        self.assertNotIn("Key", draft)
+        data = draft(design.parent)
+        self.assertEqual(data["bonus"], 2)
+        self.assertNotIn("fenced", data)
+        self.assertNotIn("Key", data)
 
     def test_large_integers_keep_every_digit(self):
         big = 2 ** 53 + 1
         design = self.write_design(CONFIG_DESIGN.replace("| integer | 3 |", f"| integer | {big} |"))
         code, out, err = run_main(emit_json, [str(design)])
         self.assertEqual(code, 0, err)
-        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
-        self.assertEqual(draft["limits"]["perDay"], big)
+        data = draft(design.parent)
+        self.assertEqual(data["limits"]["perDay"], big)
 
     def test_runs_isolated_with_its_shared_helpers(self):
         design = self.write_design()
@@ -776,10 +764,10 @@ class EmitJsonTest(TempDirCase):
         design = self.write_design(read_fixture("clean-design.md"))
         code, out, err = run_main(emit_json, [str(design)])
         self.assertEqual(code, 0, err)
-        draft = json.loads((design.parent / "config" / "weekly-challenge.json").read_text(encoding="utf-8"))
-        self.assertEqual(draft["unlockLevel"], 8)
-        self.assertEqual(draft["limits"], {"claimsPerWeek": 1})
-        self.assertEqual(draft["tiers"], [{"points": 100, "reward": "gold", "premium": False}])
+        data = draft(design.parent, "weekly-challenge.json")
+        self.assertEqual(data["unlockLevel"], 8)
+        self.assertEqual(data["limits"], {"claimsPerWeek": 1})
+        self.assertEqual(data["tiers"], [{"points": 100, "reward": "gold", "premium": False}])
 
     def no_sheet_list_design(self, items_example='["5 coin", "4 gem", "10 coin"]'):
         return (CONFIG_DESIGN
@@ -792,8 +780,8 @@ class EmitJsonTest(TempDirCase):
         design = self.write_design(self.no_sheet_list_design())
         code, out, err = run_main(emit_json, [str(design)])
         self.assertEqual((code, err), (0, ""))
-        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
-        self.assertEqual(draft["tiers"], [
+        data = draft(design.parent)
+        self.assertEqual(data["tiers"], [
             {"points": 100, "reward": "coin", "premium": False, "items": "5 coin"},
             {"points": 250, "reward": "gem", "premium": False, "items": "4 gem"},
             {"points": 500, "reward": "coin", "premium": True, "items": "10 coin"},
@@ -803,8 +791,8 @@ class EmitJsonTest(TempDirCase):
         design = self.write_design(self.no_sheet_list_design(items_example="500 gold"))
         code, out, err = run_main(emit_json, [str(design)])
         self.assertEqual(code, 0, err)
-        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
-        self.assertEqual([t["items"] for t in draft["tiers"]], ["500 gold", None, None])
+        data = draft(design.parent)
+        self.assertEqual([t["items"] for t in data["tiers"]], ["500 gold", None, None])
         warnings = [line for line in err.splitlines() if line.startswith("warning:")]
         self.assertEqual(len(warnings), 1, err)
         self.assertIn("tiers[].items", warnings[0])

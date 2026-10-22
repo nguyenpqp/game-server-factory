@@ -1,6 +1,3 @@
-import contextlib
-import importlib.util
-import io
 import json
 import os
 import shutil
@@ -11,10 +8,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from helpers import git, load_script, run_main, write_tree
+
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "validate_plugin.py"
-spec = importlib.util.spec_from_file_location("validate_plugin", SCRIPT)
-validate = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(validate)
+validate = load_script(SCRIPT)
 
 PLUGIN = "plugins/game-server/.claude-plugin/plugin.json"
 SKILLS = "plugins/game-server/skills"
@@ -76,45 +73,41 @@ def good_tree():
     }
 
 
-def write_tree(root, files):
-    for rel, content in files.items():
-        if content is None:
-            continue
-        path = Path(root, rel)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-
-
-def git(root, *args):
-    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
-
-
 class ValidatorTestCase(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         if shutil.which("git") is None:
-            self.skipTest("git binary is missing")
+            raise unittest.SkipTest("git binary is missing")
+        tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(tmp.cleanup)
+        cls.root = Path(tmp.name, "repo")
+        cls.root.mkdir()
+        cls.outside = Path(tmp.name, "outside")
+        cls.outside.mkdir()
+        git(cls.root, "init", "-q")
+
+    def setUp(self):
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
         os.environ.pop("GSS_DENYLIST", None)
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.root = Path(tmp.name, "repo")
-        self.root.mkdir()
-        self.outside = Path(tmp.name, "outside")
-        self.outside.mkdir()
+        self.fresh_root()
+
+    def fresh_root(self):
+        for child in self.root.iterdir():
+            if child.name != ".git":
+                shutil.rmtree(child) if child.is_dir() else child.unlink()
+        Path(self.root, ".git", "index").unlink(missing_ok=True)
 
     def build(self, changes=None):
-        files = {**good_tree(), **(changes or {})}
-        write_tree(self.root, files)
-        git(self.root, "init", "-q")
-        git(self.root, "add", "-A")
+        write_tree(self.root, {**good_tree(), **(changes or {})})
+
+    def with_body(self, body):
+        return {RULES_SKILL: skill_md("server-rules") + body}
 
     def run_validator(self, *args):
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = validate.main(["--root", str(self.root), *args])
-        return code, out.getvalue().splitlines(), err.getvalue().splitlines()
+        code, out, err = run_main(validate, ["--root", self.root, *args])
+        return code, out.splitlines(), err.splitlines()
 
     def denylist(self, *terms):
         path = self.outside / "denylist.txt"
@@ -186,11 +179,10 @@ class ManifestTest(ValidatorTestCase):
     def test_plugin_missing_required_field_fails(self):
         for field in ("name", "description", "author", "license", "keywords"):
             with self.subTest(field=field):
-                with tempfile.TemporaryDirectory() as tmp:
-                    self.root = Path(tmp)
-                    self.build({PLUGIN: self.plugin(**{field: None})})
-                    line = self.assert_fails_at(f"{PLUGIN}:1")
-                    self.assertIn(field, line)
+                self.fresh_root()
+                self.build({PLUGIN: self.plugin(**{field: None})})
+                line = self.assert_fails_at(f"{PLUGIN}:1")
+                self.assertIn(field, line)
 
     def test_plugin_with_version_fails(self):
         self.build({PLUGIN: self.plugin(version="1.0.0")})
@@ -249,9 +241,6 @@ class SkillFrontmatterTest(ValidatorTestCase):
 
 
 class LinkTest(ValidatorTestCase):
-    def with_body(self, body, path=RULES_SKILL):
-        return {path: skill_md("server-rules") + body}
-
     def test_broken_markdown_link_fails_at_its_line(self):
         self.build(self.with_body("\nSee [gone](references/gone.md).\n"))
         self.assert_fails_at(f"{RULES_SKILL}:7")
@@ -263,10 +252,9 @@ class LinkTest(ValidatorTestCase):
     def test_inline_code_path_with_each_prefix_is_checked(self):
         for prefix in ("references/", "scripts/", "prompts/", "../"):
             with self.subTest(prefix=prefix):
-                with tempfile.TemporaryDirectory() as tmp:
-                    self.root = Path(tmp)
-                    self.build(self.with_body(f"\nUse `{prefix}gone.md`.\n"))
-                    self.assert_fails_at(f"{RULES_SKILL}:7")
+                self.fresh_root()
+                self.build(self.with_body(f"\nUse `{prefix}gone.md`.\n"))
+                self.assert_fails_at(f"{RULES_SKILL}:7")
 
     def test_existing_targets_pass(self):
         body = "\n[a](references/index.md#top) `references/index.md` `../server-profile/SKILL.md`\n"
@@ -301,8 +289,8 @@ class LinkTest(ValidatorTestCase):
 
 
 class RuleIdTest(ValidatorTestCase):
-    def cite(self, token, path=RULES_SKILL):
-        return {path: skill_md("server-rules") + f"\nCites {token}.\n"}
+    def cite(self, token):
+        return self.with_body(f"\nCites {token}.\n")
 
     def test_undefined_rule_id_fails_at_its_line(self):
         self.build(self.cite("AUTH-99"))
@@ -312,10 +300,9 @@ class RuleIdTest(ValidatorTestCase):
     def test_every_rule_group_is_checked(self):
         for group in "AUTH MN BG PERF CFG MET CHEAT ADMIN HTTP TEST".split():
             with self.subTest(group=group):
-                with tempfile.TemporaryDirectory() as tmp:
-                    self.root = Path(tmp)
-                    self.build(self.cite(f"{group}-77"))
-                    self.assert_fails_at(f"{RULES_SKILL}:7")
+                self.fresh_root()
+                self.build(self.cite(f"{group}-77"))
+                self.assert_fails_at(f"{RULES_SKILL}:7")
 
     def test_defined_rule_id_passes(self):
         self.build(self.cite("AUTH-01"))
@@ -366,9 +353,6 @@ class CapabilityIdTest(ValidatorTestCase):
 
 
 class SkillVariablePathTest(ValidatorTestCase):
-    def with_body(self, body):
-        return {RULES_SKILL: skill_md("server-rules") + body}
-
     def test_own_script_path_must_exist(self):
         body = "\n```bash\npython3 ${CLAUDE_SKILL_DIR}/scripts/gone.py\n```\n"
         self.build(self.with_body(body))
@@ -427,21 +411,19 @@ class RulebookTest(ValidatorTestCase):
     def test_each_part_is_required(self):
         for part in ("**Why.** The server decides.", "Do:", "Don't:", "**Check.** Read the handler."):
             with self.subTest(part=part):
-                with tempfile.TemporaryDirectory() as tmp:
-                    self.root = Path(tmp)
-                    self.build({RULES_AUTH: "# Auth rules\n\n" + rule_section(drop=part)})
-                    line = self.assert_fails_at(f"{RULES_AUTH}:3")
-                    self.assertIn(part.split()[0].strip("*").rstrip(":"), line)
+                self.fresh_root()
+                self.build({RULES_AUTH: "# Auth rules\n\n" + rule_section(drop=part)})
+                line = self.assert_fails_at(f"{RULES_AUTH}:3")
+                self.assertIn(part.split()[0].strip("*").rstrip(":"), line)
 
 
 class TrackedFileScanTest(ValidatorTestCase):
     def test_home_path_in_tracked_file_fails(self):
         for prefix in ("/Us" + "ers/alice/", "/ho" + "me/alice/"):
             with self.subTest(prefix=prefix):
-                with tempfile.TemporaryDirectory() as tmp:
-                    self.root = Path(tmp)
-                    self.build({"docs/notes.txt": f"ok\nsee {prefix}work/x\n"})
-                    self.assert_fails_at("docs/notes.txt:2")
+                self.fresh_root()
+                self.build({"docs/notes.txt": f"ok\nsee {prefix}work/x\n"})
+                self.assert_fails_at("docs/notes.txt:2")
 
     def test_private_key_block_fails(self):
         key = "-----BEGIN RSA PRIV" + "ATE KEY-----\nabc\n"
@@ -450,6 +432,7 @@ class TrackedFileScanTest(ValidatorTestCase):
 
     def test_untracked_files_are_scanned(self):
         self.build()
+        git(self.root, "add", "-A")
         Path(self.root, "stray.txt").write_text("/Us" + "ers/alice/x\n", encoding="utf-8")
         self.assert_fails_at("stray.txt:1")
 
@@ -485,6 +468,7 @@ class DenylistTest(ValidatorTestCase):
 
     def test_untracked_files_are_scanned(self):
         self.build()
+        git(self.root, "add", "-A")
         Path(self.root, "stray.txt").write_text("acme\n", encoding="utf-8")
         self.assert_fails_at("stray.txt:1", "--denylist", self.denylist("acme"))
 

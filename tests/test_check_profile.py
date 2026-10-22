@@ -1,26 +1,28 @@
-import contextlib
-import importlib.util
-import io
 import re
 import tempfile
 import unittest
 from pathlib import Path
+
+from helpers import load_script, run_main
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "plugins/game-server/skills/server-profile/scripts/check_profile.py"
 FIXTURES = ROOT / "tests/fixtures/profile"
 TEMPLATE = ROOT / "plugins/game-server/skills/server-profile/references/profile-template.md"
 
-spec = importlib.util.spec_from_file_location("check_profile", SCRIPT)
-check = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(check)
+check = load_script(SCRIPT)
 
 
 def run(*args):
-    out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = check.main([str(a) for a in args])
-    return code, out.getvalue().splitlines(), err.getvalue().splitlines()
+    code, out, err = run_main(check, args)
+    return code, out.splitlines(), err.splitlines()
+
+
+def run_text(text, *flags):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp, "profile.md")
+        path.write_text(text, encoding="utf-8")
+        return (path, *run(*flags, path))
 
 
 def line_of(path, text):
@@ -76,10 +78,7 @@ class CheckProfileTest(unittest.TestCase):
         head = text.index("### CAP-COMMAND")
         end = text.index("### CAP-RESPONSE")
         cut = text[:head] + "### CAP-COMMAND Command channel and ids\n\n- status: present\n\n" + text[end:]
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp, "profile.md")
-            path.write_text(cut, encoding="utf-8")
-            code, out, _ = run(path)
+        _, code, out, _ = run_text(cut)
         self.assertEqual(code, 1)
         self.assertEqual(
             [line.split(": ", 1)[1] for line in out],
@@ -96,10 +95,7 @@ class CheckProfileTest(unittest.TestCase):
             "- blocker: Old clients cannot be told apart.",
         )
         heading = line_of(FIXTURES / "valid.md", "### CAP-CLIENTVER")
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp, "profile.md")
-            path.write_text(text, encoding="utf-8")
-            code, out, _ = run(path)
+        path, code, out, _ = run_text(text)
         self.assertEqual(code, 1)
         self.assertEqual(out, [f"{path}:{heading}: CAP-CLIENTVER is partial and its blocker names no rule id"])
 
@@ -109,10 +105,7 @@ class CheckProfileTest(unittest.TestCase):
         self.assertEqual((code, out), (1, [f"{path}:1: file not found"]))
 
     def test_no_frontmatter(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp, "profile.md")
-            path.write_text("# Profile\n", encoding="utf-8")
-            code, out, _ = run(path)
+        path, code, out, _ = run_text("# Profile\n")
         self.assertEqual(code, 1)
         self.assertEqual(out[0], f"{path}:1: missing frontmatter block")
 
@@ -150,10 +143,7 @@ class CheckProfileTest(unittest.TestCase):
             "- blocker: BG-07 and MN-10 cannot be met for part of the cases.",
         )
         heading = line_of(FIXTURES / "valid.md", "### CAP-CLIENTVER")
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp, "profile.md")
-            path.write_text(text, encoding="utf-8")
-            code, out, err = run("--blocked-rules", path)
+        path, code, out, err = run_text(text, "--blocked-rules")
         self.assertEqual(code, 0, out)
         self.assertIn("CAP-CLIENTVER (partial): BG-07, MN-10", out)
         self.assertEqual(len(err), 1, err)

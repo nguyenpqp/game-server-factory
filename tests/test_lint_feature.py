@@ -1,12 +1,11 @@
-import contextlib
-import importlib.util
-import io
 import re
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+from helpers import git, load_script, run_main, write_tree
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "plugins" / "game-server" / "skills" / "feature-review"
@@ -25,20 +24,16 @@ FEATURE_DIR = "src/main/java/com/example/game/feature/demo"
 SKILLS = ROOT / "plugins" / "game-server" / "skills"
 NO_COMMAND_NOTE = "note: no class under feature_root declares a method matching lint.command_method"
 
-spec = importlib.util.spec_from_file_location("lint_feature", SCRIPT)
-lint = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(lint)
+lint = load_script(SCRIPT)
+validate = load_script(ROOT / "scripts" / "validate_plugin.py")
 
-RULE_TOKEN = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST)-\d{2}\b")
+RULE_TOKEN = validate.RULE_ID
 OUTPUT_LINE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): (?P<rule>[A-Z]+-\d{2}) (?P<message>.+)$")
 EXPECT = re.compile(r"//\s*EXPECT:\s*([A-Z0-9 -]+)$")
 
 
 def run(*argv):
-    out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = lint.main([str(a) for a in argv])
-    return code, out.getvalue(), err.getvalue()
+    return run_main(lint, argv)
 
 
 def parse_output(text):
@@ -60,23 +55,7 @@ def expected_markers(path):
 
 
 def index_ids():
-    ids = set()
-    for line in RULE_INDEX.read_text(encoding="utf-8").splitlines():
-        match = re.match(r"###\s+(" + RULE_TOKEN.pattern + ")", line)
-        if match:
-            ids.add(match.group(1))
-    return ids
-
-
-def profile_with(replacements):
-    text = PROFILE.read_text(encoding="utf-8")
-    for old, new in replacements:
-        assert old in text, old
-        text = text.replace(old, new)
-    profile = Path(tempfile.mkdtemp()) / "docs" / "game-server" / "profile.md"
-    profile.parent.mkdir(parents=True)
-    profile.write_text(text, encoding="utf-8")
-    return profile
+    return validate.heading_ids(RULE_INDEX, RULE_TOKEN)
 
 
 def write_repo(root, files, profile_text=None, replacements=()):
@@ -84,14 +63,8 @@ def write_repo(root, files, profile_text=None, replacements=()):
     for old, new in replacements:
         assert old in text, old
         text = text.replace(old, new)
-    profile = Path(root) / "docs" / "game-server" / "profile.md"
-    profile.parent.mkdir(parents=True, exist_ok=True)
-    profile.write_text(text, encoding="utf-8")
-    for rel, content in files.items():
-        path = Path(root) / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-    return profile
+    write_tree(root, {"docs/game-server/profile.md": text, **files})
+    return Path(root) / "docs" / "game-server" / "profile.md"
 
 
 def template_profile():
@@ -269,17 +242,22 @@ class ReferenceSnippets(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             files = {f"{FEATURE_DIR}/Snippet{n:03d}.java": body for n, (_, body) in enumerate(snippets)}
             profile = write_repo(tmp, files, profile_text=template_profile())
-            failures = []
-            for n, (source, _) in enumerate(snippets):
-                code, out, err = run("--profile", profile, Path(tmp) / FEATURE_DIR / f"Snippet{n:03d}.java")
-                if code == 2 or out:
-                    failures.append(f"{source} snippet {n}: {out or err}")
+            code, out, err = run("--profile", profile, Path(tmp) / FEATURE_DIR)
+        failures = [f"usage error: {err}"] if code == 2 else []
+        for line in out.splitlines():
+            n = int(re.search(r"Snippet(\d{3})\.java:", line).group(1))
+            failures.append(f"{snippets[n][0]} snippet {n}: {line}")
         self.assertEqual(failures, [], "\n".join(failures))
 
 
 class ProfileKeys(unittest.TestCase):
+    def profile_with(self, replacements):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return write_repo(tmp.name, {}, replacements=replacements)
+
     def test_empty_list_skips_the_check(self):
-        profile = profile_with(
+        profile = self.profile_with(
             [("  forbidden_time:\n    - 'System\\.currentTimeMillis\\('\n    - 'Instant\\.now\\('\n"
               "    - 'LocalDate(Time)?\\.now\\('\n    - 'new Date\\(\\)'\n", "  forbidden_time: []\n")]
         )
@@ -287,17 +265,17 @@ class ProfileKeys(unittest.TestCase):
         self.assertEqual((code, out), (0, ""))
 
     def test_empty_string_skips_the_check(self):
-        profile = profile_with([("  cheat_marker: '@CheatCommand'", "  cheat_marker: ''")])
+        profile = self.profile_with([("  cheat_marker: '@CheatCommand'", "  cheat_marker: ''")])
         code, out, _ = run("--profile", profile, DEMO / "CheatNoEnv.java")
         self.assertEqual((code, out), (0, ""))
 
     def test_profile_patterns_drive_the_check(self):
-        profile = profile_with([("'Math\\.random\\('", "'Dice\\.roll\\('")])
+        profile = self.profile_with([("'Math\\.random\\('", "'Dice\\.roll\\('")])
         code, out, _ = run("--profile", profile, DEMO / "ForbiddenRandom.java")
         self.assertEqual({line for _, line, _ in parse_output(out)}, {7, 9})
 
     def test_invalid_regex_is_a_usage_error(self):
-        profile = profile_with([("'Math\\.random\\('", "'Math(random'")])
+        profile = self.profile_with([("'Math\\.random\\('", "'Math(random'")])
         code, out, err = run("--profile", profile, DEMO / "ForbiddenRandom.java")
         self.assertEqual((code, out), (2, ""))
         self.assertIn("forbidden_random", err)
@@ -345,7 +323,7 @@ class ProfileKeys(unittest.TestCase):
         )
 
     def test_a_commented_cheat_marker_still_drives_the_check(self):
-        profile = profile_with([("  cheat_marker: '@CheatCommand'", "  cheat_marker: '@CheatCommand' # marker")])
+        profile = self.profile_with([("  cheat_marker: '@CheatCommand'", "  cheat_marker: '@CheatCommand' # marker")])
         code, out, _ = run("--profile", profile, DEMO / "CheatNoEnv.java")
         self.assertEqual({rule for _, _, rule in parse_output(out)}, {"CHEAT-02"})
 
@@ -387,17 +365,11 @@ class Checklist(unittest.TestCase):
 class DiffMode(unittest.TestCase):
     OLD = "final class Old {\n    long t() { return System.currentTimeMillis(); }\n}\n"
 
-    def git(self, repo, *args):
-        subprocess.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
-            cwd=repo, check=True, capture_output=True,
-        )
-
     def repo_with_base(self, tmp):
         profile = write_repo(tmp, {f"{FEATURE_DIR}/Old.java": self.OLD})
-        self.git(tmp, "init", "-q")
-        self.git(tmp, "add", "-A")
-        self.git(tmp, "commit", "-q", "-m", "base")
+        git(tmp, "init", "-q")
+        git(tmp, "add", "-A")
+        git(tmp, "commit", "-q", "-m", "base")
         return profile
 
     def test_only_hits_on_lines_the_diff_adds_are_reported(self):
@@ -408,7 +380,7 @@ class DiffMode(unittest.TestCase):
                 "}\n}\n", "}\n    long u() { return Instant.now().toEpochMilli(); }\n}\n"), encoding="utf-8")
             added = Path(tmp) / FEATURE_DIR / "Added.java"
             added.write_text("final class Added {\n    void s() { Thread.sleep(1); }\n}\n", encoding="utf-8")
-            self.git(tmp, "add", "-A")
+            git(tmp, "add", "-A")
             code, out, err = run("--profile", profile, "--diff", "HEAD", old, added)
             whole_code, whole_out, _ = run("--profile", profile, old, added)
         self.assertEqual(parse_output(out), {("Old.java", 3, "AUTH-02"), ("Added.java", 2, "PERF-01")})
