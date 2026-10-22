@@ -25,6 +25,7 @@ lint:
   metric_call: 'MetricLogger\.userAction\('
   trace_id_call: 'TraceIds\.next\('
   cheat_marker: '@CheatCommand'
+  allowed_import: 'com\.example\.game\.feature\.\w+\.api\.'
   blocking_calls:
     - 'Thread\.sleep\('
     - '\.join\(\)'

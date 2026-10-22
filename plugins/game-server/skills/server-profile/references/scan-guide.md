@@ -162,6 +162,14 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 - Search for a scripted client. `rg -n -l -i "loadtest|fakeclient|e2e|simulator|bot"` over the tree and the docs.
 - Check that it logs in, sends commands, and checks responses against scenarios stored as files. A client that only sends load is partial.
 
+### CAP-MODULE
+
+- Find where features register at startup. `rg -n "register(Feature|Module)|implements \w*(Feature|Module)\b|new \w+(Feature|Module)\(\)"` near the startup path.
+- Count imports across features. For each package under `feature_root`, run `rg -n "^import .*\.<feature root package>\.\w+\." <feature dir>` and keep the hits that name another feature's package.
+- Find contract packages, such as interfaces that one feature implements and others call. `rg -n "interface \w+(Contract|Api|Port|Service)\b"`. A package of such interfaces and their value types, outside every feature package, is a contract package.
+- Find events. `rg -n "publish\(|emit\(|EventBus|@Subscribe|addListener"`. Read whether a handler runs before or after the reply, in which order, and whether a failed or undeliverable event is dropped.
+- Set `lint.allowed_import` to the prefix of the contract packages. Leave it empty only when the project has no contract package, because every import across features is then a finding with no fix to point to. CAP-MODULE is then `partial` or `missing`, and the linter skips MOD-01.
+
 ### CAP-GENERATED
 
 - Search for generated markers. `rg -n -il "generated|auto-generated|do not edit"`.

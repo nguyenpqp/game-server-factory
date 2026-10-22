@@ -530,3 +530,41 @@ Each rule's reason, Java do and don't, and review check are in [design-conforman
 
 - severity: critical
 - needs: none
+
+## MOD: modularity
+
+Each rule's reason, Java do and don't, and review check are in [modularity.md](modularity.md).
+
+### MOD-01 Feature code imports only its own package, shared packages, and contract packages, never the package of another feature.
+
+- severity: important
+- needs: CAP-MODULE
+
+### MOD-02 A cross-feature effect that the reply depends on is a synchronous contract call, and an event carries only best-effort reactions that may run after the reply.
+
+- severity: critical
+- needs: CAP-MODULE
+
+## SYNC: client sync
+
+Each rule's reason, Java do and don't, and review check are in [client-sync.md](client-sync.md).
+
+### SYNC-01 Each client-facing feature has a read command that returns all of its client-visible state, so a reconnected or desynced client rebuilds its view from that one reply.
+
+- severity: important
+- needs: CAP-COMMAND, CAP-RESPONSE
+
+### SYNC-02 A mutating reply carries server time and the absolute post-change value of only what the command changed, and a reject carries the same fields with their current values.
+
+- severity: important
+- needs: CAP-RESPONSE, CAP-CLOCK
+
+### SYNC-03 A reply or push carries the stored instant of each timer, never a boolean derived from stored state or both ends of one timer.
+
+- severity: important
+- needs: CAP-RESPONSE
+
+### SYNC-04 A push reports only a change that the client did not cause, and it is best effort, so no delivery of value depends on it.
+
+- severity: critical
+- needs: CAP-RESPONSE, CAP-INBOX

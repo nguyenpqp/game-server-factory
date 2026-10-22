@@ -30,7 +30,7 @@ Shared shapes come first, because every later slice reads them.
 2. **Commands.** One slice per command, or three for a composite command, in the order of the spec's Commands section. A command slice is blocked by the shared shapes it reads. Pushes ship with the command that triggers them.
 3. **HTTP endpoints.** One slice per endpoint, blocked by the state model and the config schema.
 4. **Cheats and admin.** One slice for the cheat handler and its cheats, and one for the admin commands with their API spec. Each is blocked by the state model and by any command slice whose domain method it calls.
-5. **Wiring.** One slice registers the feature handler and its routes in the one place that CAP-COMMAND names, registers the cheat handler only off live, and adds login hooks and login pushes. It is blocked by every command, endpoint, cheat, and admin slice. Only this slice writes the registration file and the feature handler, so no two slices write the same file.
+5. **Wiring.** One slice registers the feature handler and its routes in the one place that CAP-COMMAND names, registers the cheat handler only off live, and adds login hooks. It is blocked by every command, endpoint, cheat, and admin slice. Only this slice writes the registration file and the feature handler, so no two slices write the same file.
 6. **KPI queries and bot scenarios.** One slice copies each KPI query into the place that the profile's CAP-METRIC entry names, or `docs/game-server/features/<feature>/kpi.sql` when it names none. It adds a bot scenario per command when CAP-BOT is `present`. It is blocked by the command slices whose metric rows the queries read.
 
 Two slices that write the same file need a blocking edge between them, or the tickets file pins the exact names each one adds. Prefer the edge.
@@ -65,20 +65,20 @@ Run one task per fresh context. Clear the chat, ask `feature-build` to build tas
 
 ## Example for the login streak
 
-These are the slices of the [worked example](worked-example.md), with the example profile's `test_one_cmd` of `gradle test --tests {class}`. ClaimStreakReward has a grant, idempotency, and a push, so it splits into three slices.
+These are the slices of the [worked example](worked-example.md), with the example profile's `test_one_cmd` of `gradle test --tests {class}`. ClaimStreakReward has a grant and idempotency, so it splits into three slices.
 
 | Ticket | Builds | Blocked by | Verify classes |
 | --- | --- | --- | --- |
 | T01 | Command, push, and cheat ids and the error codes 4201 to 4203 | None | none, the generator and `build_cmd` |
 | T02 | StreakState with migration and `restore` | None | `StreakStateCompatTest` |
 | T03 | The login streak config | None | `StreakConfigTest` |
-| T04 | GetStreakState and the derived view it shares with the push | T01, T02, T03 | `GetStreakStateTest` |
+| T04 | GetStreakState and the view it reads from StreakState | T01, T02, T03 | `GetStreakStateTest` |
 | T05 | ClaimStreakReward parse and validate | T01, T02, T03 | `ClaimStreakRewardTest` |
 | T06 | ClaimStreakReward business logic | T05 | `ClaimStreakRewardTest` |
-| T07 | ClaimStreakReward persist, respond, and log, with the claim push | T04, T06 | `ClaimStreakRewardTest` |
+| T07 | ClaimStreakReward persist, respond with the post-change state, and log | T04, T06 | `ClaimStreakRewardTest` |
 | T08 | CheatSetStreak and CheatShiftDay | T01, T02 | `StreakCheatTest` |
-| T09 | AdminGetStreak and AdminSetStreak with their API spec | T01, T02 | `StreakAdminTest` |
-| T10 | Handler routes, registration, and the login push | T04, T07, T08, T09 | `StreakLoginPushTest` |
+| T09 | AdminGetStreak and AdminSetStreak with their API spec, and the StreakState push to an online target | T01, T02 | `StreakAdminTest` |
+| T10 | Handler routes and registration | T04, T07, T08, T09 | none, `build_cmd` |
 | T11 | KPI query SM1 | T07 | `ClaimStreakRewardTest` |
 
 T05, T06, and T07 all add cases to `ClaimStreakRewardTest`, so they run as a chain. T05 creates the test class, and T06 and T07 each add their own cases to it. The chain costs little, because T04, T08, and T09 build beside it.

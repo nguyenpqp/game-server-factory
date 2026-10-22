@@ -6,10 +6,11 @@ Usage: check_profile.py [--blocked-rules] <profile.md>
 Prints `path:line: message` for each failure and exits 1 if any failure exists.
 The required frontmatter keys and capability headings are read from
 `references/profile-template.md` next to this script, so the template is the
-single source. `lint.command_method` is optional. With `--blocked-rules`, a clean
-profile also prints, for each capability that is not present, the rule ids it
-blocks: for a missing capability, every rule in the rule index whose `needs` line
-names it, and for a partial one, the rule ids on its `blocker` line.
+single source. `lint.command_method` and `lint.allowed_import` are optional. With
+`--blocked-rules`, a clean profile also prints, for each capability that is not
+present, the rule ids it blocks: for a missing capability, every rule in the rule
+index whose `needs` line names it, and for a partial one, the rule ids on its
+`blocker` line.
 
 A `blocker` line that names a rule whose `needs` line in the rule index does not
 name that capability prints a warning to stderr. The exit code does not change.
@@ -29,13 +30,13 @@ RULE_INDEX = SKILLS / "server-rules" / "references" / "index.md"
 STATUSES = ("present", "partial", "missing")
 FIELDS_WHEN_PRESENT = ("api", "file", "snippet")
 FIELDS_WHEN_NOT_PRESENT = ("blocker", "proposal")
-OPTIONAL_KEYS = {"lint.command_method"}
+OPTIONAL_KEYS = {"lint.command_method", "lint.allowed_import"}
 
 FENCE = re.compile(r"^\s*(```|~~~)")
 CAP_HEADING = re.compile(r"^###\s+(CAP-[A-Z]+)\b")
 ANY_HEADING = re.compile(r"^#{1,6}\s")
 FIELD_LINE = re.compile(r"^-\s+(\w+):\s*(.*)$")
-RULE_ID = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST|DES)-\d{2}\b")
+RULE_ID = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST|DES|MOD|SYNC)-\d{2}\b")
 RULE_HEADING = re.compile(r"^###\s+(" + RULE_ID.pattern + ")")
 KEY_LINE = re.compile(r"^(\s*)([A-Za-z_]\w*):(.*)$")
 

@@ -67,7 +67,7 @@ When the input is a prompt instead of a design, `Design` says `prompt`, and the 
 
 The section has one `###` entry per client command, in the order the player meets them. Checks run in table order, and each check has its own error code. Every entry fills each line below, with `None.` where a line does not apply. The section ends with the error codes that the feature adds.
 
-The entries come from the design's UI touchpoints, Rules, Formulas, and Rewards. They usually cite AUTH-01 to AUTH-10, BG-03, BG-05, BG-07, CFG-04, CFG-05, MET-01 to MET-04, MET-08, and PERF-01.
+The entries come from the design's UI touchpoints, Rules, Formulas, and Rewards. A client-facing feature has one read command that returns all of its client-visible state. A response carries stored values and the stored instant of each timer, never a derived boolean. A mutating response carries server time and the post-change value of what it changed, and the `Reject` line says which of those fields every error carries. The entries usually cite AUTH-01 to AUTH-10, BG-03, BG-05, BG-07, CFG-04, CFG-05, MET-01 to MET-04, MET-08, MOD-02, PERF-01, and SYNC-01 to SYNC-03.
 
 ````markdown
 ## Commands
@@ -100,12 +100,17 @@ Response:
 | Order | Field | Type | Optional | Meaning | Rules |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `error` | int | no | Result code | AUTH-10 |
-| 2 | `rewardDay` | int | no | Reward day just claimed | BG-04 |
-| 3 | `items` | list | no | Items granted, at most 10 | BG-04, PERF-04 |
+| 2 | `serverTime` | long | no | Server time in epoch milliseconds | SYNC-02 |
+| 3 | `rewardDay` | int | no | Reward day just claimed | BG-04 |
+| 4 | `items` | list | no | Items granted, at most 10 | BG-04, PERF-04 |
+| 5 | `streakCount` | int | no | Stored `streakCount` after the claim | SYNC-02 |
+| 6 | `lastClaimDay` | int | no | Stored `lastClaimDay` after the claim | SYNC-02, SYNC-03 |
+| 7 | `balances` | list | no | The post-change amount of each item granted, at most 10 | SYNC-02, PERF-04 |
 
+- Reject: Every error carries `serverTime`, `streakCount`, and `lastClaimDay` with their stored values. Rules: SYNC-02.
 - Idempotency: The server keeps the last 20 request ids per user. A repeated id returns the first result and grants nothing. Rules: AUTH-08.
 - Rate limit: None. The command reads only the player's own state. Rules: AUTH-09.
-- Pushes: StreakState.
+- Pushes: None. The response carries the change. Rules: SYNC-04.
 - Metric: Action `streak_claim`, on success and on every error. Rules: MET-01, MET-02, MET-08.
 
 ### Error codes
@@ -117,14 +122,14 @@ Response:
 
 ### Pushes
 
-The section has one row per message that the server sends without a request. The rows come from the design's UI touchpoints, from the column for changes without player action. They usually cite BG-04, BG-06, BG-07, MN-10, PERF-04, and PERF-07.
+The section has one row per message that the server sends without a request. The rows come from the design's UI touchpoints, from the column for changes without player action, and from server-side changes such as another player's action or a support repair. A push reports only a change that the client did not cause, and the `Why the client cannot know` cell says why. A change that the player's own command made, a login, and a time the client can compute get no push. The rows usually cite BG-04, BG-06, BG-07, MN-10, PERF-04, PERF-07, SYNC-03, and SYNC-04.
 
 ```markdown
 ## Pushes
 
-| Push | Id | Trigger | Recipients | Fields in order | Minimum client | Design | Rules |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| StreakState | 4250 | Login, and each claim | The player | `rewardDay`, `claimedToday`, `nextDayStartsAt` | 1.4.0 | UI1, UI2 | BG-04, BG-07, MN-11, PERF-04 |
+| Push | Id | Trigger | Why the client cannot know | Recipients | Fields in order | Minimum client | Design | Rules |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| StreakState | 4250 | AdminSetStreak changes the state of an online player | A support repair changed it, not the player's own command | The player | `serverTime`, `streakCount`, `lastClaimDay` | 1.4.0 | none | BG-04, BG-07, MN-10, SYNC-03, SYNC-04 |
 ```
 
 ### State model

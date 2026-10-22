@@ -39,6 +39,7 @@ RULE_GROUP_FILES = {
     "AUTH": "auth.md", "MN": "multi-node.md", "BG": "blue-green.md", "PERF": "performance.md",
     "CFG": "config.md", "MET": "metric.md", "CHEAT": "cheat.md", "ADMIN": "admin.md",
     "HTTP": "http.md", "TEST": "testing.md", "DES": "design-conformance.md",
+    "MOD": "modularity.md", "SYNC": "client-sync.md",
 }
 RULE_ID = re.compile(r"\b(?:" + "|".join(RULE_GROUP_FILES) + r")-\d{2}\b")
 RULE_PARTS = ("**Why.**", "Do:", "Don't:", "**Check.**")

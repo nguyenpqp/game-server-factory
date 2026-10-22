@@ -5,9 +5,10 @@ description: >
   feature code, such as a new command or packet handler, per-user persistence in
   Couchbase, Redis keys and Lua scripts, feature config files, metric logs and trace
   ids, cheat commands, admin commands, HTTP or payment callbacks, anti-cheat and server
-  authority checks, multi-node safety, blue-green rollout, or compatibility with old
-  clients. It holds the fixed rule ids (AUTH, MN, BG, PERF, CFG, MET, CHEAT, ADMIN,
-  HTTP, TEST, DES) with a severity, a Java do and don't, and a review check for each rule.
+  authority checks, multi-node safety, blue-green rollout, compatibility with old
+  clients, feature boundaries, or client sync. It holds the fixed rule ids (AUTH, MN, BG,
+  PERF, CFG, MET, CHEAT, ADMIN, HTTP, TEST, DES, MOD, SYNC) with a severity, a Java do and
+  don't, and a review check for each rule.
   Specs, builds, reviews, and the feature linter cite these ids.
 ---
 
@@ -44,6 +45,8 @@ When designing a feature, read every group that the feature touches. When review
 - [HTTP, HTTP callbacks](references/http.md). Outside callers only, signed and allowlisted, idempotent by transaction id, and delivered through the durable inbox.
 - [TEST, tests](references/testing.md). A pure core tested without network, injected time and RNG, negative, cheat, config, compatibility, metric, and replay tests.
 - [DES, design conformance](references/design-conformance.md). Every design id built and tested or recorded as descoped, the design's behavior and numbers in the code, and every settled decision kept.
+- [MOD, modularity](references/modularity.md). Imports only of the feature's own, shared, and contract packages, and contract calls for every cross-feature effect a reply depends on.
+- [SYNC, client sync](references/client-sync.md). A read command that rebuilds the client's view, absolute post-change values with server time, stored instants only, and pushes only for changes the client did not cause.
 
 ## Never
 

@@ -14,6 +14,8 @@ Every skill works to the same fixed rulebook. The rules come from these constrai
 - **Couchbase and Redis only.** Per-user data goes through the Couchbase client your project already uses. Any other store needs your approval first.
 - **Performance budget.** The design target is about 100k peak concurrent players and 1M daily players. Each command gets a budget for database and Redis calls, payload size, and per-user memory.
 - **Config, metrics, cheats, admin.** Balance numbers live in one config file per feature. Every action writes a metric row with a trace id. Every feature ships cheat commands that stay off live, and admin commands with an API spec.
+- **Modular features.** Each feature imports only its own, shared, and contract packages. An effect on another feature that a reply depends on is a contract call, not an event.
+- **Client in sync.** Each feature has a read command that rebuilds the client's view. A reply carries server time and the stored values it changed, never derived flags. A push reports only a change the client did not make, and no value depends on it.
 - **True to the design.** The code builds every server-side requirement in the design, with the design's numbers, rules, and end conditions. It keeps every settled decision: answered questions, the defaults of skipped questions, and Core blockers resolutions. The review traces each design id to code and tests.
 
 The rules are listed with ids in `plugins/game-server/skills/server-rules/references/index.md`. Specs, reviews, and the linter cite them by id.

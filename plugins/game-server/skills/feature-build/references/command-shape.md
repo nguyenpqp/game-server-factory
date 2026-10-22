@@ -17,21 +17,23 @@ public final class BuyShopItem {
 
     public static void handle(UserActor actor, Request raw) {
         String traceId = TraceIds.next();
-        Outcome out = run(actor, raw, traceId);
+        long now = ServerClock.now(actor.userId());
+        Outcome out = run(actor, raw, now, traceId);
         Response.of(CmdIds.EVENT_SHOP_BUY, out.error())
+                .put(Keys.SERVER_TIME, now)
                 .put(Keys.SHOP_ITEM_ID, out.shopItemId())
                 .put(Keys.BOUGHT_TODAY, out.boughtToday())
+                .put(Keys.BALANCES, out.balances())
                 .send(actor);
         MetricLogger.userAction(actor.userId(), ACTION, out.error(), traceId,
                 out.shopItemId(), out.quantity(), out.boughtToday());
     }
 
-    static Outcome run(UserActor actor, Request raw, String traceId) {
+    static Outcome run(UserActor actor, Request raw, long now, String traceId) {
         try {
             BuyRequest req = BuyRequest.parse(raw);
             return process(actor.state(EventShopState.class), EventShopConfig.current(),
-                    actor.inventory(), req, actor.clientVersion(),
-                    ServerClock.now(actor.userId()), traceId);
+                    actor.inventory(), req, actor.clientVersion(), now, traceId);
         } catch (RuntimeException e) {
             MetricLogger.exception(actor.userId(), ACTION, traceId, e);
             return Outcome.error(Errors.SERVER_ERROR);
@@ -46,6 +48,7 @@ public final class BuyShopItem {
 - `run` reads the config snapshot once and passes it down, so the whole command sees one snapshot (CFG-03).
 - `ServerClock.now(userId)` includes the user's cheat time offset off live, and it is plain server time on live (AUTH-02, CHEAT-07).
 - The response appends new fields after the existing ones, and a new field is optional for the client (BG-04). Keep lists in the response capped by a number from the spec (PERF-04).
+- The response carries the server time and the post-change value of each thing the command changed, which is the count bought today and the balances of the price and reward items. It carries no delta and no other balance. An error carries the same fields with their stored values once the item is known, so the client resyncs from the reject (SYNC-02). Every field is a stored value, never a boolean the client can derive (SYNC-03).
 - The extras of the metric row are the ones that the spec's Actions table lists, in its order. New data goes into extras, never into a new fixed column (MET-07).
 
 The real APIs come from CAP-COMMAND for `Request`, CAP-RESPONSE for `Response`, CAP-ACTOR for `UserActor`, CAP-TRACEID for `TraceIds`, CAP-CLOCK for `ServerClock`, CAP-METRIC for `MetricLogger`, and CAP-ERRORS for `Errors`.
@@ -96,23 +99,23 @@ static Outcome process(EventShopState state, EventShopConfig cfg, Inventory inv,
     ShopItem item = cfg.item(req.shopItemId());
     if (item == null)
         return Outcome.error(Errors.UNKNOWN_SHOP_ITEM);
-    if (req.quantity() > item.maxPerBuy())
-        return Outcome.error(Errors.INVALID_REQUEST);
     long today = ServerClock.dayOf(now);
     int bought = state.boughtOn(item.id(), today);
+    if (req.quantity() > item.maxPerBuy())
+        return Outcome.reject(Errors.INVALID_REQUEST, item, bought, inv);
     if (bought + req.quantity() > item.dailyLimit())
-        return Outcome.error(Errors.DAILY_LIMIT);
+        return Outcome.reject(Errors.DAILY_LIMIT, item, bought, inv);
     Cost cost = item.price().times(req.quantity());
     if (!inv.canTake(cost))
-        return Outcome.error(Errors.NOT_ENOUGH);
+        return Outcome.reject(Errors.NOT_ENOUGH, item, bought, inv);
 
     inv.take(cost, REASON, traceId);
     if (!inv.add(item.reward().times(req.quantity()), REASON, traceId)) {
         inv.add(cost, REFUND, traceId);
-        return Outcome.error(Errors.GRANT_FAILED);
+        return Outcome.reject(Errors.GRANT_FAILED, item, bought, inv);
     }
     state.recordPurchase(item.id(), today, req.quantity());
-    Outcome out = Outcome.ok(item.id(), req.quantity(), bought + req.quantity());
+    Outcome out = Outcome.ok(item, req.quantity(), bought + req.quantity(), inv);
     state.rememberResult(req.requestId(), out);
     state.markChanged();
     return out;
@@ -142,22 +145,30 @@ A command that reads the database, touches other users, or fans out also checks 
 ## Outcome
 
 ```java
-record Outcome(int error, String shopItemId, int quantity, int boughtToday) {
-    static Outcome ok(String shopItemId, int quantity, int boughtToday) {
-        return new Outcome(Errors.OK, shopItemId, quantity, boughtToday);
+record Outcome(int error, String shopItemId, int quantity, int boughtToday, Map<String, Long> balances) {
+    static Outcome ok(ShopItem item, int quantity, int boughtToday, Inventory inv) {
+        return new Outcome(Errors.OK, item.id(), quantity, boughtToday, balancesOf(item, inv));
+    }
+
+    static Outcome reject(int error, ShopItem item, int boughtToday, Inventory inv) {
+        return new Outcome(error, item.id(), 0, boughtToday, balancesOf(item, inv));
     }
 
     static Outcome error(int error) {
-        return new Outcome(error, "", 0, 0);
+        return new Outcome(error, "", 0, 0, Map.of());
+    }
+
+    static Map<String, Long> balancesOf(ShopItem item, Inventory inv) {
+        return inv.counts(List.of(item.price().id(), item.reward().id()));
     }
 }
 ```
 
-The outcome holds everything that the response and the metric row need. Tests assert on it directly.
+The outcome holds everything that the response and the metric row need. Tests assert on it directly. `balances` holds the post-change amounts of the price and reward items only (SYNC-02). An error before the item is known has no item to resync, so it carries only the server time.
 
 ## Pushes
 
-A push to the acting player goes through CAP-RESPONSE after the response. A push to another user goes through the ownership record and cross-node delivery, never through a node-local session map (MN-10). Check the recipient's client version against the push's minimum client from the spec before sending (BG-06). A command that pushes to or changes other users stays under the spec's fan-out bound (PERF-07).
+A command pushes only a change that the receiving client did not cause. The acting player reads its own change from the response, so the command sends it no push (SYNC-04). A push is best effort, so store what it reports, in the user's state or the durable inbox, before sending it (SYNC-04). A push to another user goes through the ownership record and cross-node delivery, never through a node-local session map (MN-10). Check the recipient's client version against the push's minimum client from the spec before sending (BG-06). A command that pushes to or changes other users stays under the spec's fan-out bound (PERF-07).
 
 ## Registration
 

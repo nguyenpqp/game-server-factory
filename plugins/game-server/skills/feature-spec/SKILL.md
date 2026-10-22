@@ -36,7 +36,10 @@ Take the command id block from the profile's CAP-COMMAND entry, one block per fe
 
 ### 1. Commands
 
-- One entry per thing the player can do, from the `The player can do` column of the UI touchpoints. Add a read command when a screen shows state that the player's existing data does not carry.
+- One entry per thing the player can do, from the `The player can do` column of the UI touchpoints. A client-facing feature also has one read command whose response carries all of its client-visible state, so a client that reconnects rebuilds its view from it (SYNC-01).
+- A mutating command's response carries server time and the post-change value of each field and balance it changed, and nothing else of the state. Its errors carry the same fields with the stored values (SYNC-02).
+- Responses carry stored values and the stored instant of each timer. A boolean the client can derive, such as claimed today, and the second end of a timer stay out (SYNC-03).
+- An effect on another feature that the response reports runs through that feature's contract before the response. An event only carries reactions that may run later (MOD-02).
 - Requests carry intents only. A request never names an amount, a price, a reward, or a result (AUTH-01).
 - Every request field has a type, a range or a length, and allowed values, checked before the Checks rows run (AUTH-04).
 - Order the Checks rows as they run: feature active and window, client version, unlock, ownership of named objects, state preconditions, then costs. Each row has its own error code (AUTH-10).
@@ -48,7 +51,7 @@ Take the command id block from the profile's CAP-COMMAND entry, one block per fe
 
 ### 2. Pushes
 
-Take the rows from the `Changes without player action` column of the UI touchpoints. Prefer a push at login and after the player's own commands, and let the client refresh at a time the server sent, such as `nextDayStartsAt`. A server timer per user breaks MN-11. Every push has a minimum client and is never sent to an older one (BG-06).
+Take the rows from the `Changes without player action` column of the UI touchpoints, and from server-side changes such as another player's action or a support repair. A push reports only a change that the client did not cause, and its row says why the client cannot know it (SYNC-04). The player's own command answers with the change, and a client that logs in or reconnects calls the read command, so the feature pushes nothing at login or after the player's own command. A change the client can compute from stored values and server time, such as a countdown that reaches zero, needs no push. Let the client refresh at a time the server sent, such as `nextDayStartsAt`. A server timer per user breaks MN-11. A push is best effort, so the value it reports is stored first, in the user's state or the durable inbox (SYNC-04). Every push has a minimum client and is never sent to an older one (BG-06).
 
 ### 3. State model
 

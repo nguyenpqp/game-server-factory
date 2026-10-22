@@ -305,6 +305,17 @@ Object value = ExampleBot.call();
 - blocker: TEST-10 cannot be met for part of the cases.
 - proposal: Extend the existing class to cover the remaining cases.
 
+### CAP-MODULE Feature modules and contracts
+
+- status: present
+- api: `ExampleModule.call()` is the entry point for feature code.
+- file: `src/main/java/com/example/core/ExampleModule.java`
+- snippet:
+
+```java
+Object value = ExampleModule.call();
+```
+
 ### CAP-GENERATED Generated files
 
 - status: present

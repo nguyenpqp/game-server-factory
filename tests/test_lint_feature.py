@@ -112,6 +112,9 @@ class FixtureChecks(unittest.TestCase):
     def test_blocking_calls(self):
         self.check_file("Blocking.java")
 
+    def test_imports_of_another_feature_package(self):
+        self.check_file("CrossFeatureImport.java")
+
     def test_clean_file_has_no_findings(self):
         code, out, err = run("--profile", PROFILE, DEMO / "Clean.java")
         self.assertEqual((code, out, err), (0, "", ""))
@@ -235,6 +238,51 @@ class ClassSignatures(unittest.TestCase):
         self.assertEqual((code, out), (0, ""))
 
 
+class FeatureImports(unittest.TestCase):
+    ALLOWED = "  allowed_import: 'com\\.example\\.game\\.feature\\.\\w+\\.api\\.'\n"
+    CROSS = "import com.example.game.feature.inventory.InventoryService;\n\nfinal class A {\n}\n"
+
+    def lint_tree(self, files, replacements=()):
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = write_repo(tmp, files, replacements=replacements)
+            return run("--profile", profile, Path(tmp) / "src")
+
+    def test_an_absent_allowed_import_turns_the_check_off(self):
+        code, out, _ = self.lint_tree({f"{FEATURE_DIR}/A.java": self.CROSS}, [(self.ALLOWED, "")])
+        self.assertEqual((code, out), (0, ""))
+
+    def test_an_empty_allowed_import_turns_the_check_off(self):
+        code, out, _ = self.lint_tree({f"{FEATURE_DIR}/A.java": self.CROSS}, [(self.ALLOWED, "  allowed_import: ''\n")])
+        self.assertEqual((code, out), (0, ""))
+
+    def test_the_allowed_pattern_decides_which_feature_imports_pass(self):
+        code, out, _ = self.lint_tree(
+            {f"{FEATURE_DIR}/A.java": self.CROSS},
+            [(self.ALLOWED, "  allowed_import: 'com\\.example\\.game\\.feature\\.inventory\\.'\n")],
+        )
+        self.assertEqual((code, out), (0, ""))
+
+    def test_a_subpackage_of_the_own_feature_is_the_same_feature(self):
+        source = "import com.example.game.feature.demo.model.DemoState;\n\nfinal class A {\n}\n"
+        code, out, _ = self.lint_tree({f"{FEATURE_DIR}/handler/A.java": source})
+        self.assertEqual((code, out), (0, ""))
+
+    def test_code_outside_a_feature_folder_is_not_checked(self):
+        code, out, _ = self.lint_tree({
+            "src/main/java/com/example/game/shared/A.java": self.CROSS,
+            "src/main/java/com/example/game/feature/Registry.java": self.CROSS,
+        })
+        self.assertEqual((code, out), (0, ""))
+
+    def test_a_feature_root_outside_the_source_root_is_a_usage_error(self):
+        code, out, err = self.lint_tree(
+            {f"{FEATURE_DIR}/A.java": self.CROSS},
+            [("source_root: 'src/main/java'", "source_root: 'app/src'")],
+        )
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("source_root", err)
+
+
 class ReferenceSnippets(unittest.TestCase):
     def test_every_do_snippet_and_build_reference_snippet_lints_clean(self):
         snippets = reference_snippets()
@@ -339,7 +387,7 @@ class RuleIds(unittest.TestCase):
         reported = {rule for _, _, rule in parse_output(out)}
         self.assertEqual(
             reported,
-            {"AUTH-02", "AUTH-03", "MN-01", "CHEAT-02", "MET-01", "MET-02", "PERF-01"},
+            {"AUTH-02", "AUTH-03", "MN-01", "CHEAT-02", "MET-01", "MET-02", "PERF-01", "MOD-01"},
         )
         self.assertEqual(reported - index_ids(), set())
 

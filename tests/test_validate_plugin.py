@@ -298,7 +298,7 @@ class RuleIdTest(ValidatorTestCase):
         self.assertIn("AUTH-99", line)
 
     def test_every_rule_group_is_checked(self):
-        for group in "AUTH MN BG PERF CFG MET CHEAT ADMIN HTTP TEST DES".split():
+        for group in "AUTH MN BG PERF CFG MET CHEAT ADMIN HTTP TEST DES MOD SYNC".split():
             with self.subTest(group=group):
                 self.fresh_root()
                 self.build(self.cite(f"{group}-77"))

@@ -67,20 +67,22 @@ Checks:
 | 2 | The session's client version is 1.4.0 or later | `CLIENT_TOO_OLD` | none | BG-07 |
 
 - Cost: None. Rules: AUTH-07.
-- Effect: Read only. On the owner actor, the core derives `unlocked`, `claimedToday`, the next reward day, and the current streak from StreakState, the config snapshot, and `now`. Design: ST1, ST2, ST3, R1, F1. Rules: AUTH-02, MN-02, MN-11, CFG-03.
+- Effect: Read only. On the owner actor, the core reads the stored StreakState fields, computes the next reward day with F1 and the next day boundary from `now`, and takes `unlockLevel` and the rewards from the config snapshot. The client derives locked, ready, and claimed from these values and `serverTime`. Design: ST1, ST2, ST3, R1, F1. Rules: AUTH-02, MN-02, MN-11, CFG-03, SYNC-01, SYNC-03.
 
 Response:
 
 | Order | Field | Type | Optional | Meaning | Rules |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `error` | int | no | Result code | AUTH-10 |
-| 2 | `unlocked` | bool | no | The player's level is at least `unlockLevel` | BG-04 |
-| 3 | `claimedToday` | bool | no | Today's reward is claimed | BG-04 |
-| 4 | `rewardDay` | int | no | The day the next claim grants, 1 to 7 | BG-04 |
-| 5 | `streakCount` | int | no | Claims in a row, 0 when the streak is broken | BG-04 |
-| 6 | `nextDayStartsAt` | long | no | Epoch milliseconds of the next day boundary | BG-04, MN-11 |
-| 7 | `rewards` | list | no | The 7 reward days, each with at most 10 items | BG-04, PERF-04 |
+| 2 | `serverTime` | long | no | Server time in epoch milliseconds | SYNC-01 |
+| 3 | `unlockLevel` | int | no | The level at which the feature unlocks, from the config | SYNC-01 |
+| 4 | `streakCount` | int | no | Stored claims in a row, up to and including `lastClaimDay` | SYNC-03 |
+| 5 | `lastClaimDay` | int | no | Stored server day of the last claim, -1 before the first claim | SYNC-03 |
+| 6 | `rewardDay` | int | no | The day the next claim grants, 1 to 7 | BG-04 |
+| 7 | `nextDayStartsAt` | long | no | Epoch milliseconds of the next day boundary | BG-04, MN-11 |
+| 8 | `rewards` | list | no | The 7 reward days, each with at most 10 items | BG-04, PERF-04 |
 
+- Reject: Every error carries `serverTime`. The command changes nothing, so it has no other field to resync. Rules: SYNC-02.
 - Idempotency: None. The command changes nothing, so a retry is harmless. Rules: AUTH-08.
 - Rate limit: None. The command reads only the player's own state in memory. Rules: AUTH-09.
 - Pushes: None.
@@ -116,13 +118,18 @@ Response:
 | Order | Field | Type | Optional | Meaning | Rules |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `error` | int | no | Result code | AUTH-10 |
-| 2 | `rewardDay` | int | no | The reward day just claimed | BG-04 |
-| 3 | `items` | list | no | Items granted, at most 10 | BG-04, PERF-04 |
-| 4 | `streakCount` | int | no | Claims in a row after this claim | BG-04 |
+| 2 | `serverTime` | long | no | Server time in epoch milliseconds | SYNC-02 |
+| 3 | `rewardDay` | int | no | The reward day just claimed | BG-04 |
+| 4 | `items` | list | no | Items granted, at most 10 | BG-04, PERF-04 |
+| 5 | `streakCount` | int | no | Stored claims in a row after this claim | SYNC-02 |
+| 6 | `lastClaimDay` | int | no | Stored server day of the last claim, after this claim | SYNC-02, SYNC-03 |
+| 7 | `balances` | list | no | The post-change amount of each item granted, from CAP-INVENTORY, at most 10 | SYNC-02, PERF-04 |
+
+- Reject: Every error carries `serverTime`, `streakCount`, and `lastClaimDay` with their stored values, so the client resyncs from the reject. Rules: SYNC-02.
 
 - Idempotency: StreakState keeps the last claim's `requestId` and reward day. A request with that id returns the first result, with the day's items read from the config, and grants nothing. Any other request on a claimed day gets `ALREADY_CLAIMED`. The record is one id, so the state stays bounded. Rules: AUTH-08, PERF-06.
 - Rate limit: None. The command reads and writes only the player's own state. Rules: AUTH-09.
-- Pushes: StreakState after a successful claim.
+- Pushes: None. The response carries the change. Rules: SYNC-04.
 - Metric: Action `streak_claim`, on success, on a replay, and on every error. An unexpected exception writes an exception row with the trace id and answers the shared server error code. Rules: MET-01, MET-02, MET-08.
 
 ### Error codes
@@ -137,11 +144,13 @@ The shared codes `FEATURE_INACTIVE`, `CLIENT_TOO_OLD`, `FEATURE_LOCKED`, `INVALI
 
 ## Pushes
 
-| Push | Id | Trigger | Recipients | Fields in order | Minimum client | Design | Rules |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| StreakState | 4250 | Login while the feature is active and unlocked, and each successful claim | The player | `unlocked`, `claimedToday`, `rewardDay`, `streakCount`, `nextDayStartsAt` | 1.4.0 | UI1, UI2 | BG-04, BG-06, BG-07, MN-11, PERF-04 |
+| Push | Id | Trigger | Why the client cannot know | Recipients | Fields in order | Minimum client | Design | Rules |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| StreakState | 4250 | AdminSetStreak changes the state of a player who is online | A support repair changed it, not the player's own command | The target player, through the ownership record and cross-node delivery | `serverTime`, `streakCount`, `lastClaimDay` | 1.4.0 | none | BG-04, BG-06, BG-07, MN-10, PERF-04, SYNC-03, SYNC-04 |
 
 The client refreshes at `nextDayStartsAt` with GetStreakState, so the server keeps no timer per user. Rules: MN-11.
+
+The client calls GetStreakState at login and after a reconnect, and a claim answers with its change, so the server pushes nothing at login or after a claim. Rules: SYNC-01, SYNC-04.
 
 ## State model
 
@@ -328,7 +337,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | Once-per-cluster jobs | none | none | The feature has no job | none | MN-07 |
 | Unique ids | none | none | The feature mints no ids | none | MN-08 |
 | Node-local caches | none | none | The feature reads only its config snapshot | none | MN-09 |
-| Pushes and online checks for other users | none | none | The feature pushes only to the acting player | none | MN-10 |
+| Pushes and online checks for other users | The StreakState push to an admin's target | AdminSetStreak | Through the ownership record and cross-node delivery | A push through a node-local session map misses a target on another node | MN-10 |
 | Timed effects | `lastClaimDay` | The owner actor | Derived from the stored day on each read | A timer lost at drain leaves a claim not ready | MN-11 |
 
 ## Blue-green and client compatibility
@@ -336,7 +345,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | Case | Expected behavior | How the spec ensures it | Rules | Test |
 | --- | --- | --- | --- | --- |
 | An old client calls existing commands on the new server | Same behavior and response layout as before | No existing command changes | BG-04, BG-05, BG-06 | none, no existing command changes |
-| A client older than the feature's minimum reaches the new server | It never sees the feature and never gets its pushes | Check 2 of both commands and the push minimum | BG-06, BG-07 | `ClaimStreakRewardTest` old client 1.3.0, `StreakLoginPushTest` old client 1.3.0 |
+| A client older than the feature's minimum reaches the new server | It never sees the feature and never gets its pushes | Check 2 of both commands and the push minimum | BG-06, BG-07 | `ClaimStreakRewardTest` old client 1.3.0, `StreakAdminTest` push to a 1.3.0 player |
 | A new client reaches an old server, during rollout or after a rollback | The old server answers the new command ids as unknown, and the client hides the feature | New command ids only, no reused id | BG-03 | none, the old server has no feature code |
 | The new version reads data that the old version wrote | Absent fields take their defaults, and migration runs once | Migration 0 to 1 | BG-09 | `StreakStateCompatTest` no document |
 | The old version reads data that the new version wrote | The old version keeps the fields it does not know | The serializer keeps unknown fields | BG-01, BG-02 | `StreakStateCompatTest` unknown field |
@@ -356,7 +365,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | GetStreakState | 104, from 3 views per daily player, 3,000,000 / 86,400 s times a peak factor of 3 | 0 | 0 | 0 | 0 | 1,000 | 0 | PERF-01, PERF-02, PERF-04 |
 | ClaimStreakReward | 35, from 1 claim per daily player, 1,000,000 / 86,400 s times 3 | 0 | 0 on the command path, 1 later by the save cycle | 0 | 0 | 200 | 100 | PERF-01, PERF-02, PERF-03, PERF-04, PERF-07 |
-| StreakState push at login | 174, from 5 logins per daily player, 5,000,000 / 86,400 s times 3 | 0 | 0 | 0 | 0 | none | 100 | PERF-04 |
+| StreakState push after AdminSetStreak | under 1, support use | 0 | 0 | 0 | 1 | none | 100 | PERF-04, PERF-07 |
 | AdminGetStreak | under 1, support use | 1 when the user is offline | 0 | 0 | 1 | 300 | 0 | PERF-02, PERF-07 |
 | AdminSetStreak | under 1, support use | 1 when the user is offline | 1, or at most 3 CAS attempts when offline | 0 | 1 | 400 | 100 | PERF-02, PERF-07 |
 
@@ -372,12 +381,12 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 
 | Test class | Case | Level | Asserts | Design | Rules |
 | --- | --- | --- | --- | --- | --- |
-| `GetStreakStateTest` | Unlocked player on an unclaimed day | unit | `unlocked` true, `claimedToday` false, `rewardDay` from F1, `nextDayStartsAt` at the next boundary | ST2, F1, UI1 | TEST-01, TEST-02 |
-| `GetStreakStateTest` | Player below level 5 | unit | `unlocked` false, state unchanged | ST1, UI2 | TEST-01 |
+| `GetStreakStateTest` | Unlocked player on an unclaimed day | unit | `serverTime` is `now`, the stored `streakCount` and `lastClaimDay`, `rewardDay` from F1, `nextDayStartsAt` at the next boundary | ST2, F1, UI1 | TEST-01, TEST-02 |
+| `GetStreakStateTest` | Player below level 5 | unit | `unlockLevel` 5 and the stored fields, state unchanged | ST1, UI2 | TEST-01 |
 | `GetStreakStateTest` | Feature inactive | unit | `FEATURE_INACTIVE` | TM2 | TEST-03 |
 | `GetStreakStateTest` | Old client 1.3.0 | unit | `CLIENT_TOO_OLD` | none | TEST-03, TEST-07 |
 | `GetStreakStateTest` | Metric rows | unit | One `streak_view` row with the trace id on success and on each error | none | TEST-08 |
-| `ClaimStreakRewardTest` | First claim on a new state | unit | Reward day 1, RW1 items, `lastClaimDay` is today | R1, RW1 | TEST-01, TEST-02 |
+| `ClaimStreakRewardTest` | First claim on a new state | unit | Reward day 1, RW1 items, `lastClaimDay` is today, and the response carries `serverTime`, `lastClaimDay`, and the post-change balance of each item | R1, RW1 | TEST-01, TEST-02 |
 | `ClaimStreakRewardTest` | Claim on the day after a claim | unit | Reward day 2, RW2 items, `streakCount` 2 | F1, RW2 | TEST-02 |
 | `ClaimStreakRewardTest` | Claim after a missed day | unit | Reward day 1, `streakCount` restarts at 1 | R1, F1 | TEST-02 |
 | `ClaimStreakRewardTest` | Claim after a day 7 claim | unit | Reward day 1, `streakCount` 8 | R2, F1, RW7 | TEST-02 |
@@ -385,13 +394,11 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | `ClaimStreakRewardTest` | Feature inactive | unit | `FEATURE_INACTIVE`, state unchanged | TM2 | TEST-03 |
 | `ClaimStreakRewardTest` | Old client 1.3.0 | unit | `CLIENT_TOO_OLD`, state unchanged | none | TEST-03, TEST-07 |
 | `ClaimStreakRewardTest` | Player below level 5 | unit | `FEATURE_LOCKED`, state unchanged | ST1 | TEST-03 |
-| `ClaimStreakRewardTest` | Second claim on the same day with a new request id | unit | `ALREADY_CLAIMED`, state unchanged | ST3 | TEST-03 |
+| `ClaimStreakRewardTest` | Second claim on the same day with a new request id | unit | `ALREADY_CLAIMED` with the stored `streakCount` and `lastClaimDay`, state unchanged | ST3 | TEST-03 |
 | `ClaimStreakRewardTest` | Request id of 7 characters | unit | `INVALID_REQUEST`, state unchanged | none | TEST-03 |
 | `ClaimStreakRewardTest` | The item add fails | unit | An error code, state unchanged | none | TEST-03 |
 | `ClaimStreakRewardTest` | Replay of one request id | unit | One grant, and the replay returns the first reward day | none | TEST-09 |
 | `ClaimStreakRewardTest` | Metric rows | unit | One `streak_claim` row and one `STREAK_CLAIM` item row with the same trace id on success, and one `streak_claim` row on each error | none | TEST-08 |
-| `StreakLoginPushTest` | Login of a 1.4.0 client | unit | One StreakState push | UI2 | TEST-01 |
-| `StreakLoginPushTest` | Old client 1.3.0 | unit | No StreakState push | none | TEST-07 |
 | `StreakCheatTest` | CheatSetStreak on live | unit | Rejected, no change | ST2, ST3 | TEST-04, TEST-11 |
 | `StreakCheatTest` | CheatShiftDay on live | unit | Rejected, no change | ST2 | TEST-04, TEST-11 |
 | `StreakCheatTest` | CheatSetStreak with count 10001 | unit | `OUT_OF_RANGE`, no change | none | TEST-03 |
@@ -399,6 +406,8 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | `StreakAdminTest` | AdminSetStreak on live without `confirm` | unit | `CONFIRM_REQUIRED`, no change | none | TEST-03 |
 | `StreakAdminTest` | AdminSetStreak with count -1 | unit | `OUT_OF_RANGE`, no change | none | TEST-03 |
 | `StreakAdminTest` | Replay of one AdminSetStreak request id | unit | One change and one audit row | none | TEST-09 |
+| `StreakAdminTest` | AdminSetStreak for an online 1.4.0 player | unit | One StreakState push to the target with the stored `streakCount` and `lastClaimDay` | none | TEST-01 |
+| `StreakAdminTest` | Push to a 1.3.0 player | unit | No StreakState push | none | TEST-07 |
 | `StreakConfigTest` | Valid file | unit | Loads, and the day index has 7 entries | RW1, RW7 | TEST-05 |
 | `StreakConfigTest` | A reward for day 8 | unit | Load fails and names the file and the key | F1 | TEST-05 |
 | `StreakConfigTest` | Day 3 missing | unit | Load fails and names the file and the key | RW3 | TEST-05 |
@@ -414,7 +423,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | Design id | Spec rows | Tests |
 | --- | --- | --- |
 | SM1 | KPI query SM1, action `streak_claim` extra `rewardDay` | `ClaimStreakRewardTest` metric rows |
-| ST1 | ClaimStreakReward check 3, GetStreakState `unlocked`, transition from ST1 | `ClaimStreakRewardTest` player below level 5 |
+| ST1 | ClaimStreakReward check 3, GetStreakState `unlockLevel`, transition from ST1 | `ClaimStreakRewardTest` player below level 5 |
 | ST2 | Timed field `lastClaimDay`, transition to ST2 | `GetStreakStateTest` unlocked player on an unclaimed day |
 | ST3 | ClaimStreakReward check 4, timed field `lastClaimDay` | `ClaimStreakRewardTest` second claim on the same day with a new request id |
 | R1 | ClaimStreakReward effect, timed field `lastClaimDay` | `ClaimStreakRewardTest` claim after a missed day |
@@ -430,7 +439,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | TM1 | Server day definition, ClaimStreakReward check 4, transition from ST3 | `ClaimStreakRewardTest` claim at 00:00:01 after a claim at 23:59:59 |
 | TM2 | Config `isActive`, check 1 of both commands | `ClaimStreakRewardTest` feature inactive |
 | EC1 | ClaimStreakReward check 4 and effect | `ClaimStreakRewardTest` claim at 00:00:01 after a claim at 23:59:59 |
-| UI1 | GetStreakState, ClaimStreakReward, StreakState push | `GetStreakStateTest` unlocked player on an unclaimed day |
-| UI2 | GetStreakState `unlocked`, StreakState push at login | `StreakLoginPushTest` login of a 1.4.0 client |
+| UI1 | GetStreakState, ClaimStreakReward | `GetStreakStateTest` unlocked player on an unclaimed day |
+| UI2 | GetStreakState `unlockLevel`, `lastClaimDay`, and `serverTime`, from which the client derives the dot | `GetStreakStateTest` unlocked player on an unclaimed day |
 | Q1 | Header, answered, used by TM1 and EC1 | none |
 ````

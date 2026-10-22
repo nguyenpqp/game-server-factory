@@ -11,7 +11,7 @@ Rule ids such as `MN-02` refer to the rule index of the `server-rules` skill. Ea
 
 ## Frontmatter
 
-The block below is the complete key set. Every key is required except `lint.command_method`. The values are generic examples.
+The block below is the complete key set. Every key is required except `lint.command_method` and `lint.allowed_import`. The values are generic examples.
 
 ```yaml
 ---
@@ -42,6 +42,7 @@ lint:
   trace_id_call: 'TraceIds\.next\('
   command_method: 'handle\w*'
   cheat_marker: '@CheatCommand'
+  allowed_import: 'com\.example\.game\.contract\.'
   blocking_calls:
     - 'Thread\.sleep\('
     - '\.join\(\)'
@@ -72,6 +73,7 @@ lint:
 | `lint.trace_id_call` | regex | The call that mints a trace id. | CAP-TRACEID |
 | `lint.command_method` | regex | Name of the method that marks a command class: a class that declares a method whose whole name matches is a command class. Optional. When the key is absent, the linter uses `handle\w*`. | CAP-COMMAND |
 | `lint.cheat_marker` | regex | Text that every cheat command class contains, such as an annotation or a base class. | CAP-CHEAT |
+| `lint.allowed_import` | regex | Prefixes of imported names that feature code may use across features, such as the contract packages. The linter matches it from the start of each imported name, and an import of another feature's package that does not match is a MOD-01 finding. Optional. When the key is absent or empty, the linter skips MOD-01. | CAP-MODULE |
 | `lint.blocking_calls` | list of regexes | Calls that block the calling thread on I/O, a sleep, or a wait. Name the project's own future and sync client calls, and leave out patterns such as `\.get\(\)` that also match plain getters. | CAP-ACTOR |
 
 ### Value format
@@ -83,7 +85,7 @@ The frontmatter uses a small YAML subset, so plugin scripts parse it with the Py
 - Write an empty list as `key: []` and an empty string as `key: ''`.
 - Wrap every string in single quotes. Inside single quotes, a backslash is literal and `''` stands for one quote.
 - Write `profile_version` as a bare integer.
-- Each `lint` value is a Python regular expression that the linter searches for in Java source lines.
+- Each `lint` value is a Python regular expression that the linter searches for in Java source lines. `lint.allowed_import` is the exception. The linter matches it from the start of each imported name.
 
 An empty `lint` value means the project has no such call. The capability that the key maps to is then `partial` or `missing`, and the linter skips the checks that need the value.
 
@@ -396,6 +398,17 @@ Must provide:
 - Scenarios stored as files that a developer can add per feature.
 
 Typical partial: a load test client sends commands but does not check responses.
+
+### CAP-MODULE Feature modules and contracts
+
+Must provide:
+
+- One package per feature under `feature_root`, and shared packages that hold no feature logic.
+- Contract packages that hold the interfaces and value types one feature calls on another, apart from the package of either feature.
+- One registration point where each feature registers at startup, provides its contracts, and resolves the contracts it calls.
+- A synchronous contract call for an effect that the caller's reply depends on. When the project has events, a statement of their delivery: whether they run after the reply, in which order, and whether they can be dropped.
+
+Typical partial: features import each other's packages because no contract package exists, or a handler looks up another feature's service at call time instead of at registration.
 
 ### CAP-GENERATED Generated files
 

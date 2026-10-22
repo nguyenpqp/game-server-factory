@@ -3,8 +3,8 @@
 
 Usage: lint_feature.py --profile <profile.md> [--diff <base>] <path>...
 
-Reads the `lint` keys, `feature_root`, `test_root`, and `generated_paths` from the
-profile's frontmatter, scans the .java files under each path, and prints one line
+Reads the `lint` keys, `source_root`, `feature_root`, `test_root`, and `generated_paths`
+from the profile's frontmatter, scans the .java files under each path, and prints one line
 per finding as `path:line: <RULE-ID> message`.
 
 Exit codes: 0 when clean, 1 when any finding exists, 2 when the profile, a regex, or
@@ -31,13 +31,19 @@ Checks, with the rule each reports. A check whose profile value is empty is skip
   base class is a false finding, so treat the line as a prompt to check. When no
   checked class under `feature_root` is a command class, one note goes to stderr.
 - PERF-01: a line matches a `blocking_calls` pattern.
+- MOD-01: a file in a feature folder imports the package of another feature, and the
+  imported name does not match `allowed_import` from its start. Each direct child
+  folder of `feature_root` is one feature. The feature package is `feature_root` below
+  `source_root`, with dots for slashes. An empty or absent `allowed_import` turns the
+  check off. A name used fully qualified in code, with no import, is not checked.
 
 `time_call` and `random_call` name the approved calls. The reviewer uses them, and the
 linter does not.
 
 Comments and string, text block, and character literals are blanked before any
 pattern runs, so a commented-out call is not a finding. Braces inside annotation
-arguments are blanked too. Import and package lines are skipped. Files under `generated_paths` and `test_root` are skipped, even when named
+arguments are blanked too. Import and package lines are skipped, except that MOD-01
+reads import lines. Files under `generated_paths` and `test_root` are skipped, even when named
 on the command line. These paths and `feature_root` are relative to the repository
 root, the directory that holds `docs/game-server/profile.md`. A profile at any other
 place is a usage error.
@@ -65,10 +71,12 @@ RULE_CHEAT_ENV = "CHEAT-02"
 RULE_METRIC = "MET-01"
 RULE_TRACE = "MET-02"
 RULE_BLOCKING = "PERF-01"
+RULE_IMPORT = "MOD-01"
 
 LINT_KEYS = (
     "time_call", "forbidden_time", "random_call", "forbidden_random", "env_live_check",
     "metric_call", "trace_id_call", "command_method", "cheat_marker", "blocking_calls",
+    "allowed_import",
 )
 DEFAULT_COMMAND_METHOD = r"handle\w*"
 
@@ -83,6 +91,7 @@ METHOD_DECLARATION = re.compile(
     r"(?<![\w.])(?!(?:return|new|else|throw|case)\b)[\w<>\[\],.?]+\s+([A-Za-z_]\w*)\s*\("
 )
 SKIPPED_LINE = re.compile(r"^\s*(?:import|package)\b")
+IMPORT_LINE = re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+(?:\.\*)?)\s*;")
 LITERAL_START = re.compile(r"//|/\*|\"\"\"|[\"']")
 TYPE_WORDS = {"class", "interface", "enum", "record"}
 MODIFIERS = {
@@ -214,6 +223,13 @@ class Settings:
             raise UsageError(f"{profile_path}: the profile must sit at docs/game-server/profile.md")
         self.repo_root = resolved.parents[2]
         self.feature_root = str(data.get("feature_root") or "")
+        self.feature_package = None
+        if self.patterns["allowed_import"]:
+            root = Path(self.feature_root.strip("/"))
+            source = Path(str(data.get("source_root") or "").strip("/"))
+            if not source.parts or not root.is_relative_to(source) or root == source:
+                raise UsageError(f"{profile_path}: lint.allowed_import needs a feature_root below source_root")
+            self.feature_package = ".".join(root.relative_to(source).parts)
         generated = data.get("generated_paths") or []
         generated = generated if isinstance(generated, list) else [generated]
         self.skipped_roots = [str(root) for root in [data.get("test_root"), *generated] if root]
@@ -432,6 +448,29 @@ def check_commands(path, parts, masked, spans, settings):
     return findings, found
 
 
+def check_imports(path, parts, masked, settings):
+    if settings.feature_package is None or not under(parts, settings.feature_root):
+        return []
+    depth = len(Path(settings.feature_root.strip("/")).parts)
+    if len(parts) < depth + 2:
+        return []
+    own, prefix = parts[depth], settings.feature_package + "."
+    findings = []
+    for number, line in enumerate(masked.splitlines(), start=1):
+        match = IMPORT_LINE.match(line)
+        if not match or not match.group(1).startswith(prefix):
+            continue
+        name = match.group(1)
+        segments = name[len(prefix):].split(".")
+        if len(segments) < 2 or segments[0] == own:
+            continue
+        if any(pattern.match(name) for pattern in settings.patterns["allowed_import"]):
+            continue
+        findings.append(Finding(path, number, RULE_IMPORT,
+                                f"feature `{own}` imports `{name}` from feature `{segments[0]}`"))
+    return findings
+
+
 def lint_file(path, parts, settings):
     try:
         text = Path(path).read_text(encoding="utf-8", errors="replace")
@@ -449,6 +488,7 @@ def lint_file(path, parts, settings):
         + check_cheat(path, masked, spans, settings)
         + commands
         + scan_lines(path, masked, settings.patterns["blocking_calls"], RULE_BLOCKING, "blocking call")
+        + check_imports(path, parts, masked, settings)
     )
 
 

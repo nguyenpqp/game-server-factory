@@ -64,6 +64,7 @@ void buysOneItemAndRecordsTheDay() {
     assertEquals(Errors.OK, out.error());
     assertEquals(90, inv.count("gem"));
     assertEquals(1, inv.count("potion"));
+    assertEquals(Map.of("gem", 90L, "potion", 1L), out.balances());
     assertEquals(1, state.boughtOn("potion", ServerClock.dayOf(NOW)));
     assertEquals(List.of("EVENT_SHOP_BUY"), inv.reasons());
     assertEquals(Set.of(TRACE), inv.traceIds());
@@ -79,6 +80,7 @@ void rejectsWhenDailyLimitIsReached() {
     Outcome out = buy("req-00009", "potion", 1, "1.5.0", NOW);
 
     assertEquals(Errors.DAILY_LIMIT, out.error());
+    assertEquals(3, out.boughtToday());
     assertEquals(before, Json.write(state));
     assertEquals(gems, inv.count("gem"));
 }
@@ -115,8 +117,8 @@ void refundsTheCostWhenTheGrantFails() {
 
 Write these cases for every command.
 
-- The main flow, asserting the response fields, the state change, and each inventory change with its reason and trace id (MET-03, MET-04).
-- One negative case per row of the spec's Checks table. It asserts the error code, an unchanged state, and an unchanged inventory (TEST-03, AUTH-10). Compare the serialized state before and after, so a stray change to any field fails the test.
+- The main flow, asserting the response fields, the state change, and each inventory change with its reason and trace id (MET-03, MET-04). The response fields include the post-change values the command changed (SYNC-02).
+- One negative case per row of the spec's Checks table. It asserts the error code, the stored values that the spec's `Reject` line names, an unchanged state, and an unchanged inventory (TEST-03, AUTH-10, SYNC-02). Compare the serialized state before and after, so a stray change to any field fails the test.
 - Each time case with the clock injected, such as before the window, after it, the day boundary, and a cooldown that is not over (TEST-02).
 - Each random outcome with the RNG scripted (TEST-02).
 - A replay of one request id that asserts one effect (TEST-09).

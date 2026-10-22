@@ -174,6 +174,26 @@ Read the tests that the diff adds or should add. Judge the tests against the rul
 | TEST-10 | minor | no | A command with no bot scenario, when the project has a bot. |
 | TEST-11 | minor | no | A test that sets the config instance, clock, or environment and does not restore it. |
 
+## MOD: Modularity
+
+Read the imports of every changed file, and every call that reaches another feature.
+
+| Rule | Severity | Lint | Look for |
+| --- | --- | --- | --- |
+| MOD-01 | important | yes | An import of another feature's package. The linter finds the imports when the profile sets `lint.allowed_import`. Look for names used fully qualified in code, and for a static lookup of another feature's service. |
+| MOD-02 | critical | no | A reply that reports a cross-feature effect, such as a debit or a grant, that only an event applies. An event used to deliver value to another user. |
+
+## SYNC: Client sync
+
+Read each reply and push that the diff adds or changes, field by field, against the stored state.
+
+| Rule | Severity | Lint | Look for |
+| --- | --- | --- | --- |
+| SYNC-01 | important | no | A client-facing feature with no read command, or a read command that leaves out a part that a screen shows. State that reaches the client only in a push. |
+| SYNC-02 | important | no | A mutating reply with no server time, with a delta instead of the post-change value, or with values the command did not change. A reject that carries only the error code while the client may hold the fields wrong. |
+| SYNC-03 | important | no | A boolean in a reply or push that compares stored values, config, or server time, such as `ready` or `claimedToday`. Both the start and the end of one timer. |
+| SYNC-04 | critical | no | A push after the player's own command or at login. A push for a time the client can compute. Value that exists only in a push, with no stored state or inbox entry behind it. |
+
 ## DES: Design conformance
 
 Read `design.md` itself, beside the spec and the code. Build the trace table from the design's ids, not from the spec's Design coverage, so an id the spec dropped still gets a row.
@@ -191,7 +211,7 @@ Rules about state hold only if every entry point that touches the state follows 
 | Entry point | What to check |
 | --- | --- |
 | Gameplay command | The full spec row: checks, cost, effect, metric, trace id. |
-| Login | Lazy migration, expiry of old periods, and pushes of current state run before the first command. |
+| Login | Lazy migration and expiry of old periods run before the first command. The client reads current state through the read command, so login sends no state push (SYNC-01, SYNC-04). |
 | Offline load | A load of a document for a user who is not online runs the same migration and keeps unknown fields. |
 | Periodic job or tick | The lease is held, the lease token is checked before each write, and the job reads stored timestamps. |
 | Cheat command | The live check, the domain method, the metric row. |
