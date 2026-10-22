@@ -134,7 +134,7 @@ The section has one row per message that the server sends without a request. The
 
 ### State model
 
-The section has five parts, in this order: stored documents, timed fields, migrations, Redis keys, and states and transitions. Each stored document gets its key, writer, schema version, size bound, and a field table. A key added to an existing document has a default for documents that lack it. Fields that must change together, such as a cost and the purchase it records, go in one document, or in documents that CAP-USERSTORE saves in one write, because the store has no transaction across documents.
+The section has five parts, in this order: stored documents, timed fields, migrations, Redis keys, and states and transitions. Each stored document gets its key, writer, schema version, size bound, and a field table. A key added to an existing document has a default for documents that lack it. Fields that must change together, such as a cost and the purchase it records, go in one document, or in documents that CAP-USERSTORE saves in one atomic write, because the store has no transaction across documents.
 
 The parts come from the design's States, Rules, Timing, and Config tables. They usually cite MN-02, MN-04, MN-05, MN-06, MN-11, MN-12, BG-01, BG-02, BG-09, PERF-06, and CFG-06.
 

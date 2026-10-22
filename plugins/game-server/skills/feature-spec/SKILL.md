@@ -57,7 +57,7 @@ Take the rows from the `Changes without player action` column of the UI touchpoi
 ### 3. State model
 
 - Put new per-user state in its own document, or as new fields on an existing one. Never rename, remove, or retype a stored field (BG-01).
-- Fields that must change together go in one document, or in documents that CAP-USERSTORE saves in one write, such as a grant and the feature's record of it. The store has no transaction across documents, so a crash between two saves keeps one change and loses the other (MN-12). State that lives only for a session stays out of stored documents (MN-02).
+- Fields that must change together go in one document, or in documents that CAP-USERSTORE saves in one atomic write, such as a grant and the feature's record of it. The store has no transaction across documents, so a crash between two saves keeps one change and loses the other (MN-12). State that lives only for a session stays out of stored documents (MN-02).
 - Every field has a default for documents that lack it, and a bound. Every list has a cap (PERF-06).
 - Store timestamps or day numbers, and derive ready, expired, and broken from them on each read (MN-11).
 - Redis holds only cluster-wide state. Each key pattern names its hash tag, its atomic operation, and its TTL (MN-05, MN-06, PERF-08). A feature without such state writes `None.` under Redis keys.
