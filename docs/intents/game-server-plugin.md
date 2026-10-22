@@ -65,6 +65,7 @@ The skills that exist today live inside one internal reference project. They nam
 - Leave the reference project's skills untouched.
 - Internal content stays local and gitignored.
 - No build step in the acceptance run.
+- The acceptance run stops after 8 of its 12 build tasks. The admin commands, the handler registration, and the KPI queries are not built. The owner cut the run short on 2026-10-22 to save time, and closed the goal at that scope.
 
 ### Mine
 
