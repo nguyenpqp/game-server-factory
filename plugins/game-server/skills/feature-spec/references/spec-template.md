@@ -187,7 +187,7 @@ The parts come from the design's States, Rules, Timing, and Config tables. They 
 
 The section names the feature's config file, how it loads, and every key. A key added to an existing file is optional and has a default, so both server versions read the file.
 
-The rows come from the design's Config tables and Timing. Each cost and reward is an `{id, amount}` record, and each table of rows is a list with an `id` per row. They usually cite CFG-01 to CFG-10, BG-08, and PERF-05.
+The rows come from the design's Config tables and Timing. Each cost and reward is an `{id, amount}` record, and each table of rows is a list with an `id` per row. They usually cite CFG-01 to CFG-10, BG-08, and PERF-05. A value that a request field multiplies, such as a price times the largest quantity, has a Validation cell that caps the product so it fits its type (AUTH-04).
 
 ```markdown
 ## Config schema

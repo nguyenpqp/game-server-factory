@@ -30,10 +30,13 @@ lint:
   forbidden_time:
     - 'System\.currentTimeMillis\('
     - 'Instant\.now\('
-    - 'LocalDate(Time)?\.now\('
+    - 'Local(Date|Time|DateTime)\.now\('
+    - 'ZonedDateTime\.now\('
     - 'new Date\(\)'
     - 'ZoneId\.systemDefault\('
     - 'TimeZone\.getDefault\('
+    - 'Calendar\.getInstance\('
+    - 'Clock\.systemDefaultZone\('
   random_call: 'GameRandom\.next\w*\('
   forbidden_random:
     - 'new Random\('
@@ -267,9 +270,10 @@ Must provide:
 - Check, take, and add for each currency and item type, called on the owner's executor.
 - A reason (source or sink) and a trace id on every change, and a metric row per change.
 - A guard that rejects unknown item ids and non-positive amounts before any change.
-- A take of several items that takes nothing when any item is short.
+- A take of several items that takes nothing when any item is short, and an add of several items that adds nothing when any item fails.
+- An add that refuses a total past the limit of the balance's type.
 
-Typical partial: take and add exist, but they accept no trace id, or a multi-item take can stop halfway.
+Typical partial: take and add exist, but they accept no trace id, a multi-item take or add can stop halfway, or an add can wrap a balance.
 
 ### CAP-CROSSNODE Cross-node delivery
 

@@ -53,7 +53,7 @@ Thread.sleep(1000);
 assertTrue(StreakCore.claim(state, config, System.currentTimeMillis()) == ErrorCode.SUCCESS);
 ```
 
-**Check.** Confirm each time boundary and each random branch in the core has a test with a fixed time or a fixed RNG. A day boundary test passes with the JVM in any zone, such as UTC and a zone far from the server's. A test that needs a `user.timezone` setting reads the default zone somewhere (AUTH-02).
+**Check.** Confirm each time boundary and each random branch in the core has a test with a fixed time or a fixed RNG. A day boundary test passes the zone to the core, as it passes `now`, so the result does not depend on the JVM's zone. Never change the JVM's default zone inside a test. The suite gives the same result when run with `-Duser.timezone=UTC` and with a zone far from the server's. A test that needs one `user.timezone` setting reads the default zone somewhere (AUTH-02).
 
 - needs: CAP-CLOCK, CAP-RNG, CAP-UNITTEST
 

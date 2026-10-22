@@ -36,7 +36,7 @@ Each rule's reason, Java do and don't, and review check are in [auth.md](auth.md
 - severity: critical
 - needs: CAP-RNG
 
-### AUTH-04 Every request field is checked for presence, type, range, length, and allowed values before any state change, and its range keeps every amount computed from it within its type.
+### AUTH-04 Every request field is checked for presence, type, range, length, and allowed values before any state change, and every amount computed from it stays within its type.
 
 - severity: critical
 - needs: CAP-COMMAND, CAP-ERRORS

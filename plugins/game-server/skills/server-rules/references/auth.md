@@ -69,7 +69,7 @@ int roll = new Random().nextInt(table.totalWeight());
 
 - needs: CAP-RNG
 
-### AUTH-04 Every request field is checked for presence, type, range, length, and allowed values before any state change, and its range keeps every amount computed from it within its type.
+### AUTH-04 Every request field is checked for presence, type, range, length, and allowed values before any state change, and every amount computed from it stays within its type.
 
 **Why.** An unchecked negative count or out-of-range index turns into free items or a crash on the actor thread. A count inside its own range can still multiply a price past the limit of its type, and the product wraps to a small or negative cost.
 
@@ -89,7 +89,7 @@ int count = req.readInt("count");
 inventory.take(seedId, count, Reason.PLANT, traceId);
 ```
 
-Bound each field so that every amount computed from it fits its type with the largest config values, such as a price times the largest count. The config check at load caps the config side of that product (CFG-02). Where no bound proves that the result fits, compute it with `Math.multiplyExact` or `Math.addExact` before the first change, and return an error on the exception.
+Bound each field so that every amount computed from it fits its type with the largest config values, such as a price times the largest count. The config check at load caps the config side of that product (CFG-02). Where no bound proves that the result fits, compute it with `Math.multiplyExact` or `Math.addExact` before the first change, and return an error on the exception. A sum into a stored balance needs the same bound, and CAP-INVENTORY's add gives it when it refuses a total past the limit of its type.
 
 **Check.** For each field in the decoder, find the guard that bounds it before the first mutation. For each amount computed from a field, such as a cost times a count, find the bound that keeps it within its type, or the exact arithmetic call.
 
@@ -166,7 +166,7 @@ inventory.take(wood, Reason.CRAFT, traceId);
 
 When the effect is a write to shared state, such as a guild or a sale, claim or reserve the shared side first and take the cost last. A definite failure after the take refunds. An unknown outcome logs the case for repair and does not refund.
 
-The runner that catches an exception only logs it, so a throw after the first change leaves the command half applied. Run the work that can throw before the first change, such as lookups, arithmetic, and building the result. After the first change, run only in-memory writes that cannot throw, such as storing the request id. A change to the player's own state that can throw, such as a grant that throws on a full storage instead of returning false, is caught at the call, which undoes what ran and rethrows, so the runner still writes the exception row. A shared write that throws has an unknown outcome, so it logs the case for repair as above and does not refund.
+The runner that catches an exception only logs it, so a throw after the first change leaves the command half applied. Run the work that can throw before the first change, such as lookups, arithmetic, and building the result. After the first change, run only in-memory writes that cannot throw, such as storing the request id. A change to the player's own state that can throw, such as a grant that throws on a full storage instead of returning false, is caught at the call, which undoes what ran and rethrows, so the runner still writes the exception row. A shared write that throws has an unknown outcome, so it logs the case for repair as above and does not refund. A grant of several items that throws partway leaves the first items granted, so CAP-INVENTORY's add of several items adds nothing when any item fails, or the undo also removes what the grant added.
 
 **Check.** Find the full check before the first take, and a refund on every definite failure path after it. Then find each call after the first change that can throw, and confirm that it runs before the change instead, or that its catch undoes what ran. For a shared effect, confirm the claim comes before the take, and that a timeout path logs instead of refunding.
 
@@ -180,10 +180,12 @@ Do:
 
 ```java
 String requestId = req.readString("requestId");
-if (state.appliedRequests().contains(requestId)) {
-    return state.lastResult(requestId);
+Result stored = state.resultOf(requestId);
+if (stored != null) {
+    return stored;
 }
-state.appliedRequests().add(requestId);
+Result result = claim(state, config, now, traceId);
+state.rememberResult(requestId, result);
 ```
 
 Don't:

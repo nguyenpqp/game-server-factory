@@ -133,7 +133,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 - Search for the shared time call. `rg -n "class \w*(Clock|Time)\w*"` and the most common caller.
 - Count direct calls. `rg -c "System\.currentTimeMillis|Instant\.now|LocalDate(Time)?\.now|new Date\(\)"`. These become `lint.forbidden_time`.
 - Check that core logic takes `now` as a parameter, and that a per-user offset exists for cheats.
-- Find the zone that day resets use. `rg -n "ZoneId|ZoneOffset|TimeZone"`. Record where it comes from, such as server config. A reset in the JVM's default zone is partial, because nodes set to different zones reset at different times. Add the default-zone calls, such as `ZoneId\.systemDefault\(` and `TimeZone\.getDefault\(`, to `lint.forbidden_time`.
+- Find the zone that day resets use. `rg -n "ZoneId|ZoneOffset|TimeZone"`. Record where it comes from, such as server config. A reset in the JVM's default zone is partial, because nodes set to different zones reset at different times. Add the default-zone calls, such as `ZoneId\.systemDefault\(`, `TimeZone\.getDefault\(`, `Calendar\.getInstance\(`, and `Clock\.systemDefaultZone\(`, to `lint.forbidden_time`.
 - Find the clock that heartbeat and lease freshness use. `rg -n "nanoTime|monotonic"` in the cluster code. Wall time there is partial.
 
 ### CAP-RNG

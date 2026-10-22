@@ -94,9 +94,12 @@ static EventShopConfig validate(RawEventShop raw) {
             throw new ConfigException(FILE, key + ".maxPerBuy", "must be 1 to dailyLimit");
         checkRecord(key + ".price", it.price);
         checkRecord(key + ".reward", it.reward);
-        if ((long) it.price.amount() * it.maxPerBuy > Integer.MAX_VALUE
-                || (long) it.reward.amount() * it.maxPerBuy > Integer.MAX_VALUE)
-            throw new ConfigException(FILE, key + ".maxPerBuy", "times the price or the reward overflows an int");
+        try {
+            Math.multiplyExact(it.price.amount(), it.maxPerBuy);
+            Math.multiplyExact(it.reward.amount(), it.maxPerBuy);
+        } catch (ArithmeticException e) {
+            throw new ConfigException(FILE, key + ".maxPerBuy", "times the price or the reward overflows");
+        }
         byId.put(it.id, ShopItem.from(it));
     }
     return new EventShopConfig(raw, byId);

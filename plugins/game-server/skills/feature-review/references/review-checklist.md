@@ -26,7 +26,7 @@ Read each command handler and the core method it calls, in order. Trace every re
 | AUTH-05 | critical | An item, slot, or target id from the request used without a check that the acting user owns it or may reach it. A friend or guild member id used without a membership check. |
 | AUTH-06 | critical | A state change that runs before the active, unlocked, state-transition, or cooldown check. A check that reads client-sent state. A claim or grant command that does not check the feature's terminal state, such as finished, expired, or closed, before it grants, even when a claimed list seems to cover it. |
 | AUTH-07 | critical | Several costs taken one by one with no up-front check. A cost taken before a later step that can fail, with no refund on that failure. A cost taken before the shared claim it pays for. A refund after a shared write that timed out and may have landed. A call after the first change that can throw, with no catch that undoes what ran, or a request id stored after such a call. |
-| AUTH-08 | critical | A grant, purchase, or claim command with no request id, or a request id stored after the grant. A retry path that can run the grant twice. |
+| AUTH-08 | critical | A grant, purchase, or claim command with no request id. A request id stored before a step that can still fail or throw, or in another document than the grant. A retry path that can run the grant twice. |
 | AUTH-09 | important | A command that loads other users or the database, or fans out, with no per-user limit. A limit that still applies the effect once exceeded. |
 | AUTH-10 | important | A failure branch that changes state before it returns, or returns one generic code for different failures. |
 
