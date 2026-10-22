@@ -59,7 +59,7 @@ The formats below use the daily login streak from the design template as their e
 - Accepted risks: None.
 ```
 
-`Package` is a Java package. Its directory is the profile's `feature_root` plus the package's last segment. `profile_version` is the version of the profile template that the profile follows. `Accepted risks` lists each `critical` rule id that a Core blockers row accepts, with its reason. It says `None.` when there is none.
+`Package` is a Java package. Its directory is the profile's `feature_root` plus the package's last segment. `profile_version` is the version of the profile template that the profile follows. `Accepted risks` lists each `critical` rule id that a Core blockers row accepts, with its reason, and with its decision id when a project decision resolved the row. It says `None.` when there is none.
 
 When the input is a prompt instead of a design, `Design` says `prompt`, and the prompt follows the header as a quote. The spec then gives the requirements it reads from the prompt their own ids, in the design template's id format.
 
@@ -428,6 +428,7 @@ The `Resolution` cell holds one value.
 | `core changed` | The developer changed the core, and the profile now shows the capability as `present`. | no |
 | `descoped` | The developer removed the feature parts that need the capability. The row names the design ids dropped. | no |
 | `accepted by <name>: <reason>` | The developer accepts the risk. The value is valid for any severity. When a rule blocked is `critical`, the reason names the deployment fact and says how that fact prevents or bounds the failure that the row names, such as "one node per realm, so no second node can load the player and save over the claim". The header's `Accepted risks` line lists the rule. A critical acceptance that cites a fact without that link counts as `open`. | no |
+| `accepted by <name> (D<n>): <reason>` | A project decision in `docs/game-server/decisions.md` accepts the risk for every feature, as the [decisions template](decisions-template.md) says. The name and the reason come from the decision. | no |
 
 While any row blocks, the spec status is `blocked`. The skill that writes the spec stops and gives this section to the developer, and `feature-build` does not start. Only the developer sets a resolution. Feature code never works around a missing capability.
 

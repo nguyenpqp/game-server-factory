@@ -60,7 +60,7 @@ The plugin manifest has no version, so an install tracks the commit of the marke
 
 1. **Profile.** Run `server-profile` once per server repository, and again when the core changes. The spec, build, and review skills stop without it.
 2. **Intake.** Run `gdd-intake` on the GDD folder or the prompt. Answer the open questions it lists.
-3. **Spec.** Run `feature-spec` on the design. If the spec lists a core blocker, the skill stops and you decide. Confirm the spec. For a large feature, ask for a build plan.
+3. **Spec.** Run `feature-spec` on the design. If the spec lists a core blocker, the skill stops and you decide. A risk you accept for every feature goes to `docs/game-server/decisions.md`, and later specs do not stop on it. Confirm the spec. For a large feature, ask for a build plan.
 4. **Build.** Run `feature-build` on the spec, one slice at a time for a large feature.
 5. **Review.** Run `feature-review` over the finished branch.
 

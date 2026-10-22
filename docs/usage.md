@@ -73,6 +73,9 @@ If a capability the feature needs is missing or partial, the Core blockers secti
 - **Change the core.** Make the change, rerun `server-profile`, then continue the spec.
 - **Descope.** Drop what depends on the capability.
 - **Accept the risk** as `accepted by <name>: <reason>`. You may accept a critical rule too, but the reason must name the deployment fact and say how it prevents or bounds the failure, such as "one node per realm, so two nodes never hold the same user". The spec header lists every accepted critical rule, and the build report repeats them.
+- **Accept the risk for every feature.** The skill adds a decision to `docs/game-server/decisions.md` with your name, the deployment fact, and how it bounds the failure. Every later spec applies it to a matching row and does not stop there. PERF-01 is never accepted this way, because its risk depends on each blocking call.
+
+A decision stops applying when `server-profile` records a new status for its capability. `<plugin>/skills/feature-spec/references/decisions-template.md` gives the format and the rules. Commit `decisions.md` with the spec, like the profile.
 
 Read the finished spec and ask for fixes in plain words. When you confirm it, the status becomes `ready`.
 
@@ -139,6 +142,7 @@ Every check the skills run is a Python 3 script you can run from the repository 
 ```bash
 python3 <plugin>/skills/server-profile/scripts/check_profile.py docs/game-server/profile.md
 python3 <plugin>/skills/server-profile/scripts/check_profile.py --blocked-rules docs/game-server/profile.md
+python3 <plugin>/skills/server-profile/scripts/check_profile.py --decisions docs/game-server/decisions.md docs/game-server/profile.md
 python3 -I <plugin>/skills/gdd-intake/scripts/lint_design.py docs/game-server/features/daily-streak/design.md
 python3 <plugin>/skills/feature-review/scripts/lint_feature.py --profile docs/game-server/profile.md --diff $(git merge-base HEAD main) <paths>
 ```
@@ -157,6 +161,6 @@ The skills work the same under any workflow, with a few limits.
 ## Keep the files current
 
 - The profile, design, and spec are plain files in your repository. Edit them like any other file.
-- After a core change, rerun `server-profile`, then rerun the Core blockers step of every spec not yet built. `profile_version` is the version of the profile template, so it does not catch a core change.
+- After a core change, rerun `server-profile`, check `decisions.md` against the new profile (see [Run the checks yourself](#run-the-checks-yourself)), then rerun the Core blockers step of every spec not yet built. `profile_version` is the version of the profile template, so it does not catch a core change.
 - When a design rule changes, edit `design.md`, rerun its lint, and ask `feature-spec` to update the spec rows that cite the changed ids.
 - `server-rules` loads on its own when a skill needs a rule. To read the rules yourself, start from `<plugin>/skills/server-rules/references/index.md`.
