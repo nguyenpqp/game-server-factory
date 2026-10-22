@@ -738,6 +738,45 @@ class EmitJsonTest(TempDirCase):
         self.assertEqual(draft["limits"], {"claimsPerWeek": 1})
         self.assertEqual(draft["tiers"], [{"points": 100, "reward": "gold", "premium": False}])
 
+    def no_sheet_list_design(self, items_example='["5 coin", "4 gem", "10 coin"]'):
+        return (CONFIG_DESIGN
+                .replace("| integer | 100 |", "| integer | [100, 250, 500] |")
+                .replace("| string | gold |", '| string | ["coin", "gem", "coin"] |')
+                .replace("| boolean | false |", "| boolean | [false, false, true] |")
+                .replace("| list of item and amount | 500 gold |", f"| list of item and amount | {items_example} |"))
+
+    def test_a_json_array_example_gives_one_list_entry_per_value(self):
+        design = self.write_design(self.no_sheet_list_design())
+        code, out, err = run_main(emit_json, [str(design)])
+        self.assertEqual((code, err), (0, ""))
+        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
+        self.assertEqual(draft["tiers"], [
+            {"points": 100, "reward": "coin", "premium": False, "items": "5 coin"},
+            {"points": 250, "reward": "gem", "premium": False, "items": "4 gem"},
+            {"points": 500, "reward": "coin", "premium": True, "items": "10 coin"},
+        ])
+
+    def test_a_list_field_with_fewer_values_warns_with_both_counts(self):
+        design = self.write_design(self.no_sheet_list_design(items_example="500 gold"))
+        code, out, err = run_main(emit_json, [str(design)])
+        self.assertEqual(code, 0, err)
+        draft = json.loads((design.parent / "config" / "tiny.json").read_text(encoding="utf-8"))
+        self.assertEqual([t["items"] for t in draft["tiers"]], ["500 gold", None, None])
+        warnings = [line for line in err.splitlines() if line.startswith("warning:")]
+        self.assertEqual(len(warnings), 1, err)
+        self.assertIn("tiers[].items", warnings[0])
+        self.assertIn("emitted 1 of 3", warnings[0])
+
+    def test_a_sheet_list_whose_field_falls_back_to_the_example_warns(self):
+        design = self.write_design()
+        self.write_sheets()
+        code, out, err = run_main(emit_json, [str(design), "--sheets", str(self.work)])
+        self.assertEqual(code, 0, err)
+        warnings = [line for line in err.splitlines() if "emitted" in line]
+        self.assertEqual(len(warnings), 1, err)
+        self.assertIn("tiers[].items", warnings[0])
+        self.assertIn("emitted 1 of 3", warnings[0])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -11,10 +11,12 @@ on its Draft line, relative to the design file (or to --out-dir). The key table 
   - `[]` marks a list of objects (`tiers[].points`) or, at the end, a list of values (`tags[]`).
   - The Type column picks the JSON type: integer, number, boolean, or string. Any other type,
     such as "list of item and amount", keeps the cell text as a string.
-  - A value comes from the Example column. With --sheets, a key whose Source cites a sheet
-    range takes its values from the converted CSV instead: a single cell for a plain key, or a
-    single column for a list key. A list gets one element per row of its longest column.
-    Keys with no sheet values keep their Example in the first element and null after it.
+  - A value comes from the Example column. A list key whose Example is a JSON array, such as
+    `[8, 15, 30]`, gives one value per list element, in order. With --sheets, a key whose Source
+    cites a sheet range takes its values from the converted CSV instead: a single cell for a
+    plain key, or a single column for a list key. A list gets one element per value of its
+    longest key. A key with fewer values gets null after them, and a warning names the key, the
+    count it emitted, and the list length.
 
 --sheets takes the work directory that convert_office.py wrote. The output is a draft, so the
 developer or feature-spec checks it against the design before it becomes a config file.
@@ -147,6 +149,18 @@ def coerce(raw, type_name, warn, label):
     return raw
 
 
+def example_values(key, example):
+    if "[]" not in key or not example.lstrip().startswith("["):
+        return [example]
+    try:
+        values = json.loads(example)
+    except ValueError:
+        return [example]
+    if not isinstance(values, list):
+        return [example]
+    return [v if isinstance(v, str) else json.dumps(v) for v in values]
+
+
 def add_key(root, key, leaf):
     node = root
     parts = key.split(".")
@@ -183,8 +197,8 @@ def list_length(node):
     lengths = []
 
     def walk(current):
-        if current.kind == "leaf" and current.leaf and current.leaf["fill"]:
-            lengths.append(len(current.leaf["fill"]))
+        if current.kind == "leaf" and current.leaf:
+            lengths.append(len(current.leaf["values"]))
         for child in current.children.values():
             walk(child)
         if current.kind == "list" and current.item is not None:
@@ -194,14 +208,31 @@ def list_length(node):
     return max(lengths, default=1)
 
 
+def item_leaves(node):
+    if node.kind == "leaf":
+        return [node.leaf] if node.leaf else []
+    if node.kind == "list":
+        return []
+    return [leaf for child in node.children.values() for leaf in item_leaves(child)]
+
+
+def warn_short_lists(node, warn):
+    if node.kind == "list" and node.item is not None:
+        length = list_length(node)
+        for leaf in item_leaves(node.item):
+            if len(leaf["values"]) < length:
+                warn(f"{leaf['key']}: emitted {len(leaf['values'])} of {length} list values; "
+                     f"the rest are null")
+        warn_short_lists(node.item, warn)
+    for child in node.children.values():
+        warn_short_lists(child, warn)
+
+
 def render(node, index, warn):
     if node.kind == "leaf":
-        leaf = node.leaf
-        if leaf["fill"]:
-            raw = leaf["fill"][index] if index < len(leaf["fill"]) else None
-        else:
-            raw = leaf["example"] if index == 0 else None
-        return None if raw is None else coerce(raw, leaf["type"], warn, leaf["key"])
+        values = node.leaf["values"]
+        raw = values[index] if index < len(values) else None
+        return None if raw is None else coerce(raw, node.leaf["type"], warn, node.leaf["key"])
     if node.kind == "list":
         return [render(node.item, i, warn) for i in range(list_length(node))]
     return {name: render(child, index, warn) for name, child in node.children.items()}
@@ -224,8 +255,9 @@ def build_draft(entry, files, sheets, warn):
                 shape = "column" if "[]" in key else "cell"
                 fill = sheet_values(cells[headers.index("Source")], files, sheets, shape, warn, key)
                 from_sheets += bool(fill)
+            example = cells[headers.index("Example")].strip("`")
             add_key(root, key, {"key": key, "type": cells[headers.index("Type")],
-                                "example": cells[headers.index("Example")].strip("`"), "fill": fill})
+                                "values": fill or example_values(key, example)})
             total += 1
     return root, from_sheets, total
 
@@ -238,6 +270,7 @@ def emit_entry(entry, base, files, sheets, warn):
     if not target.is_relative_to(base.resolve()):
         raise DesignError(f"config '{entry['title']}' Draft path leaves the output folder")
     root, from_sheets, total = build_draft(entry, files, sheets, warn)
+    warn_short_lists(root, warn)
     data = render(root, 0, warn)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

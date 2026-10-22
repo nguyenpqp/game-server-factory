@@ -72,7 +72,7 @@ Follow the template section by section. These rules come from past runs.
 - Write TBD, TODO, and FIXME only inside Open questions, and prefer plain wording there.
 - Do not summarize away detail. A developer reads only this file.
 - Do not invent rules. You may settle a conflict by the heuristics above, and you may propose a default. Nothing else.
-- Write each config file from the sheets. One entry per file, headed with the file name in backticks as a level 3 heading, with the key table that `../references/design-template.md` shows. Use dotted key paths. Mark lists of objects as `list[].field`. Give the Type as `integer`, `number`, `boolean`, or `string` when it is one of them. Put the sheet range in the Source column, one column per list key, so the emitter can fill the draft from the sheet. Leave out derived columns such as a percentage that the server computes. Write sentinel values, such as `-1` for unlimited, into the meaning column.
+- Write each config file from the sheets. One entry per file, headed with the file name in backticks as a level 3 heading, with the key table that `../references/design-template.md` shows. Use dotted key paths. Mark lists of objects as `list[].field`. Give the Type as `integer`, `number`, `boolean`, or `string` when it is one of them. Put the sheet range in the Source column, one column per list key, so the emitter can fill the draft from the sheet. When a list key has no sheet, write every entry's value in its Example cell, in list order, as a JSON array such as `[8, 15, 30]`. Leave out derived columns such as a percentage that the server computes. Write sentinel values, such as `-1` for unlimited, into the meaning column.
 
 ### 7. Write the questions
 
