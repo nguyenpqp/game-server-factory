@@ -1,5 +1,7 @@
 # Tickets: game server feature skills plugin
 
+This is the plan the plugin was first built from, kept as history. Paths and file names in it may be out of date. The usage guides it names were later merged into `docs/usage.md`, and the skills no longer target a specific workflow.
+
 Intent: `docs/intents/game-server-plugin.md`. Spec branch: `feat/game-server-plugin`. Ticket branches: `feat/game-server-plugin--tNN`.
 
 Every path below is relative to the repository root. The plugin root is `plugins/game-server/`.
