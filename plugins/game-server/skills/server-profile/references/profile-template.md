@@ -71,14 +71,14 @@ lint:
 | `lint.env_live_check` | regex | The expression that is true when the server runs on live. | CAP-ENV |
 | `lint.metric_call` | regex | The call that writes a user action metric row. | CAP-METRIC |
 | `lint.trace_id_call` | regex | The call that mints a trace id. | CAP-TRACEID |
-| `lint.command_method` | regex | Name of the method that marks a command class: a class that declares a method whose whole name matches is a command class. Optional. When the key is absent, `handle\w*` marks it. | CAP-COMMAND |
+| `lint.command_method` | regex | Name of the method that marks a command class: a class that declares a method whose whole name matches is a command class. Optional. When the key is absent, a command class is known by its shape, as `feature-build`'s command shape shows. | CAP-COMMAND |
 | `lint.cheat_marker` | regex | Text that every cheat command class contains, such as an annotation or a base class. | CAP-CHEAT |
 | `lint.allowed_import` | regex | Prefixes of imported names that feature code may use across features, such as the contract packages. It matches from the start of each imported name, and an import of another feature's package that does not match is a MOD-01 finding. Optional. When the key is absent or empty, a review judges MOD-01 from the code alone. | CAP-MODULE |
 | `lint.blocking_calls` | list of regexes | Calls that block the calling thread on I/O, a sleep, or a wait. Name the project's own future and sync client calls, and leave out patterns such as `\.get\(\)` that also match plain getters. | CAP-ACTOR |
 
 ### Value format
 
-The frontmatter uses a small YAML subset, so plugin scripts parse it with the Python standard library.
+The frontmatter uses a small YAML subset, so every reader takes each value the same way.
 
 - Write each key at the start of a line as `key: value`. The `lint` sub-keys are indented two spaces.
 - Write a list as the key alone on its line, then one `- 'item'` line per item, indented two spaces deeper than the key.

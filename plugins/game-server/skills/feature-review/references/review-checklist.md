@@ -78,7 +78,7 @@ Count the calls per command, and read every loop.
 
 | Rule | Severity | Look for |
 | --- | --- | --- |
-| PERF-01 | critical | A blocking call, sleep, join, lock, or database or Redis call made on the user actor thread. The profile's `lint.blocking_calls` names the common ones. Look also for the project's own synchronous client calls. A blocking call in an HTTP endpoint class, built on the profile's CAP-HTTP endpoint API, runs on an HTTP worker thread and is not a finding. A call that the spec's `Accepted blocking calls` table names is accepted. It is a finding only when its bound does not hold, such as a call that runs more often or waits longer than the row says. |
+| PERF-01 | critical | A blocking call, sleep, join, lock, or database or Redis call made on the user actor thread. The profile's `lint.blocking_calls` names the common ones. Look also for the project's own synchronous client calls. A blocking call in an HTTP endpoint class, built on the profile's CAP-HTTP endpoint API, runs on an HTTP worker thread and is not a finding. A call that the spec's `Accepted blocking calls` table names, by its class and its call, is accepted. It is a finding only when its bound does not hold, such as a call that runs more often or waits longer than the row says. |
 | PERF-02 | important | The count of database and Redis calls per command, against the spec's budget. |
 | PERF-03 | important | A database or Redis call inside a `for`, `forEach`, or stream over users, items, or rows. A single `get` repeated where a multi-get exists. |
 | PERF-04 | important | A list put into a response or push with no cap. A push sent for every change instead of once per command. |

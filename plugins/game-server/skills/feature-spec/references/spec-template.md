@@ -405,7 +405,7 @@ The section states the peak load and one row per command and push. Calls per sec
 
 The section lists every capability that a cited rule needs and that the profile does not show as `present`. Build the list in four steps.
 
-1. Collect every rule id that the spec cites. Leave out a rule that the spec cites only on a fixed Multi-node or Blue-green row that says the feature has nothing of that kind, such as "The feature has no job" under MN-07. When the profile blocks a rule you leave out, name it on a `Left out:` line below the table, with the reason, such as `Left out: MN-07, cited only where the feature has no job.`
+1. Collect every rule id that the spec cites. Leave out a rule that the spec cites only on a fixed Multi-node or Blue-green row that says the feature has nothing of that kind, such as "The feature has no job" under MN-07. When the profile blocks a rule you leave out, name it on a `Left out:` line at the end of the section, after the table or after `None.`, with the reason, such as `Left out: MN-07, cited only where the feature has no job.`
 2. Read each rule's `needs:` line in the rule index.
 3. Read each needed capability's status in the profile.
 4. Write one row per capability that blocks a collected rule. A `missing` capability blocks every rule whose `needs:` line names it. A `partial` capability blocks only the rule ids on its profile `blocker` line. `Rules blocked` lists the collected rules that the capability blocks.
@@ -434,7 +434,7 @@ While any row blocks, the spec status is `blocked`. The skill that writes the sp
 
 A resolved row stays in the table with its resolution. The section says `None.` only when no row was ever needed, because every capability the spec needs is `present` in the profile.
 
-A row that blocks PERF-01 is accepted call by call. When the developer accepts one, an `Accepted blocking calls` table follows the Core blockers table. It has one row per call site for each blocking call that the feature makes on the user actor thread, such as a call the profile's `lint.blocking_calls` names. `Class` is the Java class that makes the call. `Call` is the call's text as it appears on that line. `Bound` says how long the call can wait and whose work waits behind it, as any critical acceptance must. Write `None.` under the heading when the feature makes no such call. A blocking call that this table does not name stays a PERF-01 finding in `feature-build` and `feature-review`, whatever the row's reason says.
+A row that blocks PERF-01 is accepted call by call. When the developer accepts one, an `Accepted blocking calls` table follows the Core blockers table. It has one row per call site for each blocking call that the feature makes on the user actor thread, such as a call the profile's `lint.blocking_calls` names. `Class` is the Java class that makes the call. `Call` is the call's text as it appears on that line. Two call sites with the same text in one class take two rows, so a class with more such calls than rows makes one that is not accepted. `Bound` says how long the call can wait and whose work waits behind it, as any critical acceptance must. Write `None.` under the heading when the feature makes no such call. A blocking call that this table does not name stays a PERF-01 finding in `feature-build` and `feature-review`, whatever the row's reason says.
 
 ```markdown
 ### Accepted blocking calls

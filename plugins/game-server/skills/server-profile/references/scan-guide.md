@@ -25,7 +25,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 ### CAP-COMMAND
 
 - Search for the registration of handlers at startup. `rg -n "addRequestHandler|registerHandler|\.register\(|ChannelInboundHandler|SimpleChannelInboundHandler|extends \w*Handler"`.
-- Read the command classes and find the method that each command or request handler class declares as its entry point. Set `lint.command_method` to a regex for that method name. Leave the key out when the default `handle\w*` matches.
+- Read the command classes and find the method that each command or request handler class declares as its entry point. Set `lint.command_method` to a regex for that method name, such as `handle\w*`.
 - Search for the decoder. `rg -n "ByteBuf|ByteBuffer|readInt\(|readShort\(|readUtf|decode\("`. Check what happens when a field is absent.
 - Search for the id table. `rg -n "static final (short|int) \w*(CMD|_ID)"`, or a generated class of ids. Note whether blocks of ids are reserved per feature.
 
