@@ -54,7 +54,7 @@ These are the slices of the [worked example](worked-example.md), with the exampl
 
 | Task | Builds | Depends on | Verify classes |
 | --- | --- | --- | --- |
-| T01 | Command, push, and cheat ids and the error codes 4201 to 4203 | None | none, the generator and `build_cmd` |
+| T01 | Command, push, and cheat ids and the error codes 4201 to 4204 | None | none, the generator and `build_cmd` |
 | T02 | StreakState with migration and `restore` | None | `StreakStateCompatTest` |
 | T03 | The login streak config | None | `StreakConfigTest` |
 | T04 | GetStreakState and the view it reads from StreakState | T01, T02, T03 | `GetStreakStateTest` |
