@@ -24,7 +24,8 @@ The brief names one mode.
 3. An answer from the developer beats the extractor's choices and the reviewer's suggestions. If a lint or review fix would undo an answered question, keep the answer and report the skipped fix.
 4. Ids are permanent. A new requirement takes the next unused number for its prefix. A removed requirement leaves a gap. Never reuse an id or renumber.
 5. Keep the template's rules: a `Source:` line on every requirement, units on every number, `None.` for an empty section, and TBD, TODO, and FIXME only inside Open questions.
-6. After you edit, run the lint script if you can, and fix what it prints.
+6. An interim default you write or keep contradicts neither the source text it cites nor another row. If one does, report it, because a skip does not settle a default that the source contradicts.
+7. After you edit, run the lint script if you can, and fix what it prints.
 
 ## `apply-answers`
 

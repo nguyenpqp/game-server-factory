@@ -213,13 +213,13 @@ Read every log call, comment, and exception message that the diff adds.
 
 ## DES: Design conformance
 
-Read `design.md` itself, beside the spec and the code. Build the trace table from the design's ids, not from the spec's Design coverage, so an id the spec dropped still gets a row.
+Read `design.md` itself, beside the spec and the code. Build the trace table from the design's ids, not from the spec's Design coverage, so an id the spec dropped still gets a row. Read each row's cited source in the converted GDD text under `.gdd-intake/<feature>/raw/`. That folder is gitignored, so when it is missing, say so in the report and check against `design.md` alone.
 
 | Rule | Severity | Lint | Look for |
 | --- | --- | --- | --- |
 | DES-01 | important | no | A design id with no code, or with code and no test, and no Core blockers row, open question, or client-only reason that records the gap. A dropped push, such as a real-time progress update that a UI row asks for. |
-| DES-02 | critical | no | An end condition, state transition, limit, reward, cost, duration, or count that differs from the design, such as a chain that ends only after every milestone is claimed, while the design ends it at the claim of milestone 3. A config value that differs from the design's Config tables or the sheet range they cite. |
-| DES-03 | critical | no | Code that follows an interim default after its question was answered, or ignores the default of a skipped question. Code that contradicts a Core blockers resolution. A handler, field, or config key for a descoped id. |
+| DES-02 | critical | no | An end condition, state transition, limit, reward, cost, duration, or count that differs from the design, such as a chain that ends only after every milestone is claimed, while the design ends it at the claim of milestone 3. A config value that differs from the design's Config tables or the sheet range they cite. A design row whose rule, number, or end condition contradicts the source it cites, which is a finding against the design. |
+| DES-03 | critical | no | Code that follows an interim default after its question was answered, or ignores the default of a skipped question. Code that contradicts a Core blockers resolution. A handler, field, or config key for a descoped id. An interim default that contradicts its cited source or another design row, such as a default that ends the chain only after every milestone is claimed while the source ends it at the claim of milestone 3, which is a finding against the design. |
 
 ## Lifecycle parity
 

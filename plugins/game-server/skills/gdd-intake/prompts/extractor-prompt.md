@@ -69,6 +69,7 @@ Follow the template section by section. These rules come from past runs.
 - Every rule has an example with real numbers. Every formula has an input, an output, a code block, and a worked example whose numbers you recomputed.
 - Write every number with its unit. A number that design may tune goes in a config table with its key.
 - Keep the in-game names as the sources spell them.
+- A timing word in a source, such as "real time", "live", "at once", "immediately", or "instantly", or the same word in the GDD's language, such as `ngay`, never stays a bare timing note. Write a requirement that the server pushes the change to the client, naming what changes and the game event that triggers the push, such as "the server pushes the new progress when an order completes". If the source does not make clear that the player must see the change before the next request, ask in an open question whether a push is needed.
 - Write TBD, TODO, and FIXME only inside Open questions, and prefer plain wording there.
 - Do not summarize away detail. A developer reads only this file.
 - Do not invent rules. You may settle a conflict by the heuristics above, and you may propose a default. Nothing else.
@@ -86,7 +87,7 @@ Limits:
 
 - At most 15 questions across Blocker and Important. If you have more, keep the most damaging and fold the rest into the interim defaults of related questions.
 - Ask closed questions: a choice, or a number. The Source line names what each source says, so the asker can offer the options.
-- Every question has an interim default that the design can run on.
+- Every question has an interim default that the design can run on. The default contradicts neither the source text it cites nor another row, the rule's own Description included. A default that ends a chain only after every milestone is claimed, while the source ends it at the claim of milestone 3, breaks this.
 - Group related gaps into one question when one answer settles them.
 
 ### 8. Check your work

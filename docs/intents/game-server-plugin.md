@@ -70,7 +70,7 @@ The skills that exist today live inside one internal reference project. They nam
 ### Mine
 
 - The profile is a registry of core capabilities with fixed ids (`CAP-*`). Each entry has a status (present, partial, missing), the concrete API, a snippet, and a file path.
-- Rules have fixed ids by group: `AUTH`, `MN`, `BG`, `PERF`, `CFG`, `MET`, `CHEAT`, `ADMIN`, `HTTP`, `TEST`, `DES`. Spec, build, review, and lint cite rules by id. A test fails on any cited id missing from the index.
+- Rules have fixed ids by group: `AUTH`, `MN`, `BG`, `PERF`, `CFG`, `MET`, `CHEAT`, `ADMIN`, `HTTP`, `TEST`, `MOD`, `SYNC`, `LOG`, `DES`. Spec, build, review, and lint cite rules by id. A test fails on any cited id missing from the index. The `MOD`, `SYNC`, and `LOG` groups were adopted on 2026-10-22, at the owner's choice, from another internal project's code conventions.
 - Cheat handlers are not registered on live, and each cheat command also checks the environment at the point of mutation.
 - Background jobs that must run once per cluster hold a lease. Redis keys use hash tags so multi-key operations work on Redis Cluster.
 - Feature config loads into an immutable snapshot that is validated before use, so hot reload stays possible.
@@ -80,7 +80,7 @@ The skills that exist today live inside one internal reference project. They nam
 - No `gh` CLI is installed, so delivery pushes the branch and links the GitHub compare page.
 - The GDD converter may use Python libraries if needed (owner, 2026-10-22). A measurement against library extractors showed that only PDF needs one, so docx, pptx, and xlsx stay on the Python standard library (`zipfile` and `ElementTree`) and need no package install. PDF needs PyMuPDF. Without it, the converter lists the PDF under export requests with the reason.
 - The developer may accept the risk of any blocked rule, critical included, as `accepted by <name>: <reason>`. This follows the owner's rule that the developer decides on a missing capability. A critical acceptance must name the deployment fact and say how it prevents or bounds the failure, such as "one node per realm, so two nodes never hold the same user". The spec header lists every accepted critical risk, and the feature-build report repeats them.
-- `feature-review` checks design conformance before the rule-group walk. It reads `design.md` itself and traces every design id to spec row, code, and test. It checks every number the design states and every settled decision, and cites the `DES` rules. The owner asked for this on 2026-10-22, after the acceptance run's coverage report found divergences from the design that the review had missed.
+- `feature-review` checks design conformance before the rule-group walk. It reads `design.md` itself and traces every design id to spec row, code, and test. It checks every number the design states and every settled decision, and cites the `DES` rules. It also checks each design row and each interim default against the GDD source the row cites, in the converted text under `.gdd-intake/<feature>/raw/` when that folder exists. The owner asked for this on 2026-10-22, after the acceptance run's coverage report found divergences from the design that the review had missed.
 
 ## Open questions
 

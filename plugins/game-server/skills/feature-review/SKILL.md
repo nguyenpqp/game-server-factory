@@ -26,7 +26,8 @@ Review feature code against the feature design, the rule index, the project prof
 
    Pass the changed Java files or the feature package directory. `<base>` is the commit the feature started from, such as `$(git merge-base HEAD <base branch>)`. With `--diff`, the linter keeps only the findings on lines that `git diff -U0 <base>` adds, so old code in a shared file the feature touched does not fill the report. A file git does not track is not in that diff, so `git add` new files first. A finding on a class line, such as MET-01, stays only when that line is new, so check the command classes the diff changes by hand. Each output line is `path:line: RULE-ID message`. Exit code 1 means findings, 2 means the profile, a path, or the `--diff` base could not be used. Treat each line as a finding after you check it against the code. The linter finds calls to forbidden time and random sources (AUTH-02, AUTH-03), mutable static fields (MN-01), cheat classes with no live check (CHEAT-02), command classes with no metric call or trace id (MET-01, MET-02), blocking calls (PERF-01), and imports of another feature's package (MOD-01). A command class is a class under `feature_root` that declares a method whose name matches the profile's `lint.command_method`, or `handle\w*` when the key is absent. When no checked class is a command class, the linter prints a note to stderr, and MET-01 and MET-02 need a check by hand. The linter finds only what a pattern can find, so a clean run says nothing about the other rules. It reads the profile's `lint` patterns, and an empty pattern turns its check off. MOD-01 is also off when the profile has no `lint.allowed_import` key. Name the checks that were off in the report.
 3. **Check design conformance.** Open the DES section of `references/review-checklist.md`. Read the code against `design.md` itself, not only against the spec. Skip this step only when there is no design.
-   - Build a trace table with one row per id in the design, open questions included. Take the ids from `design.md`, not from the spec's Design coverage, so an id the spec dropped still gets a row. Each row has the design id, the spec row, the code `file:line`, the test, and a status.
+   - Build a trace table with one row per id in the design, open questions included. Take the ids from `design.md`, not from the spec's Design coverage, so an id the spec dropped still gets a row. Each row has the design id, the spec row, the code `file:line`, the test, a status, and `source agrees`.
+   - Fill `source agrees` from the GDD. Open the source the row cites, `S<n>` with its slide, page, heading, or sheet range, in the converted text under `.gdd-intake/<feature>/raw/`. The Sources table names the converted file. Write `yes` when the row says what the source says, `no` when its rule, number, or end condition contradicts the source, and `no source` when the row cites only the prompt or an answer. The raw folder is gitignored, so it may be missing. When it is, write `no source` on every row, say so in the report, and check against `design.md` alone.
    - Give each row one status.
      - `matched`. The code and a test do what the design says.
      - `partial`. Only part of the id is built, or the code has no test (DES-01).
@@ -35,9 +36,10 @@ Review feature code against the feature design, the rule index, the project prof
      - `descoped (<where recorded>)`. A Core blockers row or an open question records the descope. Name it.
      - `client only`. The id has no server effect, such as a layout-only UI row. Say why.
    - Check every number the design states against the code and the config: limits, rewards, costs, durations, counts, and each value in the Config tables or in the sheet range a row cites. Check each rule, state transition, and end condition the same way (DES-02).
-   - Check every Q row's settled decision. An answered question's answer holds in the code. A skipped question's interim default holds. An open Important or Minor question holds the interim default that the spec header lists. Check that the code matches each Core blockers resolution, and that a descoped id has no half-built code (DES-03).
+   - Check every Q row's settled decision. An answered question's answer holds in the code. A skipped question's interim default holds. An open Important or Minor question holds the interim default that the spec header lists. Check that the code matches each Core blockers resolution, and that a descoped id has no half-built code (DES-03). Read each interim default against the source it cites and against the other design rows, the rule's own Description included.
    - A spec row that departs from the design with no recorded decision is a finding against the spec. Name the spec row in the finding, with the DES id that the code breaks by following it.
-   - Each row that is not `matched`, `descoped`, or `client only` is a finding. A finding with no code line, such as a `missing` id, cites the design id and the spec row in place of `file:line`.
+   - A design row whose rule, number, or end condition contradicts its cited source is a finding against the design (DES-02). So is an interim default that contradicts its source or another design row (DES-03). Name the design id and the source file and line in the finding.
+   - Each row that is not `matched`, `descoped`, or `client only` is a finding, and so is each row with `source agrees` `no`, even when it is `matched`. A finding with no code line, such as a `missing` id, cites the design id and the spec row in place of `file:line`.
 
    These findings cite DES ids. Their severity follows the index and the severity audit in step 7.
 4. **Review rule group by rule group.** Open `references/review-checklist.md`. Walk the other groups in the order AUTH, MN, BG, PERF, CFG, MET, CHEAT, ADMIN, HTTP, TEST, MOD, SYNC, LOG. For each group, compare the code with the matching spec sections:
@@ -62,7 +64,7 @@ Review feature code against the feature design, the rule index, the project prof
    ```markdown
    ## Review of <feature or branch>
 
-   Scope: <files reviewed>. Design: <path, "prompt", or "none">. Spec: <path or "none">. Profile: <path>.
+   Scope: <files reviewed>. Design: <path, "prompt", or "none">. GDD text: <raw folder or "missing">. Spec: <path or "none">. Profile: <path>.
    Lint: <n findings, exit code>. Checks off in the profile: <list or "none">.
    Groups skipped: <list with reasons or "none">.
 
@@ -72,11 +74,12 @@ Review feature code against the feature design, the rule index, the project prof
    ### Design conformance
    matched <n>, partial <n>, divergent <n>, missing <n>, descoped <n>, client only <n>.
 
-   | Design id | Spec row | Code | Test | Status |
-   | --- | --- | --- | --- | --- |
-   | R5 | ClaimMilestone effect | `src/.../ChainCore.java:61` | `ClaimMilestoneTest` final claim | divergent |
-   | UI4 | none | none | none | missing |
-   | UI6 | none | none | none | descoped (Core blockers CAP-INBOX) |
+   | Design id | Spec row | Code | Test | Status | Source agrees |
+   | --- | --- | --- | --- | --- | --- |
+   | R5 | ClaimMilestone effect | `src/.../ChainCore.java:61` | `ClaimMilestoneTest` final claim | divergent | yes |
+   | Q1 | Open questions, interim default | `src/.../ChainCore.java:58` | `ClaimMilestoneTest` all claimed | matched | no |
+   | UI4 | none | none | none | missing | yes |
+   | UI6 | none | none | none | descoped (Core blockers CAP-INBOX) | no source |
 
    ### Dismissals kept after audit
    - `file:line` <suspected break>. Kept because <evidence>.
