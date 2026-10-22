@@ -107,7 +107,7 @@ Then apply the project decisions, the risks the developer accepted for every fea
 python3 ${CLAUDE_SKILL_DIR}/../server-profile/scripts/check_profile.py --decisions docs/game-server/decisions.md docs/game-server/profile.md
 ```
 
-A decision on a line that the check reports resolves nothing. The [decisions template](references/decisions-template.md) says when any other decision resolves a row and how to write the resolution. A row that a decision resolves does not stop the spec.
+The [decisions template](references/decisions-template.md#when-a-decision-applies) says, from the check's output and the row, when a decision resolves the row and how to write the resolution. A row that a decision resolves does not stop the spec.
 
 A `critical` rule may be accepted only with a reason that names the deployment fact and says how that fact prevents or bounds the failure in the row's `What fails for players` cell, such as "one node per realm, so no second node can load the player and save over the claim". A reason that only cites a fact, without that link, counts as `open`. Ask the developer for the link. List each accepted critical rule id with its reason, and its decision id when a decision resolved it, on the header's `Accepted risks` line. Write `None.` there when there is none.
 
@@ -118,7 +118,7 @@ When any row counts as `open`:
 3. Save the file and give the Core blockers section to the developer. For each open row, offer the resolutions: change the core, descope, accept for this feature, or accept for every feature. Leave out accept for every feature on a row that blocks PERF-01.
 4. Stop. Only the developer sets a resolution. Never design around a missing capability.
 
-When the developer accepts a row for every feature, add a decision to `docs/game-server/decisions.md` in the decisions template format, with the developer's name and today's date. Create the file with its title and header row when it does not exist. Run the check again, then resolve the row from the new decision. When the developer resolves every row, finish the remaining sections.
+When the developer accepts a row for every feature, add a decision to `docs/game-server/decisions.md` in the decisions template format, with the developer's name and today's date. Create the file with its title, header row, and separator row when it does not exist. Run the check again, then resolve the row from the new decision. When the developer resolves every row, finish the remaining sections.
 
 ### 13. Test plan
 

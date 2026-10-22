@@ -210,6 +210,30 @@ class CheckDecisionsTest(unittest.TestCase):
         self.assertEqual(len(out), 1, out)
         self.assertTrue(out[0].startswith(f"{path}:1: no table"), out)
 
+    def test_file_that_is_not_utf8(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "decisions.md")
+            path.write_bytes(self.file().encode("utf-8") + b"\xff\xfe\n")
+            code, out, _ = run("--decisions", path, FIXTURES / "valid.md")
+        self.assertEqual(code, 1)
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith(f"{path}:1: cannot read"), out)
+
+    def test_header_without_a_separator_row(self):
+        text = self.file().replace("| " + " | ".join(["---"] * 8) + " |\n", "")
+        path, code, out, _ = run_decisions(text)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith(f"{path}:1: "), out)
+        self.assertIn("separator", out[0])
+
+    def test_rows_split_off_by_a_blank_line(self):
+        moved = "| " + " | ".join({**self.GOOD, "Id": "D2", "Date": "soon"}[c] for c in self.COLUMNS) + " |\n"
+        path, code, out, _ = run_decisions(self.file({}) + "\n" + moved)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith(f"{path}:1: line 7 starts another table"), out)
+
     def test_columns_in_another_order_are_not_the_table(self):
         swapped = self.HEADER.replace("Capability | Profile status", "Profile status | Capability")
         path, code, out, _ = run_decisions(self.file().replace(self.HEADER, swapped))
@@ -224,7 +248,9 @@ class CheckDecisionsTest(unittest.TestCase):
         self.assertEqual((code, out), (0, []))
 
     def test_id_must_be_d_and_digits(self):
-        self.one_error({"Id": "X1"}, "X1", "D")
+        for id in ("X1", "D01", "D0", "D"):
+            with self.subTest(id=id):
+                self.one_error({"Id": id}, id, "D")
 
     def test_repeated_id(self):
         self.one_error({"Capability": "CAP-DRAIN", "Rules": "BG-10"}, "D1", "repeats", "line 5",
@@ -242,8 +268,26 @@ class CheckDecisionsTest(unittest.TestCase):
     def test_rule_not_in_the_index(self):
         self.one_error({"Rules": "MN-07, MN-99"}, "MN-99", "rule index")
 
-    def test_rule_whose_needs_line_omits_the_capability(self):
-        self.one_error({"Rules": "MN-07, MN-02"}, "MN-02", "CAP-LEASE", "needs")
+    def test_rule_the_capability_does_not_block(self):
+        self.one_error({"Rules": "MN-07, MN-02"}, "MN-02", "CAP-LEASE", "does not block", "re-decide")
+
+    def test_partial_capability_blocks_only_its_blocker_line(self):
+        row = {"Capability": "CAP-CLIENTVER", "Profile status": "partial"}
+        self.one_error({**row, "Rules": "BG-07, BG-04"}, "BG-04", "CAP-CLIENTVER", "does not block")
+        _, code, out, _ = run_decisions(self.file({**row, "Rules": "BG-07"}))
+        self.assertEqual((code, out), (0, []))
+
+    def test_rule_on_the_blocker_line_outside_its_needs_line(self):
+        text = (FIXTURES / "valid.md").read_text(encoding="utf-8").replace(
+            "- blocker: BG-07 cannot be met for part of the cases.",
+            "- blocker: BG-07 and MN-10 cannot be met for part of the cases.",
+        )
+        row = {"Capability": "CAP-CLIENTVER", "Profile status": "partial", "Rules": "MN-10"}
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = Path(tmp, "profile.md")
+            profile.write_text(text, encoding="utf-8")
+            _, code, out, _ = run_decisions(self.file(row), profile=profile)
+        self.assertEqual((code, out), (0, []))
 
     def test_perf_01_is_never_accepted_in_decisions(self):
         self.one_error({"Capability": "CAP-BOT", "Profile status": "partial", "Rules": "PERF-01"},

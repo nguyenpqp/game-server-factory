@@ -49,7 +49,7 @@ FIELD_LINE = re.compile(r"^-\s+(\w+):\s*(.*)$")
 RULE_ID = re.compile(r"\b(?:AUTH|MN|BG|PERF|CFG|MET|CHEAT|ADMIN|HTTP|TEST|DES|MOD|SYNC|LOG)-\d{2}\b")
 RULE_HEADING = re.compile(r"^###\s+(" + RULE_ID.pattern + ")")
 KEY_LINE = re.compile(r"^(\s*)([A-Za-z_]\w*):(.*)$")
-DECISION_ID = re.compile(r"^D\d+$")
+DECISION_ID = re.compile(r"^D[1-9]\d*$")
 DECISION_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 SEPARATOR_CELL = re.compile(r"^:?-+:?$")
 
@@ -250,13 +250,22 @@ def read_decisions(path):
         lines = Path(path).read_text(encoding="utf-8").splitlines()
     except FileNotFoundError:
         return [Finding(path, 1, "file not found")], []
-    table = next((t for t in tables(unfenced(lines)) if tuple(t[0][1]) == DECISION_COLUMNS), None)
+    except (OSError, UnicodeDecodeError) as error:
+        return [Finding(path, 1, f"cannot read the file as UTF-8 text ({error})")], []
+    found = list(tables(unfenced(lines)))
+    table = next((t for t in found if tuple(t[0][1]) == DECISION_COLUMNS), None)
     if table is None:
         return [Finding(path, 1, f"no table with the columns {' | '.join(DECISION_COLUMNS)}")], []
     findings, decisions = [], []
-    for number, cells in table[1:]:
-        if all(SEPARATOR_CELL.match(cell) for cell in cells):
-            continue
+    findings += [Finding(path, 1, f"line {other[0][0]} starts another table, whose rows are not checked; "
+                         "keep every decision in the one table, with no blank line between rows")
+                 for other in found if other is not table]
+    (header_line, _), *rows = table
+    if rows and all(SEPARATOR_CELL.match(cell) for cell in rows[0][1]):
+        rows = rows[1:]
+    else:
+        findings.append(Finding(path, 1, f"the header on line {header_line} has no separator row under it"))
+    for number, cells in rows:
         if len(cells) == len(DECISION_COLUMNS):
             decisions.append(Decision(number, *cells))
         else:
@@ -274,11 +283,11 @@ def valid_date(text):
     return True
 
 
-def decision_errors(decision, caps, needs, status, first_line):
+def decision_errors(decision, caps, rule_ids, status, blocked, first_line):
     label, cap = decision.id or "row", decision.capability
     errors = []
     if not DECISION_ID.match(decision.id):
-        errors.append(f"id '{decision.id}' is not D followed by a number")
+        errors.append(f"id '{decision.id}' is not D followed by a number with no leading zero")
     elif decision.id in first_line:
         errors.append(f"{label} repeats the id on line {first_line[decision.id]}")
     if cap not in caps:
@@ -291,10 +300,11 @@ def decision_errors(decision, caps, needs, status, first_line):
     for rule in dict.fromkeys(rules):
         if rule == RULE_BLOCKING:
             errors.append(f"{label} names {rule}, which is accepted per call site in each spec, never in decisions")
-        elif rule not in needs:
+        elif rule not in rule_ids:
             errors.append(f"{label} names {rule}, which is not in the rule index")
-        elif cap in caps and cap not in needs[rule]:
-            errors.append(f"{label} names {rule}, whose needs line in the rule index does not name {cap}")
+        elif status in ACCEPTABLE_STATUSES and rule not in blocked:
+            errors.append(f"{label} names {rule}, which {cap} does not block in the profile, "
+                          "so the developer must re-decide it")
     for column, value in (("Deployment fact", decision.fact), ("How it bounds the failure", decision.bound),
                           ("Accepted by", decision.by)):
         if not value:
@@ -307,15 +317,16 @@ def decision_errors(decision, caps, needs, status, first_line):
     return errors
 
 
-def check_decisions(path, statuses, index=RULE_INDEX):
+def check_decisions(path, statuses, blockers, index=RULE_INDEX):
     _, caps = load_template()
-    needs = rule_needs(index)
+    rule_ids = set(rule_needs(index))
+    blocked = blocked_rules(statuses, blockers, index)
     findings, decisions = read_decisions(path)
     warnings, first_line = [], {}
     for decision in decisions:
         status = statuses.get(decision.capability)
-        findings += [Finding(path, decision.line, error)
-                     for error in decision_errors(decision, caps, needs, status, first_line)]
+        errors = decision_errors(decision, caps, rule_ids, status, blocked.get(decision.capability, []), first_line)
+        findings += [Finding(path, decision.line, error) for error in errors]
         first_line.setdefault(decision.id, decision.line)
         if status == "present":
             warnings.append(Finding(path, decision.line, f"{decision.id or 'row'} names {decision.capability}, "
@@ -330,7 +341,8 @@ def main(argv=None):
     parser.add_argument("--decisions")
     args = parser.parse_args(argv)
     findings, statuses, blockers, headings = check_profile(args.profile)
-    decision_findings, decision_warnings = check_decisions(args.decisions, statuses) if args.decisions else ([], [])
+    decision_findings, decision_warnings = (check_decisions(args.decisions, statuses, blockers)
+                                            if args.decisions else ([], []))
     for finding in findings + decision_findings:
         print(f"{finding.path}:{finding.line}: {finding.message}")
     for warning in blocker_warnings(args.profile, blockers, headings) + decision_warnings:

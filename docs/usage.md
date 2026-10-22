@@ -75,7 +75,7 @@ If a capability the feature needs is missing or partial, the Core blockers secti
 - **Accept the risk** as `accepted by <name>: <reason>`. You may accept a critical rule too, but the reason must name the deployment fact and say how it prevents or bounds the failure, such as "one node per realm, so two nodes never hold the same user". The spec header lists every accepted critical rule, and the build report repeats them.
 - **Accept the risk for every feature.** The skill adds a decision to `docs/game-server/decisions.md` with your name, the deployment fact, and how it bounds the failure. Every later spec applies it to a matching row and does not stop there. PERF-01 is never accepted this way, because its risk depends on each blocking call.
 
-A decision stops applying when `server-profile` records a new status for its capability. `<plugin>/skills/feature-spec/references/decisions-template.md` gives the format and the rules. Commit `decisions.md` with the spec, like the profile.
+A decision stops applying when a new profile changes its capability's status or no longer blocks one of its rules. `<plugin>/skills/feature-spec/references/decisions-template.md` gives the format and the rules. Commit `decisions.md` with the spec, like the profile.
 
 Read the finished spec and ask for fixes in plain words. When you confirm it, the status becomes `ready`.
 
