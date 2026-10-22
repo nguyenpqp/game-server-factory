@@ -17,7 +17,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 | `build_cmd`, `test_cmd`, `test_one_cmd` | The build file, CI config, and the README. For Gradle, `gradle test --tests {class}`. For Maven, `mvn -Dtest={class} test`. |
 | `source_root`, `test_root` | The `sourceSets` block of the build file, or the Maven default `src/main/java` and `src/test/java`. Some projects use `src` and `test`. |
 | `feature_root` | The parent directory of the packages that hold one feature each. Find the package of the newest feature. |
-| `generated_paths` | `rg -il "generated|do not edit"` over source files, plus build file tasks that run an exporter. |
+| `generated_paths` | `rg -il -e generated -e "do not edit"` over source files, plus build file tasks that run an exporter. |
 | `lint.*` | Fill after the capabilities below, from the call you chose as the example. Escape regex characters for a literal call, such as `ServerClock\.now\(`. |
 
 ## Capabilities
