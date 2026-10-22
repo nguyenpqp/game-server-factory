@@ -46,7 +46,8 @@ HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
 FIELD = re.compile(r"^- ([A-Za-z][A-Za-z ]*?):\s*(.*)$")
 SPLIT_CITATIONS = re.compile(r"\s*;\s*|\s*,\s*(?=(?:S\d+\b|prompt\b|answer Q\d))")
 SOURCE_TOKEN = re.compile(r"\bS\d+\b|\bprompt\b|\banswer Q\d+\b")
-SHEET_RANGE = re.compile(r".+!\$?[A-Z]+\$?\d+(?::\$?[A-Z]+\$?\d+)?")
+SHEET_RANGE = re.compile(r"(.+)!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?")
+DRAFT_PATH = re.compile(r"`([^`]+\.json)`")
 CITATION_FORMATS = "S<n> slide <k>, S<n> § <heading>, S<n> <sheet>!<range>, S<n>, prompt, or answer Q<n>"
 
 
@@ -90,7 +91,7 @@ def parse_document(text):
             nodes.append(current)
         else:
             current.body.append(lines[-1])
-    return root, nodes, lines
+    return nodes, lines
 
 
 def split_row(text):
@@ -127,7 +128,7 @@ def fields_of(node):
 class Linter:
     def __init__(self, text):
         self.issues = []
-        self.root, self.nodes, self.lines = parse_document(text)
+        self.nodes, self.lines = parse_document(text)
         self.source_ids = set()
         self.seen_ids = {}
         self.questions = {}
@@ -139,6 +140,14 @@ class Linter:
     def section(self, name):
         return next((n for n in self.nodes if n.level == 2 and n.text == name), None)
 
+    def full_rows(self, header_line, headers, rows):
+        if not rows:
+            self.add(header_line, "table has no rows; write None. instead")
+        for number, cells in rows:
+            if len(cells) == len(headers):
+                yield number, cells
+            else:
+                self.add(number, f"row '{cells[0]}' has {len(cells)} cells, header has {len(headers)}")
 
     def check_id(self, raw, prefix, line, section_name):
         match = re.fullmatch(r"([A-Z]+)(\d+)", raw)
@@ -190,7 +199,7 @@ class Linter:
         titles = [n for n in self.nodes if n.level == 1]
         if not titles or not titles[0].text.endswith(" design"):
             self.add(1, "missing title; start with '# <Feature name> design'")
-        positions = {}
+        positions = set()
         highest = -1
         for node in self.nodes:
             if node.level != 2 or node.text not in SECTIONS:
@@ -199,7 +208,7 @@ class Linter:
             if node.text in positions:
                 self.add(node.number, f"duplicate section '## {node.text}'")
                 continue
-            positions[node.text] = node.number
+            positions.add(node.text)
             if index < highest:
                 self.add(node.number, f"section '## {node.text}' is out of order; "
                          f"follow the order in the template, which puts it before '## {SECTIONS[highest]}'")
@@ -236,12 +245,8 @@ class Linter:
         elif scope[1] not in SCOPES:
             self.add(scope[0], f"Scope must be one of {', '.join(SCOPES)}")
         for header_line, headers, rows in find_tables(node):
-            if not rows:
-                self.add(header_line, "table has no rows; write None. instead")
-            for number, cells in rows:
-                if len(cells) != len(headers):
-                    self.add(number, f"row '{cells[0]}' has {len(cells)} cells, header has {len(headers)}")
-                elif not re.fullmatch(r"S[1-9]\d*", cells[0]):
+            for number, cells in self.full_rows(header_line, headers, rows):
+                if not re.fullmatch(r"S[1-9]\d*", cells[0]):
                     self.add(number, f"bad source id '{cells[0]}'; use S<n>")
                 elif cells[0] in self.source_ids:
                     self.add(number, f"duplicate id {cells[0]}")
@@ -292,12 +297,7 @@ class Linter:
                 if "Id" not in headers or "Source" not in headers:
                     self.add(header_line, f"table in '{name}' needs the columns Id and Source")
                     continue
-                if not rows:
-                    self.add(header_line, "table has no rows; write None. instead")
-                for number, cells in rows:
-                    if len(cells) != len(headers):
-                        self.add(number, f"row '{cells[0]}' has {len(cells)} cells, header has {len(headers)}")
-                        continue
+                for number, cells in self.full_rows(header_line, headers, rows):
                     row_id = cells[headers.index("Id")]
                     self.check_id(row_id, prefix, number, name)
                     self.check_sources(cells[headers.index("Source")], number, row_id)
@@ -339,7 +339,7 @@ class Linter:
                 if field not in fields or not fields[field][1]:
                     self.add(entry.number, f"config '{entry.text}' is missing '- {field}:'")
             draft = fields.get("Draft")
-            if draft and not re.search(r"`[^`]+\.json`", draft[1]):
+            if draft and not DRAFT_PATH.search(draft[1]):
                 self.add(draft[0], f"config '{entry.text}' Draft line must name a path in backticks that ends in .json")
             tables = find_tables(entry)
             if not tables:
@@ -349,13 +349,8 @@ class Linter:
                 if missing:
                     self.add(header_line, f"config '{entry.text}' table is missing column '{missing[0]}'")
                     continue
-                if not rows:
-                    self.add(header_line, "table has no rows; write None. instead")
                 keys = {}
-                for number, cells in rows:
-                    if len(cells) != len(headers):
-                        self.add(number, f"row '{cells[0]}' has {len(cells)} cells, header has {len(headers)}")
-                        continue
+                for number, cells in self.full_rows(header_line, headers, rows):
                     key = cells[headers.index("Key")].strip("`")
                     if key in keys:
                         self.add(number, f"duplicate key {key}, first used on line {keys[key]}")
@@ -368,10 +363,9 @@ class Linter:
             return
         parts = {child.text: child for child in node.children}
         for name in QUESTION_PARTS:
-            if name not in parts:
-                self.add(node.number, f"Open questions is missing '### {name}'")
-        for name in QUESTION_PARTS:
             part = parts.get(name)
+            if part is None:
+                self.add(node.number, f"Open questions is missing '### {name}'")
             if part is None or part.is_none():
                 continue
             if name == "Undefined terms":

@@ -32,10 +32,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from convert_office import column_number  # noqa: E402
-from lint_design import SPLIT_CITATIONS, fields_of, find_tables, parse_document  # noqa: E402
+from lint_design import DRAFT_PATH, SHEET_RANGE, SPLIT_CITATIONS, fields_of, find_tables, parse_document  # noqa: E402
 
-SHEET_CITATION = re.compile(
-    r"(S\d+) (.+)!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?")
 KEY_PART = re.compile(r"([A-Za-z_][\w-]*)(\[\])?")
 TRUE_WORDS, FALSE_WORDS = {"true", "yes", "1"}, {"false", "no", "0"}
 
@@ -94,10 +92,11 @@ class Sheets:
 
 def sheet_values(source, files, sheets, shape, warn, label):
     for item in SPLIT_CITATIONS.split(source.strip().rstrip(".")):
-        match = SHEET_CITATION.fullmatch(item.strip())
-        if not match:
+        match = re.fullmatch(r"(S\d+) (.+)", item.strip())
+        cells = match and SHEET_RANGE.fullmatch(match.group(2))
+        if not cells:
             continue
-        source_id, sheet, c1, r1, c2, r2 = match.groups()
+        source_id, (sheet, c1, r1, c2, r2) = match.group(1), cells.groups()
         c2, r2 = c2 or c1, r2 or r1
         if (shape == "cell" and (c1, r1) != (c2, r2)) or (shape == "column" and c1 != c2):
             warn(f"{label}: {item.strip()} is not a single {shape}; using the Example")
@@ -119,6 +118,7 @@ class Node:
         self.children = {}
         self.item = None
         self.leaf = None
+        self.length = None
 
 
 def coerce(raw, type_name, warn, label):
@@ -193,39 +193,22 @@ def add_key(root, key, leaf):
             node = child
 
 
-def list_length(node):
-    lengths = []
-
-    def walk(current):
-        if current.kind == "leaf" and current.leaf:
-            lengths.append(len(current.leaf["values"]))
-        for child in current.children.values():
-            walk(child)
-        if current.kind == "list" and current.item is not None:
-            walk(current.item)
-
-    walk(node)
-    return max(lengths, default=1)
-
-
-def item_leaves(node):
+def finalize(node):
+    """Store each list's length and return (longest value count, leaves outside nested lists, warnings)."""
     if node.kind == "leaf":
-        return [node.leaf] if node.leaf else []
+        return len(node.leaf["values"]), [node.leaf], []
     if node.kind == "list":
-        return []
-    return [leaf for child in node.children.values() for leaf in item_leaves(child)]
-
-
-def warn_short_lists(node, warn):
-    if node.kind == "list" and node.item is not None:
-        length = list_length(node)
-        for leaf in item_leaves(node.item):
-            if len(leaf["values"]) < length:
-                warn(f"{leaf['key']}: emitted {len(leaf['values'])} of {length} list values; "
-                     f"the rest are null")
-        warn_short_lists(node.item, warn)
+        node.length, leaves, nested = finalize(node.item)
+        short = [f"{leaf['key']}: emitted {len(leaf['values'])} of {node.length} list values; the rest are null"
+                 for leaf in leaves if len(leaf["values"]) < node.length]
+        return node.length, [], short + nested
+    longest, leaves, warnings = 0, [], []
     for child in node.children.values():
-        warn_short_lists(child, warn)
+        child_longest, child_leaves, child_warnings = finalize(child)
+        longest = max(longest, child_longest)
+        leaves += child_leaves
+        warnings += child_warnings
+    return longest, leaves, warnings
 
 
 def render(node, index, warn):
@@ -234,7 +217,7 @@ def render(node, index, warn):
         raw = values[index] if index < len(values) else None
         return None if raw is None else coerce(raw, node.leaf["type"], warn, node.leaf["key"])
     if node.kind == "list":
-        return [render(node.item, i, warn) for i in range(list_length(node))]
+        return [render(node.item, i, warn) for i in range(node.length)]
     return {name: render(child, index, warn) for name, child in node.children.items()}
 
 
@@ -263,14 +246,15 @@ def build_draft(entry, files, sheets, warn):
 
 
 def emit_entry(entry, base, files, sheets, warn):
-    draft = re.search(r"`([^`]+\.json)`", entry["fields"].get("Draft", ""))
+    draft = DRAFT_PATH.search(entry["fields"].get("Draft", ""))
     if not draft:
         raise DesignError(f"config '{entry['title']}' has no Draft line with a .json path in backticks")
     target = (base / draft.group(1)).resolve()
     if not target.is_relative_to(base.resolve()):
         raise DesignError(f"config '{entry['title']}' Draft path leaves the output folder")
     root, from_sheets, total = build_draft(entry, files, sheets, warn)
-    warn_short_lists(root, warn)
+    for message in finalize(root)[2]:
+        warn(message)
     data = render(root, 0, warn)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -304,7 +288,7 @@ def main(argv=None):
         warnings.append(message)
         print(f"warning: {message}", file=sys.stderr)
 
-    _, nodes, _ = parse_document(design.read_text(encoding="utf-8"))
+    nodes, _ = parse_document(design.read_text(encoding="utf-8"))
     entries = config_entries(nodes)
     if not entries:
         print("No config tables in the design; nothing to emit.")
