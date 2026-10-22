@@ -450,7 +450,7 @@ The section names the check command and one row per test case. Each test class r
 
 ### Design coverage
 
-The section has one row per id in the design, including success measures and open questions. A design id that the spec does not build names the Core blockers row that descoped it, or the open question that holds it.
+The section has one row per id in the design, including success measures and open questions. A design id that the spec does not build names the Core blockers row that descoped it, or the open question that holds it. An id with no server effect says `client only` and why.
 
 ```markdown
 ## Design coverage

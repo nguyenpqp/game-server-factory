@@ -131,6 +131,7 @@ Read these skill files in full before you start.
 - <plugin>/skills/server-rules/SKILL.md
 
 Review the diff of the spec branch against <integration branch>. Spec: <spec worktree>/docs/game-server/features/daily-streak/spec.md
+Design: <spec worktree>/docs/game-server/features/daily-streak/design.md
 Profile: <spec worktree>/docs/game-server/profile.md
 ```
 
@@ -140,7 +141,7 @@ The reviewer runs the linter first.
 python3 <plugin>/skills/feature-review/scripts/lint_feature.py --profile docs/game-server/profile.md --diff $(git merge-base HEAD <integration branch>) <paths>
 ```
 
-With `--diff`, it reports only the lines that the spec branch adds since its base, so old code in a shared file does not count. It prints `path:line: RULE-ID message` for forbidden time and random calls, static mutable state, cheat classes without the live environment check, commands without a metric call or trace id, and blocking calls. Exit code 1 means findings. A check whose profile pattern is empty is off, and the report names it. A clean run does not clear the other rules, so the reviewer then walks the checklist group by group and reports each finding with a severity, a rule id, `file:line`, and a failure scenario. Spec build gives the findings to one fix delegate and lands the result like a ticket. Tell the fix delegate to rerun the linter besides the test command.
+With `--diff`, it reports only the lines that the spec branch adds since its base, so old code in a shared file does not count. It prints `path:line: RULE-ID message` for forbidden time and random calls, static mutable state, cheat classes without the live environment check, commands without a metric call or trace id, and blocking calls. Exit code 1 means findings. A check whose profile pattern is empty is off, and the report names it. A clean run does not clear the other rules, so the reviewer then traces each design id in `design.md` to code and tests, checks the design's numbers and settled decisions, and walks the checklist group by group and reports each finding with a severity, a rule id, `file:line`, and a failure scenario. Spec build gives the findings to one fix delegate and lands the result like a ticket. Tell the fix delegate to rerun the linter besides the test command.
 
 Nstack's built-in `/code-review` still runs over the branch. It checks general correctness, and `feature-review` checks the server rules.
 

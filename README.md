@@ -49,7 +49,7 @@ The plugin manifest has no version, so an install tracks the commit of the marke
 | `gdd-intake` | Triggers when you hand over a GDD folder, slides, docs, a balance sheet, or a feature prompt | A folder of pptx, docx, xlsx, PDF, Markdown, or images, or a prompt | `docs/game-server/features/<feature>/design.md` with sourced requirements and open questions, plus draft config JSON in the `config` folder beside it |
 | `feature-spec` | Triggers when you want a server design or plan for a feature | `design.md` or a prompt, plus the profile | `docs/game-server/features/<feature>/spec.md`. On request, also a tickets file at `docs/intents/<feature>-tickets.md` for nstack Spec build, or a task list at `docs/game-server/features/<feature>/tasks.md` for plain Claude Code |
 | `feature-build` | Triggers when you implement a feature, command, or spec slice | The profile, the spec, and one slice | Java code and unit tests for the slice, written through the core APIs the profile records, and a slice report |
-| `feature-review` | Triggers when you review feature code or a diff | The code, the profile, and the spec | A findings report with severity, rule id, `file:line`, and a failure scenario. It runs the feature linter first. |
+| `feature-review` | Triggers when you review feature code or a diff | The code, the profile, the spec, and the design | A findings report with severity, rule id, `file:line`, and a failure scenario, plus a trace table from each design id to code and tests. It runs the feature linter first. |
 
 `server-profile` is explicit only because it writes into your repository from a scan. Claude never starts it on its own, and a subagent will not pick it up from its description. The other five load from their descriptions.
 

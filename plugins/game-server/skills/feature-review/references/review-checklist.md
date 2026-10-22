@@ -174,6 +174,16 @@ Read the tests that the diff adds or should add. Judge the tests against the rul
 | TEST-10 | minor | no | A command with no bot scenario, when the project has a bot. |
 | TEST-11 | minor | no | A test that sets the config instance, clock, or environment and does not restore it. |
 
+## DES: Design conformance
+
+Read `design.md` itself, beside the spec and the code. Build the trace table from the design's ids, not from the spec's Design coverage, so an id the spec dropped still gets a row.
+
+| Rule | Severity | Lint | Look for |
+| --- | --- | --- | --- |
+| DES-01 | important | no | A design id with no code, or with code and no test, and no Core blockers row, open question, or client-only reason that records the gap. A dropped push, such as a real-time progress update that a UI row asks for. |
+| DES-02 | critical | no | An end condition, state transition, limit, reward, cost, duration, or count that differs from the design, such as a chain that ends only after every milestone is claimed, while the design ends it at the claim of milestone 3. A config value that differs from the design's Config tables or the sheet range they cite. |
+| DES-03 | critical | no | Code that follows an interim default after its question was answered, or ignores the default of a skipped question. Code that contradicts a Core blockers resolution. A handler, field, or config key for a descoped id. |
+
 ## Lifecycle parity
 
 Rules about state hold only if every entry point that touches the state follows them. List the entry points, then check each one against the same rules. A rule that holds on the main command path and fails on a side path is a finding, even when nothing on the failing line looks wrong.

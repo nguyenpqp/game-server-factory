@@ -102,7 +102,7 @@ python3 <plugin>/skills/feature-review/scripts/lint_feature.py --profile docs/ga
 
 Pass the changed Java files or the feature package directory. With `--diff`, the linter reports only the lines that the branch adds since its base, so old code in a shared file does not count. The linter prints `path:line: RULE-ID message` for forbidden time and random calls, static mutable state, cheat classes without the live environment check, commands without a metric call or trace id, and blocking calls. It exits 1 when it finds anything. An empty pattern in the profile turns a check off, and the report names the checks that were off.
 
-The skill then walks the checklist group by group. Each finding has a severity, a rule id, `file:line`, and a failure scenario that names who does what and what the player or operator sees. A critical finding needs a reachable trigger, or the skill demotes it. The skill reports and does not fix. To fix the findings, ask `feature-build` for each one, or hand the report back to your own task list.
+The skill then checks the code against `design.md`. It traces each design id to code and tests, and compares every number and settled decision in the design with the code. Then it walks the checklist group by group. Each finding has a severity, a rule id, `file:line`, and a failure scenario that names who does what and what the player or operator sees. A critical finding needs a reachable trigger, or the skill demotes it. The skill reports and does not fix. To fix the findings, ask `feature-build` for each one, or hand the report back to your own task list.
 
 ```
 Use feature-build to fix finding 2 of the review above, then rerun feature-review's linter.

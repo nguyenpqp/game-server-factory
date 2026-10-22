@@ -298,7 +298,7 @@ class RuleIdTest(ValidatorTestCase):
         self.assertIn("AUTH-99", line)
 
     def test_every_rule_group_is_checked(self):
-        for group in "AUTH MN BG PERF CFG MET CHEAT ADMIN HTTP TEST".split():
+        for group in "AUTH MN BG PERF CFG MET CHEAT ADMIN HTTP TEST DES".split():
             with self.subTest(group=group):
                 self.fresh_root()
                 self.build(self.cite(f"{group}-77"))
@@ -393,6 +393,11 @@ class RulebookTest(ValidatorTestCase):
         self.build({RULES_AUTH: None})
         line = self.assert_fails_at(f"{RULES_INDEX}:3")
         self.assertIn("auth.md", line)
+
+    def test_design_rule_maps_to_its_group_file(self):
+        self.build({RULES_INDEX: INDEX + "\n### DES-01 Every design id has code\n\n- needs: none\n"})
+        line = self.assert_fails_at(f"{RULES_INDEX}:{INDEX.count(chr(10)) + 2}")
+        self.assertIn("design-conformance.md", line)
 
     def test_duplicate_section_fails(self):
         self.build({RULES_AUTH: "# Auth rules\n\n" + rule_section() + "\n" + rule_section()})

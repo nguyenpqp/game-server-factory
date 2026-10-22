@@ -113,7 +113,7 @@ Cover every case the template lists. Put each test class in the header's package
 
 ### 14. Design coverage
 
-One row per design id, including success measures and open questions. An id the spec does not build names the Core blockers row that descoped it, or the open question that holds it.
+One row per design id, including success measures and open questions. An id the spec does not build names the Core blockers row that descoped it, or the open question that holds it. An id with no server effect, such as a layout-only UI row, says `client only` and why. `feature-review` traces each id from this table to code and tests, so name each spec row by its section and entry, and each test by class and case.
 
 ## Self-check
 

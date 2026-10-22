@@ -90,6 +90,7 @@ End each slice with this report. Write `none` for an empty part.
 ## Slice <name>
 
 - Spec rows: <the commands, documents, config keys, and other rows the slice covers>
+- Design ids: <the design ids the slice builds, from the `Design` cells of its spec rows>
 - Files: <every file added or changed>
 - Tests: <each test class and its cases>
 - Check: <each test_one_cmd as run> passed | failed with <failing cases> | NOT RUN, <tool> not found

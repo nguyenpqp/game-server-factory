@@ -511,3 +511,22 @@ Each rule's reason, Java do and don't, and review check are in [testing.md](test
 
 - severity: minor
 - needs: CAP-UNITTEST
+
+## DES: design conformance
+
+Each rule's reason, Java do and don't, and review check are in [design-conformance.md](design-conformance.md).
+
+### DES-01 Every design id in server scope has code and a test, or a recorded descope as a Core blockers row, an open question, or a client-only id.
+
+- severity: important
+- needs: none
+
+### DES-02 The code's behavior and numbers equal the design's rules, state transitions, end conditions, limits, rewards, costs, durations, and counts, and config values equal the design's tables or the sheets they cite.
+
+- severity: critical
+- needs: none
+
+### DES-03 Every settled decision holds in the code, including each answered question's answer, each skipped question's interim default, and each Core blockers resolution, and a descoped id has no half-built code.
+
+- severity: critical
+- needs: none

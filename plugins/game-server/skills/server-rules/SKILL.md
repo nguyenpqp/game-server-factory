@@ -7,7 +7,7 @@ description: >
   ids, cheat commands, admin commands, HTTP or payment callbacks, anti-cheat and server
   authority checks, multi-node safety, blue-green rollout, or compatibility with old
   clients. It holds the fixed rule ids (AUTH, MN, BG, PERF, CFG, MET, CHEAT, ADMIN,
-  HTTP, TEST) with a severity, a Java do and don't, and a review check for each rule.
+  HTTP, TEST, DES) with a severity, a Java do and don't, and a review check for each rule.
   Specs, builds, reviews, and the feature linter cite these ids.
 ---
 
@@ -43,6 +43,7 @@ When designing a feature, read every group that the feature touches. When review
 - [ADMIN, admin commands](references/admin.md). Authenticated per request, run on the target's owner, audited, guarded when destructive, and specified.
 - [HTTP, HTTP callbacks](references/http.md). Outside callers only, signed and allowlisted, idempotent by transaction id, and delivered through the durable inbox.
 - [TEST, tests](references/testing.md). A pure core tested without network, injected time and RNG, negative, cheat, config, compatibility, metric, and replay tests.
+- [DES, design conformance](references/design-conformance.md). Every design id built and tested or recorded as descoped, the design's behavior and numbers in the code, and every settled decision kept.
 
 ## Never
 
