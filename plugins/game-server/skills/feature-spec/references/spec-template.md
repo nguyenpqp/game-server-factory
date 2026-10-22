@@ -187,7 +187,7 @@ The parts come from the design's States, Rules, Timing, and Config tables. They 
 
 The section names the feature's config file, how it loads, and every key. A key added to an existing file is optional and has a default, so both server versions read the file.
 
-The rows come from the design's Config tables and Timing. They usually cite CFG-01 to CFG-08, BG-08, and PERF-05.
+The rows come from the design's Config tables and Timing. Each cost and reward is an `{id, amount}` record, and each table of rows is a list with an `id` per row. They usually cite CFG-01 to CFG-10, BG-08, and PERF-05.
 
 ```markdown
 ## Config schema
@@ -200,7 +200,7 @@ The rows come from the design's Config tables and Timing. They usually cite CFG-
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `isActive` | bool | yes | none | none | none | TM2 | CFG-04 |
 | `unlockLevel` | int | yes | none | 1 or more | none | ST1 | CFG-02, CFG-05 |
-| `rewards` | list | yes | none | Days 1 to 7, each once, known item ids | Map from day to entry | RW1, RW7 | CFG-02, CFG-06, PERF-05 |
+| `rewards` | list | yes | none | Days 1 to 7, each once, each item an `{id, amount}` record with a known item id and an amount of 1 or more | Map from day to entry | RW1, RW7 | CFG-02, CFG-06, CFG-09, CFG-10, PERF-05 |
 
 Environment values:
 

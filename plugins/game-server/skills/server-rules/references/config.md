@@ -183,3 +183,75 @@ public static final short HARVEST_CLAIM = 4102;
 **Check.** Compare the diff with the profile's `generated_paths`. A change there needs a matching change in the generator source.
 
 - needs: CAP-GENERATED
+
+### CFG-09 Every cost and reward in config is one `{id, amount}` record, with the currency or item id as a value, never in a key name.
+
+**Why.** A currency in a key name, such as `gemCost`, makes a change of currency a code change and a deploy, and each new currency adds a column to every row.
+
+Do:
+
+```java
+record Amount(String id, long amount) {}
+
+static final class RawShopItem {
+    String id;
+    Amount price;
+    Amount reward;
+}
+```
+
+```json
+{ "id": "potion_small", "price": { "id": "gem", "amount": 10 }, "reward": { "id": "potion", "amount": 1 } }
+```
+
+Don't:
+
+```json
+{ "id": "potion_small", "gemCost": 10, "rewardPotion": 1 }
+```
+
+Don't pair a `currency` key with a separate `price` key either. One record names the currency and the amount together, and a list of records holds a cost or a reward of several items.
+
+**Check.** Read every cost, price, reward, and grant in the config file and its raw class. Each one is an `{id, amount}` record or a list of them, and no key name holds a currency or an item.
+
+- needs: CAP-CONFIG
+
+### CFG-10 Config row tables are lists with an explicit id per row, even for one row, an option that is not offered is an omitted key and never a zero, no string holds a mini-language, and no value repeats one that another table owns.
+
+**Why.** A single object turns the second row into a schema change on the server and the client, a zero price reads as free and grants the item for nothing, a packed string has no validation, and a copied value drifts from its source, so the player sees one number while the server applies another.
+
+Do:
+
+```java
+static void checkAmount(String key, Amount value) {
+    if (value != null && value.amount() < 1)
+        throw new ConfigException(FILE, key + ".amount", "must be 1 or more, or leave the key out");
+}
+```
+
+```json
+{
+  "items": [
+    { "id": "potion_small", "price": { "id": "gem", "amount": 10 }, "reward": { "id": "potion", "amount": 1 } },
+    { "id": "potion_event", "reward": { "id": "potion", "amount": 1 } }
+  ]
+}
+```
+
+The second row has no `price`, so the shop does not sell it.
+
+Don't:
+
+```json
+{
+  "item": { "id": "potion_small", "price": { "id": "gem", "amount": 0 } },
+  "rewards": "gold:400;potion:3",
+  "growMs": 14400000
+}
+```
+
+Don't author one object where a table of rows belongs, a zero for an option that is not offered, a list packed into a string, or a duration copied from the crop table that owns it.
+
+**Check.** For each table in the config, confirm that it is a list whose rows carry an `id`. For each zero cost, price, or limit, ask whether it means free or not offered, and confirm that validation rejects a zero amount (CFG-02). Look for string values with separators such as `:` or `;`. For each value, confirm that no other table already holds it.
+
+- needs: CAP-CONFIG

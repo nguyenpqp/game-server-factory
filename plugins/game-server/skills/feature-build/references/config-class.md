@@ -92,17 +92,26 @@ static EventShopConfig validate(RawEventShop raw) {
             throw new ConfigException(FILE, key + ".dailyLimit", "must be 1 or more");
         if (it.maxPerBuy < 1 || it.maxPerBuy > it.dailyLimit)
             throw new ConfigException(FILE, key + ".maxPerBuy", "must be 1 to dailyLimit");
-        if (!ItemCatalog.isKnown(it.rewardItemId))
-            throw new ConfigException(FILE, key + ".rewardItemId", "unknown item " + it.rewardItemId);
+        checkRecord(key + ".price", it.price);
+        checkRecord(key + ".reward", it.reward);
         byId.put(it.id, ShopItem.from(it));
     }
     return new EventShopConfig(raw, byId);
+}
+
+static void checkRecord(String key, Amount record) {
+    if (record == null || !ItemCatalog.isKnown(record.id()))
+        throw new ConfigException(FILE, key + ".id", "must name a known item");
+    if (record.amount() < 1)
+        throw new ConfigException(FILE, key + ".amount", "must be 1 or more");
 }
 ```
 
 - Validation runs at load and at reload, never on the first command. A bad file fails startup or the reload, and the message names the file and the key (CFG-02). A failed reload keeps the old snapshot.
 - Each check matches a row of the spec's Config schema. Each `Validation` cell becomes one `if`, and each `Index built at load` cell becomes one map.
 - Check every referenced id against the catalog it points into, such as item ids, so a typo fails at load.
+- Every cost and reward is one `{id, amount}` record, such as `"price": { "id": "gem", "amount": 10 }`, read into one record type, so a change of currency is a data edit (CFG-09). A list of records holds a cost or a reward of several items.
+- A table of rows is a list whose rows carry an `id`, even when the design has one row today. An option that is not offered is an omitted key, and validation rejects a zero amount, because zero reads as free. Every shop item here has a price and a reward, so `checkRecord` rejects a missing record, and a record that may be left out gets a null check instead. No string packs a list, such as `gold:400;potion:3`, and no key repeats a value that another table owns (CFG-10).
 - A known reward type is not enough. `validate` rejects any reward type whose grant can be partial, capped, silently empty, or written without a metric row and trace id (CFG-02, MET-03, MET-04). The profile's CAP-INVENTORY entry names the types whose grant is safe. When it does not say, allow only the types whose grant path you read, and list the reward types you allowed under Follow-ups in the slice report.
 - The JSON parser ignores keys it does not know, so an old server reads a file that has a newer key (BG-08). A key that the new version adds is optional, and its default lives on the raw field, like `minClientVersion` above. When the project's parser fails on unknown keys, CAP-CONFIG is `partial`. The slice stops at gate 3 when CAP-CONFIG is `missing`, or when it is `partial` and its `blocker` line names a rule that the slice's rows cite.
 - A key never changes meaning. A new meaning gets a new key (BG-08).

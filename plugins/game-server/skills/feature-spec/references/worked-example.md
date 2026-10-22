@@ -207,7 +207,7 @@ None. The feature keeps no cluster-wide state. Rules: MN-05.
 | `unlockLevel` | int | yes | none | 1 or more | none | ST1 | CFG-02, CFG-05 |
 | `rewards` | list | yes | none | Exactly one entry for each day from 1 to 7 | Array of 7 entries indexed by day | RW1, RW2, RW3, RW4, RW5, RW6, RW7 | CFG-02, CFG-06, PERF-05 |
 | `rewards[].day` | int | yes | none | 1 to 7, each once | none | F1 | CFG-02, CFG-06 |
-| `rewards[].items` | list | yes | none | 1 to 10 entries, each a known item id from CAP-INVENTORY with an amount of 1 or more | none | RW1, RW2, RW3, RW4, RW5, RW6, RW7 | CFG-02, CFG-05, PERF-04 |
+| `rewards[].items` | list | yes | none | 1 to 10 `{id, amount}` records, each a known item id from CAP-INVENTORY with an amount of 1 or more | none | RW1, RW2, RW3, RW4, RW5, RW6, RW7 | CFG-02, CFG-05, CFG-09, CFG-10, PERF-04 |
 
 Environment values:
 

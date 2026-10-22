@@ -156,13 +156,14 @@ formula:
 
 - Source sheets: S2 Rewards, S2 Settings.
 - Draft: `config/login-streak.json`, relative to this file.
-- Shape: an object with `unlockLevel` and a `rewards` list.
+- Shape: an object with `unlockLevel` and a `rewards` list, where each entry holds one `reward` record of `id` and `amount`.
 
 | Key | Meaning | Type | Example | Allowed values | Source |
 | --- | --- | --- | --- | --- | --- |
 | `unlockLevel` | Level at which the streak unlocks | integer | 5 | 1 or more | S2 Settings!B2 |
 | `rewards[].day` | Reward day of this entry | integer | 1 | 1 to 7, each once | S2 Rewards!A2:A8 |
-| `rewards[].items` | Items the entry grants | list of item and amount | 500 gold | known item ids, amount 1 or more | S2 Rewards!B2:D8 |
+| `rewards[].reward.id` | Item the entry grants | string | gold | known item ids | S2 Rewards!B2:B8 |
+| `rewards[].reward.amount` | Amount of the item | integer | 500 | 1 or more | S2 Rewards!C2:C8 |
 
 - Cross-row checks: the `rewards` list has exactly one entry per day from 1 to 7.
 

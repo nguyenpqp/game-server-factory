@@ -96,6 +96,8 @@ Read the config file, its loader, its validator, and every place that reads it.
 | CFG-06 | critical | no | A stored or sent value that is an index into a config list. A config reorder that changes what a stored value means. |
 | CFG-07 | important | no | A secret, allowlist, or endpoint in the feature's balance file. |
 | CFG-08 | important | no | A hand edit in a generated path, or a generated file changed with no change to its source. |
+| CFG-09 | important | no | A currency or an item in a key name, such as `gemCost`, or a `currency` key paired with a separate `price` key. A cost or reward that is not an `{id, amount}` record or a list of them. |
+| CFG-10 | critical | no | A table of rows authored as one object or as a map without an `id` per row. A zero cost or price that stands for not offered, or a validator that accepts a zero amount. A string that packs a list, such as `gold:400;potion:3`. A value copied from a table that another feature or file owns. |
 
 ## MET: Metrics
 

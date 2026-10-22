@@ -282,6 +282,16 @@ Each rule's reason, Java do and don't, and review check are in [config.md](confi
 - severity: important
 - needs: CAP-GENERATED
 
+### CFG-09 Every cost and reward in config is one `{id, amount}` record, with the currency or item id as a value, never in a key name.
+
+- severity: important
+- needs: CAP-CONFIG
+
+### CFG-10 Config row tables are lists with an explicit id per row, even for one row, an option that is not offered is an omitted key and never a zero, no string holds a mini-language, and no value repeats one that another table owns.
+
+- severity: critical
+- needs: CAP-CONFIG
+
 ## MET: metrics
 
 Each rule's reason, Java do and don't, and review check are in [metric.md](metric.md).

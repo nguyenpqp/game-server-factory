@@ -64,7 +64,7 @@ Take the rows from the `Changes without player action` column of the UI touchpoi
 
 ### 4. Config schema
 
-Build the keys from the design's Config tables, one file per feature (CFG-01). Each allowed value and cross-row check becomes a load-time validation (CFG-02). Each lookup on the command path gets an index built at load (PERF-05). A time-bound feature takes its window from the design's Timing table (CFG-04). Secrets, allowlists, and endpoints go to environment config (CFG-07). Command id constants and other generated files change through the generator that CAP-GENERATED names (CFG-08).
+Build the keys from the design's Config tables, one file per feature (CFG-01). Each allowed value and cross-row check becomes a load-time validation (CFG-02). Each lookup on the command path gets an index built at load (PERF-05). A time-bound feature takes its window from the design's Timing table (CFG-04). Secrets, allowlists, and endpoints go to environment config (CFG-07). Each cost and reward is one `{id, amount}` record (CFG-09). Each table of rows is a list with an `id` per row, even for one row, an option that is not offered is an omitted key, never a zero, and no key repeats a value that another table owns (CFG-10). Command id constants and other generated files change through the generator that CAP-GENERATED names (CFG-08).
 
 ### 5. Metric events and KPI queries
 
