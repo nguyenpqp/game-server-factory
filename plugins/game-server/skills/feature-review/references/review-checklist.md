@@ -25,7 +25,7 @@ Read each command handler and the core method it calls, in order. Trace every re
 | AUTH-04 | critical | no | A request decoded and used before a range, length, enum, or null check. A list field with no size cap. A string used as a key with no length cap. |
 | AUTH-05 | critical | no | An item, slot, or target id from the request used without a check that the acting user owns it or may reach it. A friend or guild member id used without a membership check. |
 | AUTH-06 | critical | no | A state change that runs before the active, unlocked, state-transition, or cooldown check. A check that reads client-sent state. A claim or grant command that does not check the feature's terminal state, such as finished, expired, or closed, before it grants, even when a claimed list seems to cover it. |
-| AUTH-07 | critical | no | Several costs taken one by one with no up-front check. A cost taken before a later step that can fail, with no refund on that failure. |
+| AUTH-07 | critical | no | Several costs taken one by one with no up-front check. A cost taken before a later step that can fail, with no refund on that failure. A cost taken before the shared claim it pays for. A refund after a shared write that timed out and may have landed. |
 | AUTH-08 | critical | no | A grant, purchase, or claim command with no request id, or a request id stored after the grant. A retry path that can run the grant twice. |
 | AUTH-09 | important | no | A command that loads other users or the database, or fans out, with no per-user limit. A limit that still applies the effect once exceeded. |
 | AUTH-10 | important | no | A failure branch that changes state before it returns, or returns one generic code for different failures. |
@@ -36,18 +36,21 @@ Ask which node and which thread run each line. Ask what happens when two nodes r
 
 | Rule | Severity | Lint | Look for |
 | --- | --- | --- | --- |
-| MN-01 | critical | yes | Static fields, singletons, and `static final` maps or lists in feature code. The linter finds the field forms. Look for state hidden in a singleton or an enum field. |
-| MN-02 | critical | no | Code that reads or writes another user's live state from the acting user's thread, or that holds a user object across commands outside the actor. State that lives only for a session, such as a session key or a per-session cache, stored in the user's document, so it survives into the next session or onto another node. A state reference read before an async hop and used after it, instead of a fresh read on the owner. A continuation that the owner drops when the session ends, used to signal a caller that outlives the session. |
-| MN-03 | critical | no | A load-modify-save of a second user's document. A reward, gift, or penalty applied to a target user in the sender's command. |
-| MN-04 | critical | no | A `set` or `replace` on a document that two users or two nodes write. A CAS loop with no attempt limit. |
-| MN-05 | critical | no | A Redis `GET`, Java arithmetic, then `SET`. A check-then-act on a counter or a board across two calls. |
-| MN-06 | important | no | A Lua script or a multi-key command over keys that have no shared hash tag. |
-| MN-07 | critical | no | A scheduled job with no lease. A job that checks the lease once at the start and writes later without checking the token. |
-| MN-08 | critical | no | A counter field or an `AtomicLong` used to make ids that are stored or sent to other users. A snowflake node id read from config that two nodes can share. |
-| MN-09 | important | no | A node-local cache of shared data with no invalidation call or no stated staleness bound. |
-| MN-10 | important | no | A lookup in a node-local session map to push to a user or test if the user is online. |
+| MN-01 | critical | yes | Static fields, singletons, and `static final` maps or lists in feature code. The linter finds the field forms. Look for state hidden in a singleton or an enum field. A shared pool loaded into memory at boot and written back at shutdown. |
+| MN-02 | critical | no | Code that reads or writes another user's live state from the acting user's thread, or that holds a user object across commands outside the actor. State that lives only for a session, such as a session key or a per-session cache, stored in the user's document, so it survives into the next session or onto another node. A state reference read before an async hop and used after it, instead of a fresh read on the owner. A continuation that the owner drops when the session ends, used to signal a caller that outlives the session. A grant decided from a private copy of another user's document instead of the owner or a shared claim. |
+| MN-03 | critical | no | A load-modify-save of a second user's document. A reward, gift, or penalty applied to a target user in the sender's command, including a direct call because the target is on this node. For a contested thing: a cost taken before the claim, an append failure that keeps the claim, a claim deleted when it settles. |
+| MN-04 | critical | no | A `set` or `replace` on a document that two users or two nodes write. A CAS loop with no attempt limit. A catch inside the loop that applies the change again without re-reading. A change made to an object the live state also holds. A log, push, or grant inside the loop. |
+| MN-05 | critical | no | A Redis `GET`, Java arithmetic, then `SET`. A check-then-act on a counter or a board across two calls. A fact checked in Java, such as a role or a slot's item, that the script does not recheck. An index updated in a second call. A periodic job that rebuilds an index. |
+| MN-06 | important | no | A key name built inside a Lua script instead of passed in KEYS. On Redis Cluster, a script or a multi-key command over keys that have no shared hash tag. |
+| MN-07 | critical | no | A scheduled job with no lease or lock. A job that checks it once at the start and runs every unit after. A unit that pays a user with no per-user claim or idempotent write. A done marker set while a unit failed. A retry scheduled outside `finally`. A job for data only the new version has that waits on the cluster lease. A weekly job that fires once instead of ticking often. |
+| MN-08 | critical | no | A counter field or an `AtomicLong` used to make ids that are stored or sent to other users. A snowflake node id read from config that two nodes can share. An increment that recreates a missing counter from zero. |
+| MN-09 | important | no | A node-local cache of shared data with no stated staleness bound, or with no invalidation call where a stale value is not on the safe side. |
+| MN-10 | important | no | A lookup in a node-local session map to push to a user or test if the user is online. An online check that reads the owner record without the owner's heartbeat. |
 | MN-11 | critical | no | A scheduled timer, `schedule`, or `Timer` that finishes a user's effect. State that stores a remaining duration that is decremented. A ready time that is not read from a stored timestamp. A speed-up that stores a remaining time instead of moving the stored timestamp, such as the start back or the ready time to now. |
 | MN-12 | critical | no | Fields that one invariant ties together, split across two documents that save at different times, such as a cost in one and the purchase it paid for in another. |
+| MN-13 | critical | no | A Redis or store wrapper that returns null, false, or empty on error, and a caller that maps it to "full", "absent", "offline", "already claimed", or an empty list. A claim or login path that treats a fault as a definite answer. |
+| MN-14 | important | no | A claim, counter, or event key with no occurrence id for a thing that can close or be recreated. A close that deletes the key. A branch where a missing key means open or zero. |
+| MN-15 | important | no | A buffered, async, or shutdown-flushed write to a score, count, or board that is a plain set instead of a monotone or versioned write. An admin override that leaves pending buffered writes. |
 
 ## BG: Blue-green rollout and client compatibility
 
@@ -55,17 +58,19 @@ Compare the stored classes, packets, ids, and config before and after the change
 
 | Rule | Severity | Lint | Look for |
 | --- | --- | --- | --- |
-| BG-01 | critical | no | A removed, renamed, or retyped field or key in a stored class. A class rename that changes a document key. A changed enum ordinal stored as a number. A retired enum constant that was a key in a stored map, so an old document fails to load. |
-| BG-02 | critical | no | A serializer or loader that maps to a fixed class and drops fields it does not know. A save that rebuilds the document from the class only. A nested stored type that drops unknown fields while the top-level document keeps them. |
-| BG-03 | critical | no | An existing command id or field reused for a new meaning. A retired id handed to a new command. |
+| BG-01 | critical | no | A removed, renamed, or retyped field or key in a stored class. A class rename that changes a document key. A changed enum ordinal stored as a number. A retired enum constant that was a key in a stored map, so an old document fails to load. A stored type removed outside a maintenance deploy. |
+| BG-02 | critical | no | A document that both versions write, with a serializer or loader that maps to a fixed class and drops fields it does not know. A save that rebuilds such a document from the class only. A new field nested where the codec keeps only top-level unknown fields. A document only its owner writes that drops new fields, with no rollback note in the spec. |
+| BG-03 | critical | no | An existing command id or field reused for a new meaning. A retired id handed to a new command. A retired feature whose handler or packet shape is removed while old clients still send it. |
 | BG-04 | critical | no | A response or push field inserted before existing fields, retyped, or made required. A changed meaning of an existing field. |
 | BG-05 | critical | no | A new request field that is read without a default. A decoder that throws when the field is absent. |
-| BG-06 | critical | no | Any new packet, field, or error code that an old client receives. A changed result of an existing command for an old client. |
+| BG-06 | critical | no | Any new packet, field, or error code that an old client receives, including a new code on the login or reconnect path. A changed result of an existing command for an old client. |
 | BG-07 | important | no | A new feature or changed behavior with no client version check. A check that reads a client-sent flag in the request body instead of the session version. |
-| BG-08 | critical | no | A config key that is required, renamed, or changed in meaning. A parser that fails on an unknown key. |
-| BG-09 | critical | no | A migration that runs for all users at startup, runs twice with a different result, or lowers the schema version. |
-| BG-10 | critical | no | A drain or shutdown path that releases ownership before queued commands finish or before save results are confirmed. A feature job that keeps running during drain. |
-| BG-11 | critical | no | An inbox or message receiver with a `default` branch that drops, fails on, or removes an unknown type. |
+| BG-08 | critical | no | A config key that is required, renamed, or changed in meaning. A parser that fails on an unknown key. A change to the config of an event that is already running, shipped in a rolling deploy. |
+| BG-09 | critical | no | A migration that runs for all users at startup, runs twice with a different result, or lowers the schema version. A boot step that overwrites shared data instead of adding where absent. |
+| BG-10 | critical | no | A drain or shutdown path that releases ownership before queued commands finish or before save results are confirmed. A feature job that keeps running during drain. A release that deletes the owner record. A failed final save that releases anyway. |
+| BG-11 | critical | no | An inbox receiver with a `default` branch that drops, fails on, or removes an unknown type, or removes it to add it back. A cross-node message that carries value not already in the inbox. A message-driven refresh with no periodic sweep. A shared replayed log that blocks on an entry it cannot read. |
+| BG-12 | critical | no | A stored key or document format that the old version cannot read, shipped in a rolling deploy, or with no rollback step in the spec. |
+| BG-13 | critical | no | A boot hook of the feature that catches and logs a failed config load, seed, or migration, so the node boots without it. |
 
 ## PERF: Performance
 
@@ -165,7 +170,7 @@ Read the tests that the diff adds or should add. Judge the tests against the rul
 
 | Rule | Severity | Lint | Look for |
 | --- | --- | --- | --- |
-| TEST-01 | important | no | A core test that needs a socket, a database, or a network. |
+| TEST-01 | important | no | A core test that needs a socket, a database, or a network. A Redis script test that shares a keyspace with other tests or leaves keys behind. |
 | TEST-02 | important | no | A test that reads real time or real random numbers. |
 | TEST-03 | important | no | A command with a check and no negative test for it. |
 | TEST-04 | important | no | A cheat with no test that it is rejected on live. |
@@ -173,10 +178,11 @@ Read the tests that the diff adds or should add. Judge the tests against the rul
 | TEST-06 | important | no | A stored-data change with no test that loads old data and data with unknown fields. |
 | TEST-07 | important | no | A request change with no test that decodes an old request. |
 | TEST-08 | important | no | A command test that does not assert the metric row or the trace id. |
-| TEST-09 | important | no | An idempotent request or callback with no replay test. |
-| TEST-10 | minor | no | A command with no bot scenario, when the project has a bot. |
+| TEST-09 | important | no | An idempotent request or callback with no replay test. A retried write with no test for a failure after it applied and one before. |
+| TEST-10 | minor | no | A command with no bot scenario, when the project has a bot. A cross-node guarantee with no drill scenario, when the project has a drill. |
 | TEST-11 | minor | no | A test that sets the config instance, clock, or environment and does not restore it. |
 | TEST-12 | minor | no | A test of a getter, of the JSON library's parsing, of framework delivery or saves, or of a constant restated from config. A mock `verify` with no assertion on the effect. |
+| TEST-13 | important | no | A shared document, counter, claim, queue, or cross-node push with no test that runs two instances over one store. A shared document with no stale-copy test. A node id, clock, or sender read from a global in the component under test. |
 
 ## MOD: Modularity
 
@@ -231,11 +237,13 @@ Rules about state hold only if every entry point that touches the state follows 
 | Login | Lazy migration and expiry of old periods run before the first command. The client reads current state through the read command, so login sends no state push (SYNC-01, SYNC-04). |
 | Logout and session close | The hook reads only state already loaded and creates no document for a user who never used the feature. Session-only state is dropped, not saved. A continuation still waiting on I/O can be dropped, so nothing outside the session waits on it. |
 | Offline load | A load of a document for a user who is not online runs the same migration and keeps unknown fields. |
-| Periodic job or tick | The lease is held, the lease token is checked before each write, and the job reads stored timestamps. |
+| Non-owner read of another user | The copy is never saved, it may refuse but never grant, and claims overlay it. |
+| Boot | Feature boot steps fail the boot on error, and a shared-data step adds where absent. |
+| Periodic job or tick | A lease or lock is held and rechecked between units, each unit is claimed or idempotent, the job reads stored timestamps, and a second node running it at once grants nothing twice. |
 | Cheat command | The live check, the domain method, the metric row. |
 | Admin command | The owner routing or CAS path, validation, audit row, and retry safety. |
 | HTTP callback | Signature, allowlist, idempotency lock, delivery through the inbox. |
-| Cross-node message and inbox drain | Unknown types are kept. Applying an entry twice has no second effect. |
+| Cross-node message and inbox drain | Unknown inbox types are kept in place. Applying an entry twice has no second effect. Entries applied to a user this node then loses go back to the inbox. |
 | Drain | The feature stops its jobs, flushes changed state, and confirms writes. |
 
 Also check each gate that decides whether a handler runs. If the only code that refreshes stale state sits behind that gate, the gate drops every event once the state goes stale, and the refresh never runs.

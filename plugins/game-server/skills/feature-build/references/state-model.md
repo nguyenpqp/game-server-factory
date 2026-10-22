@@ -58,7 +58,8 @@ public final class EventShopState {
 
 - Add a field with a default. Never remove, rename, or retype a field (BG-01). A field that is no longer used stays in the class, unread.
 - A changed meaning gets a new field, and the old field keeps its old meaning (BG-03). For example, when a count becomes a count per item, add `boughtByItem` and keep the old `boughtToday` as it was.
-- The serializer keeps every field that the running version does not know, and writes it back on save (BG-02). This is the core's job, through CAP-USERSTORE. When the profile shows that the serializer drops unknown fields, the slice stops at gate 3. Do not add a feature-local workaround, such as a hand-written map of extra fields, unless the profile's CAP-USERSTORE entry names that map as the project's way.
+- A document that two server versions can write during a rollout keeps every field the running version does not know, and writes it back on save (BG-02). This is the core's job, through CAP-USERSTORE, whose entry says which documents keep unknown fields and how deep. When it keeps only top-level fields, put new fields at the top level. When a document that two versions write would drop unknown fields, the slice stops at gate 3. A per-user document that only its owner writes may rely on added fields only, and the spec's Blue-green section states the rollback loss. Do not add a feature-local workaround, such as a hand-written map of extra fields, unless the profile's CAP-USERSTORE entry names that map as the project's way.
+- A format change that the old version cannot read, such as a number stored as a string, is a one-way door. It needs a maintenance deploy and a rollback step in the spec (BG-12).
 
 ## Lazy migration
 
@@ -77,11 +78,12 @@ void migrate(long now) {
 ```
 
 - `migrate` runs on the owner actor, in the after-load hook that CAP-USERSTORE names, before the first command (BG-09).
-- Each step runs only when `schemaVersion` is below its target, so a second run changes nothing. The version only increases.
+- Each step runs only when `schemaVersion` is below its target, so a second run changes nothing. The version only increases. A version field is one way to make a step idempotent. A step that checks the stored data itself and changes nothing on a second run is enough (BG-09).
 - A step derives its result from the stored data, never from the step's own earlier run, so a crash in the middle leaves a document that the next load migrates again.
 - Each step matches a row of the spec's Migrations table.
 - A newer server may have written a higher `schemaVersion`. Leave it as it is, and keep the fields this version does not know.
 - Call `markChanged` after a migration that changed the document, so the save cycle writes it.
+- A boot step that migrates or seeds shared data writes with add-if-absent, so a second node's boot or a later boot changes nothing, and it throws on any failure so the node does not boot (BG-09, BG-13).
 
 ## Timestamps instead of timers
 
@@ -97,8 +99,11 @@ A timed effect, such as a cooldown, an expiry, or a ready time, is a stored time
 
 - Only the user's owner actor touches the live document (MN-02). Code on another user's thread never reads or writes it directly.
 - A change to another user goes to that user's owner through CAP-CROSSNODE, or into that user's durable inbox through CAP-INBOX (MN-03).
-- A document that several users or nodes write, such as a shared group record, uses a CAS read and write with a bounded retry from CAP-CAS, never a blind set (MN-04).
-- Cluster-wide counters and boards live in Redis and change through atomic commands or a Lua script from CAP-REDIS (MN-05). Keys that one command or script touches share a hash tag (MN-06).
+- A document that several users or nodes write, such as a shared group record, uses a CAS read and write with a bounded retry from CAP-CAS, never a blind set (MN-04). Each try changes the copy that its read returned. A timeout re-reads before it applies the change again. Logs, pushes, and grants run after the write is confirmed.
+- Cluster-wide counters and boards live in Redis and change through atomic commands or a Lua script from CAP-REDIS (MN-05). The script rechecks every fact the Java side decided on and updates derived indexes itself. Every key a script touches is passed in KEYS, and on Redis Cluster the keys of one call share a hash tag (MN-06).
+- Each Redis or store result is won, lost, or unknown. An unknown result answers retry-later and never becomes "full", "absent", or "already claimed" (MN-13).
+- When users race for one shared thing, claim it first, append the owner's inbox entry second, release the claim if the append fails, and take the cost last. Settling gives the claim a TTL instead of deleting it (MN-03, AUTH-07). Keys for a thing that can close or be recreated carry its occurrence id, and closing writes a marker (MN-14).
+- A buffered or late write to a score or a count is monotone, such as `ZADD GT`, so a former owner's flush cannot lower it (MN-15).
 - The hash tag names the entity that one command touches, such as one group, never the whole feature. A tag shared by every user's keys puts them all on one Redis Cluster slot. A key that every active user writes is sharded or batched (PERF-08).
 
 The real Redis client comes from the profile's CAP-REDIS entry. The calls below show the shape. `redis` is a `RedisOps`.
@@ -109,4 +114,4 @@ long sold = redis.incrBy(tag + ":sold:" + itemId, quantity);
 boolean first = redis.setNx(tag + ":first_buyer:" + itemId, String.valueOf(userId), ttlMs);
 ```
 
-A Redis call is I/O. Run it off the actor thread through CAP-ACTOR's async path and continue on the actor with the result (PERF-01). Count it in the spec's performance budget (PERF-02).
+A Redis call is I/O. Run it off the actor thread through CAP-ACTOR's async path and continue on the actor with the result (PERF-01), unless the profile's CAP-REDIS entry records synchronous calls with a timeout and a circuit breaker as the project's pattern. Count it in the spec's performance budget (PERF-02).

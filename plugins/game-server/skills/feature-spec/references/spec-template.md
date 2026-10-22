@@ -352,14 +352,22 @@ The section is one table with fixed rows. Keep every row. A row that does not ap
 | Node-local caches | none | none | The feature reads only its config snapshot | none | MN-09 |
 | Pushes and online checks for other users | none | none | The feature pushes only to the acting player | none | MN-10 |
 | Timed effects | `lastClaimDay` | The owner actor | Derived from the stored day on each read | A timer lost at drain leaves a claim not ready | MN-11 |
+| Contested shared things | none | none | No two users race for one thing | none | MN-03, MN-14 |
+| Reads of another user's state | none | none | The feature reads no other user | none | MN-02 |
+| Unknown results from Redis or the store | none | none | The feature makes no Redis call, and a failed save is the core's | none | MN-13 |
+| Late writes after a handover | none | none | The feature buffers no write | none | MN-15 |
 ```
 
 ### Blue-green and client compatibility
 
-The section is one table with fixed rows. Keep every row, and keep its `Rules` cell. The `Test` cell names a test from the Test plan, or says why no test applies.
+The section starts with one Deploy line, then one table with fixed rows. Keep every row, and keep its `Rules` cell. The `Test` cell names a test from the Test plan, or says why no test applies.
+
+The Deploy line says `rolling` or `maintenance` and why. A rolling deploy needs all four: stored data only gains fields with defaults, packets other users receive stay safe for old clients, the config of a running event and the formats of Redis keys and shared logs do not change, and no new inbox entry type must be understood by the old version, only kept. Anything else, and any change under BG-12, makes it a maintenance deploy with the rollback step written out.
 
 ```markdown
 ## Blue-green and client compatibility
+
+- Deploy: rolling, because the feature only adds fields, adds no format the old version cannot read, and changes no running event's config. Rules: BG-12.
 
 | Case | Expected behavior | How the spec ensures it | Rules | Test |
 | --- | --- | --- | --- | --- |
@@ -369,9 +377,13 @@ The section is one table with fixed rows. Keep every row, and keep its `Rules` c
 | The new version reads data that the old version wrote | Absent fields take their defaults, and migration runs once | Migration 0 to 1 | BG-09 | `StreakStateCompatTest` old document |
 | The old version reads data that the new version wrote | The old version keeps the fields it does not know | The serializer keeps unknown fields | BG-01, BG-02 | `StreakStateCompatTest` unknown field |
 | Both versions read the same config | Each version reads the keys it knows | New keys are optional with defaults | BG-08 | `StreakConfigTest` extra key |
-| An old node meets a new inbox entry or cross-node message type | The entry stays in the inbox for a newer node | The feature adds no entry type | BG-11 | none, no new entry type |
+| An old node meets a new inbox entry or cross-node message type | The entry stays in the inbox for a newer node, and an unknown message is ignored because it only carries a signal | The feature adds no entry type | BG-11 | none, no new entry type |
 | A node drains during a claim | The claim finishes and its save is confirmed before ownership moves | The core's drain | BG-10 | none, core behavior |
 | The servers roll back to the old version | Data and granted items from the new version survive | Additive fields only | BG-01, BG-02, BG-09 | `StreakStateCompatTest` unknown field |
+| Both versions write the same shared document | Neither version drops the other's fields | The feature has no shared document | BG-02 | none, no shared document |
+| A stored format changes in a way the old version cannot read | The release ships as a maintenance deploy with a rollback step | No format changes | BG-12 | none, no format change |
+| A boot step of the feature fails | The node does not boot | The config load throws on an invalid file | BG-13 | `StreakConfigTest` invalid file |
+| A cluster job runs while the old version holds the cluster lease | The job still runs, and runs once per unit | The feature has no job | MN-07 | none, no job |
 ```
 
 ### Performance budget

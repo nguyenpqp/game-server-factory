@@ -131,7 +131,7 @@ class CheckProfileTest(unittest.TestCase):
         code, out, _ = run("--blocked-rules", FIXTURES / "valid.md")
         self.assertEqual(code, 0, out)
         self.assertIn("CAP-CLIENTVER (partial): BG-07", out)
-        self.assertIn("CAP-DRAIN (missing): BG-10", out)
+        self.assertIn("CAP-DRAIN (missing): BG-10, BG-13", out)
 
     def test_valid_profile_prints_no_warning(self):
         code, _, err = run(FIXTURES / "valid.md")

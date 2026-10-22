@@ -55,17 +55,23 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 
 - Search for a record of which node holds a user. `rg -n -i "owner|lease|lock.*user|userNode|sessionNode|fencing|fence"` in the login and logout code.
 - Check what stops a second node from saving the same user. No owner field and no CAS on save means missing or partial.
+- Read every save path, including autosave and shutdown save, and find the ownership check before the write. Read what the check returns on a Redis error, and what the node does once its own heartbeat lapses. A check that maps an error to "owned" with no heartbeat bound is partial.
+- Read the login takeover. A takeover that waits a fixed time and then takes the user from a live owner is partial. Read the release: a delete of the owner record, instead of a released marker, is partial.
 
 ### CAP-DRAIN
 
 - Search the shutdown path. `rg -n "addShutdownHook|@PreDestroy|destroy\(|shutdown\(|drain|readiness|/health|/alive|/ready"`.
 - Read whether it closes listeners first, waits for queued commands, awaits every save result, and reports not ready while draining.
+- Read what happens when a final save fails: whether the node keeps ownership and retries, what limits each kind of failure has, and whether login and shutdown see the pending save.
+- Find the order in which shutdown removes the heartbeat and leases, and whether a `finally` block covers it. Find the boot failure path: `rg -n "System\.exit|halt\("` near the boot entry point. A boot that logs an error and keeps running is partial.
+- Find the readiness signal and read when it turns true. A log line or a flag set before listeners are bound is partial.
 
 ### CAP-USERSTORE
 
 - Search for the document store client. `rg -n "couchbase|CouchbaseClient|Collection\.(upsert|get)|MemcachedClient|spymemcached|\.set\(|\.gets\("`.
 - Find the document key format. A class name inside the key breaks stored data on rename.
 - Read the serializer. `rg -n "ObjectMapper|Gson|JsonIgnoreProperties|FAIL_ON_UNKNOWN|JsonAnySetter"`. A serializer that drops unknown fields on load is partial.
+- Find the code that keeps unknown fields, if any, and list its callers. Record which documents use it and whether it keeps nested fields or only top-level ones.
 - Find the changed flag and the save cycle. Check that a failed write is reported and the flag is not cleared before the write is confirmed. Find the hook that runs after load, which is where lazy migration goes.
 
 ### CAP-CAS
@@ -73,17 +79,21 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 - Search for CAS calls. `rg -n "\.gets\(|\.cas\(|getAndLock|replace\(.*cas|casMismatch|CasMismatch|OptimisticLock"`.
 - Count blind writes against CAS writes with `rg -c`. Mostly blind sets means partial.
 - Look for a retry helper with a bounded attempt count, and for an add that fails when the key exists (`\.add\(`, `insert\(`).
+- Read the catch blocks of the retry helper. A timeout or error that loops back and applies the change again is partial. Check that the change runs on the copy the read returned, not on a live object.
 
 ### CAP-REDIS
 
 - Search for the client. `rg -n "io\.lettuce|redis\.clients\.jedis|Redisson|RedisClusterClient|JedisPool|StatefulRedis"`.
 - Search for Lua and atomic commands. `rg -n "eval\(|evalsha|RedisScript|\.incr\(|\.setnx\(|SET.*NX|hsetnx|zadd"`.
-- Check key naming for hash tags, such as `{user:123}:inbox`, when the deployment is a cluster. Check that calls use a timeout and are not issued on the actor thread.
+- Find out whether the deployment is one instance or a cluster, from the client class, the deploy config, or the docs. Check key naming for hash tags, such as `{user:123}:inbox`, when it is a cluster. Check that scripts get every key in KEYS.
+- Check that calls use a timeout and are not issued on the actor thread. When they are by design, find the circuit breaker.
+- Read the wrapper's error path. A helper that returns null or an empty value on error is partial, because callers cannot tell "absent" from "down". Record the eviction policy and persistence from the Redis config or docs.
 
 ### CAP-IDGEN
 
 - Search for id generators. `rg -n -i "snowflake|idgenerator|nextId|\.incr\(|AtomicLong.*id|sequence"`.
 - Find where the node bits come from. Config that two nodes can share, or an in-process counter saved on a timer, is partial.
+- For a counter in Redis or the store, read what an increment does when the key is missing. Creating it from zero is partial.
 
 ### CAP-INVENTORY
 
@@ -94,16 +104,19 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 
 - Search for messaging between nodes. `rg -n "pubsub|PUBLISH|subscribe|RedisPubSub|rpc|grpc|NodeMessage|remoteUser|forward"`.
 - Check that a message runs on the target user's executor on the owner node.
+- Read the receive path for a message type with no handler, and read what each message carries. A payload that exists only in the message is partial, because pub/sub drops messages on reconnect. Find the periodic sweep that covers a lost message.
 
 ### CAP-INBOX
 
 - Search for a per-user queue of pending grants or events. `rg -n -i "inbox|mailbox|pending(Events|Rewards|Grants)|outbox"`.
 - Check that appends use CAS, and that the owner drains the queue at login and while the user is online.
+- Read the drain from removal to the confirmed save. Record whether it applies then removes, or removes first, and what happens when the save fails or the node is no longer the owner. Check that an unknown entry type stays in place.
 
 ### CAP-LEASE
 
 - Search for scheduled jobs. `rg -n "@Scheduled|scheduleAtFixedRate|scheduleWithFixedDelay|Timer\(|Quartz|CronTrigger"`.
 - For each job, look for a lease or lock around it. `rg -n "SET.*NX.*PX|tryLock|acquireLease|JobLease|RLock"`. Jobs on every node with no lease make the capability missing.
+- Read how a job learns that it still holds the lease, and which clock the validity uses. Look for per-job locks beside the cluster lease.
 
 ### CAP-CONFIG
 
@@ -120,6 +133,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 - Search for the shared time call. `rg -n "class \w*(Clock|Time)\w*"` and the most common caller.
 - Count direct calls. `rg -c "System\.currentTimeMillis|Instant\.now|LocalDate(Time)?\.now|new Date\(\)"`. These become `lint.forbidden_time`.
 - Check that core logic takes `now` as a parameter, and that a per-user offset exists for cheats.
+- Find the clock that heartbeat and lease freshness use. `rg -n "nanoTime|monotonic"` in the cluster code. Wall time there is partial.
 
 ### CAP-RNG
 
@@ -157,11 +171,14 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 
 - Search the build file for the test framework. `rg -n "junit|jupiter|testng|useJUnitPlatform"`.
 - Read two existing tests. Check whether per-user state can be built in memory without a database, and which hooks inject time, random numbers, config, and environment.
+- Find the in-memory store fake, if any, and read whether its CAS token changes on every write and whether it can fail a write after or before applying it.
+- Check whether the test command needs a local Redis: find tests that connect to Redis and whether they skip when it is down. Find the key prefix and wipe helper they use.
 
 ### CAP-BOT
 
 - Search for a scripted client. `rg -n -l -i "loadtest|fakeclient|e2e|simulator|bot"` over the tree and the docs.
 - Check that it logs in, sends commands, and checks responses against scenarios stored as files. A client that only sends load is partial.
+- Look for a two-process drill. `rg -n -l -i "drill|two.?servers|suspend|CLIENT PAUSE"` over the tree, the tools, and the docs. Record what faults it injects and whether it can run two different builds.
 
 ### CAP-MODULE
 

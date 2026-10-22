@@ -2,9 +2,9 @@
 
 These are the `TEST` rules from [the rule index](index.md), which also gives each rule's severity. Tests are the main proof that a feature keeps the other rules. The examples use JUnit 5 and generic names. The project profile supplies the real classes and the test command.
 
-### TEST-01 The feature's core logic has unit tests that run without network, sockets, or a database.
+### TEST-01 The feature's core logic has unit tests that run without network, sockets, or a database, and tests of its Redis scripts run against a real Redis under a key prefix that each test wipes.
 
-**Why.** Tests that need a server or a database run rarely and fail for reasons unrelated to the feature.
+**Why.** Tests that need a server or a database run rarely and fail for reasons unrelated to the feature. A fake of a script language passes while the real script fails, and a shared keyspace makes tests depend on each other.
 
 Do:
 
@@ -29,7 +29,7 @@ void claimGrantsDayReward() {
 }
 ```
 
-**Check.** Confirm the feature's tests call the pure core directly and open no socket or database connection.
+**Check.** Confirm the feature's logic tests call the pure core directly and open no socket or database connection. A test of a Redis script builds its keys through a prefix unique to the run and wipes it afterward. The profile's CAP-UNITTEST entry says whether the test command needs a local Redis.
 
 - needs: CAP-UNITTEST
 
@@ -230,9 +230,9 @@ void claim() {
 
 - needs: CAP-METRIC, CAP-UNITTEST
 
-### TEST-09 Tests replay each idempotent request and each duplicate callback, and assert exactly one effect.
+### TEST-09 Tests replay each idempotent request and each duplicate callback, run each retried write once failing after it applied and once failing before, and assert exactly one effect.
 
-**Why.** Duplicate delivery is normal on mobile networks and payment providers, so a missing guard pays twice.
+**Why.** Duplicate delivery is normal on mobile networks and payment providers, so a missing guard pays twice. A write that times out after it landed looks like a failure, and a retry that applies it again grants twice.
 
 Do:
 
@@ -255,7 +255,16 @@ void claimGrants() {
 }
 ```
 
-**Check.** For each command with a request id and each callback, find a test that sends it twice and asserts one effect.
+```java
+@Test
+void casTimeoutAfterApplyGrantsOnce() {
+    store.failNextCas(Applied.YES);     // the write lands, then the call throws
+    GuildCore.join(store, guildId, userId, NOW);
+    assertEquals(1, store.guild(guildId).countOf(userId));
+}
+```
+
+**Check.** For each command with a request id and each callback, find a test that sends it twice and asserts one effect. For each write the feature retries, find the two failure tests: one where the store applied the write and then failed, and one where it failed before applying.
 
 - needs: CAP-UNITTEST
 
@@ -278,7 +287,7 @@ Don't:
 // The bot covers login only; new commands are tested by hand.
 ```
 
-**Check.** When the profile lists an E2E bot, match each new command to a scenario.
+**Check.** When the profile lists an E2E bot, match each new command to a scenario. When its CAP-BOT entry also has a two-process drill, each cross-node guarantee the feature claims, such as a claim won once or a push delivered across nodes, has a drill scenario.
 
 - needs: CAP-BOT
 
@@ -345,5 +354,35 @@ void buyCallsTake() {
 Don't write a test per getter or setter, a test that the JSON library parses a plain config class, or a test of the framework's delivery or save cycle. Config validation is behavior and keeps its tests (TEST-05).
 
 **Check.** For each new test, break the behavior it names and confirm that it fails, then change only the internals and confirm that it passes. A test that fails neither way, or that tests a getter, library parsing, framework behavior, a restated constant, or mock wiring, is a finding.
+
+- needs: CAP-UNITTEST
+
+### TEST-13 Cross-node behavior has a test that runs two instances of the component with different node identities over one shared store, including a writer with a stale copy, a store fault, and a write whose outcome is unknown.
+
+**Why.** Lost updates, double claims, and lost cross-node pushes only show up with two writers, and one instance in a test never meets them.
+
+Do:
+
+```java
+@Test
+void secondNodeWithStaleCopyCannotClaimTwice() {
+    SaleService a = new SaleService(sharedStore, NodeId.of("a"), clock);
+    SaleService b = new SaleService(sharedStore, NodeId.of("b"), clock);
+    SaleView staleOnB = b.view(sellerId);                   // read before a buys
+    assertEquals(ErrorCode.SUCCESS, a.buy(buyer1, saleId));
+    assertEquals(ErrorCode.SOLD_OUT, b.buyFrom(staleOnB, buyer2, saleId));
+}
+```
+
+Don't:
+
+```java
+@Test
+void buySucceeds() {
+    assertEquals(ErrorCode.SUCCESS, new SaleService(store).buy(buyer1, saleId));
+}
+```
+
+**Check.** For each shared document, counter, claim, queue, or cross-node push the feature adds, find a test with two instances over one store, and for shared documents the stale-copy case. Node identity, clock, and message sender are injected, not read from globals.
 
 - needs: CAP-UNITTEST

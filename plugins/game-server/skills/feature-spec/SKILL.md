@@ -84,11 +84,11 @@ Add an endpoint only for a caller that cannot log in, such as a payment provider
 
 ### 9. Multi-node analysis
 
-Fill every fixed row. A row that does not apply says `none` and why. Read the profile's CAP-OWNERSHIP, CAP-CROSSNODE, and CAP-LEASE entries before you claim a row is safe.
+Fill every fixed row. A row that does not apply says `none` and why. Read the profile's CAP-OWNERSHIP, CAP-CROSSNODE, CAP-INBOX, CAP-LEASE, and CAP-REDIS entries before you claim a row is safe. CAP-REDIS says whether Redis is one instance or a cluster, which decides MN-06.
 
 ### 10. Blue-green and client compatibility
 
-Fill every fixed row. Each `Test` cell names a test class and case from the Test plan, or says why no test applies.
+Write the Deploy line first, with the four conditions of a rolling deploy from the template. Then fill every fixed row. Each `Test` cell names a test class and case from the Test plan, or says why no test applies.
 
 ### 11. Performance budget
 

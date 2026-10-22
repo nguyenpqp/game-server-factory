@@ -51,7 +51,7 @@ Each rule's reason, Java do and don't, and review check are in [auth.md](auth.md
 - severity: critical
 - needs: CAP-CONFIG, CAP-CLOCK
 
-### AUTH-07 A command checks every cost in full before it takes any, and refunds what it took when a later step fails.
+### AUTH-07 A command checks every cost in full before it takes any, takes it after any shared claim the action needs, and refunds what it took when a later step definitely fails.
 
 - severity: critical
 - needs: CAP-INVENTORY
@@ -80,32 +80,32 @@ Each rule's reason, Java do and don't, and review check are in [multi-node.md](m
 - severity: critical
 - needs: none
 
-### MN-02 Only the user actor on the user's owner node touches that user's live state, and any other reader works from a snapshot built on that actor or from a private load of the stored document.
+### MN-02 Only the user actor on the user's owner node touches that user's live state, and any other reader works from a snapshot built on that actor or from a private copy of the stored document, which may reject an action but never grant one.
 
 - severity: critical
 - needs: CAP-OWNERSHIP, CAP-ACTOR
 
-### MN-03 A change to another user's state goes to that user's owner through cross-node delivery or the durable inbox, never through a direct load and save.
+### MN-03 A change to another user's state goes to that user's owner through the durable inbox or cross-node delivery, even when the owner is this node, never through a direct load and save.
 
 - severity: critical
 - needs: CAP-CROSSNODE, CAP-INBOX
 
-### MN-04 A stored document that several users or nodes write is updated with CAS and a bounded retry, never with a blind set.
+### MN-04 A stored document that several users or nodes write is updated with CAS and a bounded retry on a version mismatch, the change is applied to a fresh copy that shares no object with live state, and a timeout or error is an unknown outcome that is re-read, never re-applied.
 
 - severity: critical
 - needs: CAP-CAS
 
-### MN-05 Cluster-wide state lives in Redis and changes through atomic commands or Lua scripts, never through a read-modify-write in Java.
+### MN-05 Cluster-wide state lives in Redis and changes through atomic commands or Lua scripts, never through a read-modify-write in Java, and a script rechecks every fact the caller decided on and updates derived indexes in the same call.
 
 - severity: critical
 - needs: CAP-REDIS
 
-### MN-06 Redis keys that one command or script touches together share a hash tag.
+### MN-06 Every key that a Redis script touches is passed in KEYS, and on Redis Cluster the keys that one command or script touches together share a hash tag.
 
 - severity: important
 - needs: CAP-REDIS
 
-### MN-07 A job that must run once per cluster runs only while it holds a lease, and it checks the lease token before each write.
+### MN-07 A cluster-wide job stays correct when two nodes run it at once: a lease or lock only saves duplicate work, the job rechecks it between units, each unit is claimed or idempotent, and a job for data only the new version knows does not depend on a lease the old version can hold.
 
 - severity: critical
 - needs: CAP-LEASE
@@ -115,12 +115,12 @@ Each rule's reason, Java do and don't, and review check are in [multi-node.md](m
 - severity: critical
 - needs: CAP-IDGEN
 
-### MN-09 A node-local cache of shared data has an invalidation path and a stated staleness bound.
+### MN-09 A node-local cache of shared data has a stated staleness bound and an invalidation path, unless a stale value only errs on the safe side.
 
 - severity: important
 - needs: CAP-CROSSNODE, CAP-REDIS
 
-### MN-10 Pushes to another user and checks of another user's online status go through the ownership record and cross-node delivery, never through a node-local session map.
+### MN-10 Pushes to another user and checks of another user's online status go through the ownership record and cross-node delivery, never through a node-local session map, and a user counts as online only while the owner record exists and its node's heartbeat is current.
 
 - severity: important
 - needs: CAP-OWNERSHIP, CAP-CROSSNODE
@@ -135,6 +135,21 @@ Each rule's reason, Java do and don't, and review check are in [multi-node.md](m
 - severity: critical
 - needs: CAP-USERSTORE
 
+### MN-13 Every check or write against Redis, the store, or a cluster primitive tells yes, no, and unknown apart, and an unknown result never turns into a definite answer that grants, denies, or hides player value.
+
+- severity: critical
+- needs: CAP-REDIS
+
+### MN-14 Claims, counters, and events about a shared thing that can close or be created again carry the id of that occurrence, and closing it stores an explicit closed marker instead of deleting the key.
+
+- severity: important
+- needs: CAP-REDIS
+
+### MN-15 A buffered or late write that a former owner can flush after a handover cannot move shared state backward, because it is a monotone write or carries a version check.
+
+- severity: important
+- needs: CAP-REDIS
+
 ## BG: blue-green rollout and client compatibility
 
 Each rule's reason, Java do and don't, and review check are in [blue-green.md](blue-green.md).
@@ -144,7 +159,7 @@ Each rule's reason, Java do and don't, and review check are in [blue-green.md](b
 - severity: critical
 - needs: CAP-USERSTORE
 
-### BG-02 Loading and saving a document keeps every field that the running server version does not know.
+### BG-02 A document that two server versions can write during one rollout keeps every field the writing version does not know, at every level where new fields go, and a document that only its owner writes either does the same or adds fields only, with the rollback loss stated in the spec.
 
 - severity: critical
 - needs: CAP-USERSTORE
@@ -179,20 +194,30 @@ Each rule's reason, Java do and don't, and review check are in [blue-green.md](b
 - severity: critical
 - needs: CAP-CONFIG
 
-### BG-09 Data migration runs lazily on the owner at load, is idempotent, and records a per-document schema version that only increases.
+### BG-09 Data migration is idempotent and derives its result only from stored data: per-user data migrates lazily on the owner at load, and shared data migrated at boot is written only where the target is absent, so two nodes booting at once and every later boot are safe.
 
 - severity: critical
 - needs: CAP-USERSTORE
 
-### BG-10 A draining node finishes every queued command and confirms every save before it releases user ownership.
+### BG-10 A draining node refuses new logins, finishes every queued command, and confirms every save before it releases user ownership, and when the final save fails it keeps ownership, retries, and makes the user's next login wait.
 
 - severity: critical
 - needs: CAP-DRAIN, CAP-OWNERSHIP, CAP-USERSTORE
 
-### BG-11 A node that meets an inbox entry or cross-node message of a type it does not know puts or leaves it unchanged in the user's inbox, so a newer version applies it later.
+### BG-11 An inbox entry of a type the node does not know stays in the inbox unchanged for a newer version, and a cross-node message carries only a signal, so a node may ignore a message type it does not know.
 
 - severity: critical
 - needs: CAP-INBOX, CAP-CROSSNODE
+
+### BG-12 A change to a stored format that the old version cannot read is a one-way door: it ships only in a maintenance deploy, and the spec gives the manual rollback step.
+
+- severity: critical
+- needs: CAP-USERSTORE
+
+### BG-13 A feature step that runs at boot, such as a config load, a seed, or a shared-data migration, stops the boot when it fails, so a node never runs or reports healthy with that step undone.
+
+- severity: critical
+- needs: CAP-DRAIN
 
 ## PERF: performance
 
@@ -389,7 +414,7 @@ Each rule's reason, Java do and don't, and review check are in [admin.md](admin.
 - severity: critical
 - needs: CAP-ADMIN
 
-### ADMIN-02 An admin command that changes a user's state runs on that user's owner, or with CAS on the stored document when the user is offline.
+### ADMIN-02 An admin command that changes a user's state runs on that user's owner, or, when the user is offline, holds the user's ownership slot for the edit and writes with CAS.
 
 - severity: critical
 - needs: CAP-ADMIN, CAP-OWNERSHIP, CAP-CROSSNODE, CAP-CAS
@@ -472,7 +497,7 @@ Each rule's reason, Java do and don't, and review check are in [http.md](http.md
 
 Each rule's reason, Java do and don't, and review check are in [testing.md](testing.md).
 
-### TEST-01 The feature's core logic has unit tests that run without network, sockets, or a database.
+### TEST-01 The feature's core logic has unit tests that run without network, sockets, or a database, and tests of its Redis scripts run against a real Redis under a key prefix that each test wipes.
 
 - severity: important
 - needs: CAP-UNITTEST
@@ -512,7 +537,7 @@ Each rule's reason, Java do and don't, and review check are in [testing.md](test
 - severity: important
 - needs: CAP-METRIC, CAP-UNITTEST
 
-### TEST-09 Tests replay each idempotent request and each duplicate callback, and assert exactly one effect.
+### TEST-09 Tests replay each idempotent request and each duplicate callback, run each retried write once failing after it applied and once failing before, and assert exactly one effect.
 
 - severity: important
 - needs: CAP-UNITTEST
@@ -530,6 +555,11 @@ Each rule's reason, Java do and don't, and review check are in [testing.md](test
 ### TEST-12 Tests assert behavior through fakes that record effects, and no test covers a getter, a library's config parsing, framework behavior, a restated constant, or mock wiring.
 
 - severity: minor
+- needs: CAP-UNITTEST
+
+### TEST-13 Cross-node behavior has a test that runs two instances of the component with different node identities over one shared store, including a writer with a stale copy, a store fault, and a write whose outcome is unknown.
+
+- severity: important
 - needs: CAP-UNITTEST
 
 ## DES: design conformance

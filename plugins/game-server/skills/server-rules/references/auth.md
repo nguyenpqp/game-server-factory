@@ -138,9 +138,9 @@ grantDailyReward(state, now);
 
 - needs: CAP-CONFIG, CAP-CLOCK
 
-### AUTH-07 A command checks every cost in full before it takes any, and refunds what it took when a later step fails.
+### AUTH-07 A command checks every cost in full before it takes any, takes it after any shared claim the action needs, and refunds what it took when a later step definitely fails.
 
-**Why.** Taking the first cost and then failing on the second loses player value with nothing in return.
+**Why.** Taking the first cost and then failing on the second loses player value with nothing in return. A shared write that times out may have landed, so a blind refund pays the player back for something they got.
 
 Do:
 
@@ -160,7 +160,9 @@ inventory.take(gold, Reason.CRAFT, traceId);
 inventory.take(wood, Reason.CRAFT, traceId);
 ```
 
-**Check.** Find the full check before the first take, and a refund on every failure path after it.
+When the effect is a write to shared state, such as a guild or a sale, claim or reserve the shared side first and take the cost last. A definite failure after the take refunds. An unknown outcome logs the case for repair and does not refund.
+
+**Check.** Find the full check before the first take, and a refund on every definite failure path after it. For a shared effect, confirm the claim comes before the take, and that a timeout path logs instead of refunding.
 
 - needs: CAP-INVENTORY
 

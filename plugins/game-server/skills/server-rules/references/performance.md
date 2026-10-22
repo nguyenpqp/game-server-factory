@@ -20,7 +20,7 @@ UserSnapshot doc = KvStore.getAsync(targetKey).join();
 Thread.sleep(50);
 ```
 
-**Check.** Search the command path for `.join()`, `.get()` on futures, `.await(`, `.block()`, `Thread.sleep(`, and synchronous DB calls. The feature-review linter flags the profile's blocking calls.
+**Check.** Search the command path for `.join()`, `.get()` on futures, `.await(`, `.block()`, `Thread.sleep(`, and synchronous DB calls. The feature-review linter flags the profile's blocking calls. The core's own ownership checks and confirmed handover saves, which the profile's CAP-OWNERSHIP and CAP-DRAIN entries record, are not feature findings. A feature's synchronous Redis call on the actor thread passes only when the profile's CAP-REDIS entry records that pattern with a timeout and a circuit breaker, and the spec's performance budget counts the call.
 
 - needs: CAP-ACTOR
 

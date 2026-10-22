@@ -27,9 +27,9 @@ if (session.wasAdminAtLogin()) {
 
 - needs: CAP-ADMIN
 
-### ADMIN-02 An admin command that changes a user's state runs on that user's owner, or with CAS on the stored document when the user is offline.
+### ADMIN-02 An admin command that changes a user's state runs on that user's owner, or, when the user is offline, holds the user's ownership slot for the edit and writes with CAS.
 
-**Why.** An admin write from another thread or node races the owner's save and is lost.
+**Why.** An admin write from another thread or node races the owner's save and is lost. CAS alone is not enough offline, because a login can load the document before the edit and save over it later.
 
 Do:
 
@@ -37,7 +37,10 @@ Do:
 if (Ownership.isOnline(targetId)) {
     CrossNode.submitToOwner(targetId, s -> StreakCore.setStreak(s, streak));
 } else {
-    KvStore.casUpdate(userKey(targetId), s -> StreakCore.setStreak(s, streak), 5);
+    try (OfflineEdit edit = Ownership.holdOffline(targetId)) {   // a login meanwhile gets retry-later
+        if (edit == null) return ErrorCode.RETRY_LATER;
+        KvStore.casUpdate(userKey(targetId), s -> StreakCore.setStreak(s, streak), 5);
+    }
 }
 ```
 
@@ -49,7 +52,7 @@ s.streak = streak;
 KvStore.save(targetId, s);
 ```
 
-**Check.** For each mutating admin command, find the route to the owner and the CAS path for offline users.
+**Check.** For each mutating admin command, find the route to the owner, and for offline users the held ownership slot and the CAS write inside it.
 
 - needs: CAP-ADMIN, CAP-OWNERSHIP, CAP-CROSSNODE, CAP-CAS
 

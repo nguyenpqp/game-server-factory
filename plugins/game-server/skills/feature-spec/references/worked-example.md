@@ -159,7 +159,7 @@ The client calls GetStreakState at login and after a reconnect, and a claim answ
 #### StreakState
 
 - Key: `streak_<userId>`, which does not change when a class is renamed. Rules: BG-01.
-- Writer: The user's owner actor, and AdminSetStreak through the owner or with CAS when the user is offline. Rules: MN-02, ADMIN-02.
+- Writer: The user's owner actor, and AdminSetStreak through the owner, or holding the user's ownership slot and writing with CAS when the user is offline. Rules: MN-02, ADMIN-02.
 - Schema version: 1. Rules: BG-09.
 - Size bound: Under 1 KB, with no lists. Rules: PERF-06.
 
@@ -332,15 +332,21 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | Static state | The config snapshot reference only | The config loader | One reference swap at reload | A node-local value differs between nodes | MN-01 |
 | The player's own state | StreakState | The owner actor | Only the owner actor touches it | Two nodes overwrite each other's saves, and a claim is lost or granted twice | MN-02 |
 | Other users' state | The StreakState of an admin's target | AdminSetStreak | The command runs on the target's owner through cross-node delivery | An admin write and a claim on another node overwrite each other | MN-03, ADMIN-02 |
-| Shared documents | StreakState while its user is offline | AdminSetStreak, through the CAP-ADMIN offline path | CAS with at most 3 attempts | Two support writes at once lose one repair | MN-04, ADMIN-02 |
+| Shared documents | StreakState while its user is offline | AdminSetStreak, through the CAP-ADMIN offline path | Holds the user's ownership slot, then CAS with at most 3 attempts | Two support writes at once lose one repair, or a login loads before the repair and saves over it | MN-04, ADMIN-02 |
 | Cluster-wide state | none | none | The feature keeps no Redis state | none | MN-05, MN-06, PERF-08 |
 | Once-per-cluster jobs | none | none | The feature has no job | none | MN-07 |
 | Unique ids | none | none | The feature mints no ids | none | MN-08 |
 | Node-local caches | none | none | The feature reads only its config snapshot | none | MN-09 |
 | Pushes and online checks for other users | The StreakState push to an admin's target | AdminSetStreak | Through the ownership record and cross-node delivery | A push through a node-local session map misses a target on another node | MN-10 |
 | Timed effects | `lastClaimDay` | The owner actor | Derived from the stored day on each read | A timer lost at drain leaves a claim not ready | MN-11 |
+| Contested shared things | none | none | No two users race for one thing | none | MN-03, MN-14 |
+| Reads of another user's state | none | none | AdminGetStreak reads on the owner, or a private copy that it only shows | none | MN-02 |
+| Unknown results from Redis or the store | The offline CAS write of AdminSetStreak | AdminSetStreak | A timeout re-reads and answers retry-later, never applies the change twice | A repair applied twice, or reported as failed after it landed | MN-04, MN-13 |
+| Late writes after a handover | none | none | The feature buffers no write | none | MN-15 |
 
 ## Blue-green and client compatibility
+
+- Deploy: rolling, because StreakState only gains fields with defaults, the new pushes go only to clients 1.4.0 or later, and nothing changes a format the old version reads. Rules: BG-12.
 
 | Case | Expected behavior | How the spec ensures it | Rules | Test |
 | --- | --- | --- | --- | --- |
@@ -350,9 +356,13 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | The new version reads data that the old version wrote | Absent fields take their defaults, and migration runs once | Migration 0 to 1 | BG-09 | `StreakStateCompatTest` no document |
 | The old version reads data that the new version wrote | The old version keeps the fields it does not know | The serializer keeps unknown fields | BG-01, BG-02 | `StreakStateCompatTest` unknown field |
 | Both versions read the same config | Each version reads the keys it knows | New keys are optional with defaults | BG-08 | `StreakConfigTest` extra key |
-| An old node meets a new inbox entry or cross-node message type | The entry stays in the inbox for a newer node | The feature adds no entry type, and AdminSetStreak uses the core's existing admin routing | BG-11 | none, no new entry type |
+| An old node meets a new inbox entry or cross-node message type | The entry stays in the inbox for a newer node, and an unknown message is ignored because it only carries a signal | The feature adds no entry type, and AdminSetStreak uses the core's existing admin routing | BG-11 | none, no new entry type |
 | A node drains during a claim | The claim finishes and its save is confirmed before ownership moves | The core's drain | BG-10 | none, core behavior |
 | The servers roll back to the old version | Data and granted items from the new version survive | Additive fields only | BG-01, BG-02, BG-09 | `StreakStateCompatTest` unknown field |
+| Both versions write the same shared document | Neither version drops the other's fields | StreakState has one writer at a time, the owner or an admin holding its slot | BG-02 | none, no shared document |
+| A stored format changes in a way the old version cannot read | The release ships as a maintenance deploy with a rollback step | No format changes | BG-12 | none, no format change |
+| A boot step of the feature fails | The node does not boot | The config load throws on an invalid file | BG-13 | `StreakConfigTest` day 3 missing |
+| A cluster job runs while the old version holds the cluster lease | The job still runs, and runs once per unit | The feature has no job | MN-07 | none, no job |
 
 ## Performance budget
 

@@ -129,7 +129,7 @@ An entry for a missing capability, under its heading `### CAP-LEASE Cluster-wide
 ````markdown
 - status: missing
 - blocker: MN-07 cannot be met. Every node runs the weekly ranking job, so each player gets the reward once per node.
-- proposal: Add a `JobLease` helper that takes a Redis `SET key token NX PX ttl`, renews it while the job runs, and checks the token before each write.
+- proposal: Add a `JobLease` helper that takes a Redis `SET key token NX PX ttl`, renews it while the job runs, and answers whether it is still held, so a job checks it between units of work.
 ````
 
 ## Capabilities
@@ -188,22 +188,28 @@ Typical partial: executors exist, but loading a user from the database blocks th
 
 Must provide:
 
-- A cluster-wide record of the node that owns each online user, taken at login and released at logout or drain.
-- Fencing, so a node that lost ownership of a user cannot save that user, such as a lease token or a CAS write on an owner field.
-- A lookup of a user's owner node and online status.
+- A cluster-wide record of the node that owns each online user, taken at login and released at logout or drain. A release writes a released marker instead of deleting the record, so a paused old node cannot claim the user again.
+- Fencing, so a node that lost ownership of a user cannot save that user. A token checked at write time, such as a CAS write on an owner field, is the strong form. A check of the owner record right before each save is accepted when two more items hold: a node writes on an unknown answer only while its own heartbeat is fresh, measured on a monotonic clock, and after one lapse it refuses saves until it restarts.
+- Takeover at login that asks the live owner to release and waits for it, and takes the user without consent only when the owner's heartbeat has expired, never after a fixed wait.
+- Ownership checks and claims that answer yes, no, or unknown, where login refuses with retry-later on unknown.
+- A short hold of the ownership slot for an offline edit, such as an admin change, so a login waits for it.
+- A lookup of a user's owner node and online status, where online also needs the owner's heartbeat.
 
-Typical partial: the load balancer routes a user to one node, but nothing stops a second node from loading and saving the same user.
+Typical partial: the load balancer routes a user to one node, but nothing stops a second node from loading and saving the same user. Or ownership exists, but a Redis error during the check counts as "owned" or "free", or takeover happens after a timeout while the old owner still saves.
 
 ### CAP-DRAIN Drain and handover
 
 Must provide:
 
-- A drain mode that stops new logins and new commands on a node while queued commands finish.
+- A drain mode that refuses new logins before it claims them and stops new commands on a node while queued commands finish.
 - A flush of every changed user, with each write confirmed, before the node releases ownership.
+- A final save that keeps ownership when it fails and retries, with a limit per kind of failure (store error, a payload that cannot be built, owner unknown), a give-up that still releases, and a pending mark that makes login answer retry-later and shutdown wait.
+- A shutdown order: refuse logins, disconnect users, wait for confirmed saves and pending final saves, then remove the node's heartbeat and leases last, in a `finally` block.
 - Feature hooks that run at drain, to stop jobs and release leases.
-- A readiness signal that is false until startup completes and false again during drain.
+- A boot that exits the process on any boot failure, so a half-started node never holds a heartbeat or a lease.
+- A readiness signal that is true only after listeners are bound and startup completes, and false again during drain. Record how an operator reads it.
 
-Typical partial: shutdown saves users but ignores the write results, or listeners stay open while the node drains.
+Typical partial: shutdown saves users but ignores the write results, or listeners stay open while the node drains. Or readiness is only a log line that also prints when a listener fails to bind.
 
 ### CAP-USERSTORE Per-user storage
 
@@ -211,21 +217,22 @@ Must provide:
 
 - Load and save of per-user documents in Couchbase through the project's client, keyed by user id.
 - Document keys that do not change when a Java class is renamed.
-- A serializer that keeps unknown fields on load and writes them back on save.
+- A serializer that keeps unknown fields on load and writes them back on save, for every document that two server versions can write. Record which documents keep them and how deep, top level only or nested.
 - A hook on the owner's executor that runs after load and before the first command, where lazy migration runs.
 - A changed flag and a save cycle that reports a failed write and keeps the change for the next attempt.
 
-Typical partial: the serializer drops unknown fields, the key contains the class name, or a failed async write is lost because the changed flag was already cleared.
+Typical partial: the serializer drops unknown fields, keeps them only at the top level, or keeps them only on the shared-document write path, the key contains the class name, or a failed async write is lost because the changed flag was already cleared.
 
 ### CAP-CAS CAS writes
 
 Must provide:
 
 - A read that returns a CAS token, and a write that fails when the document changed since that read.
-- A retry helper with a bounded attempt count.
+- A retry helper with a bounded attempt count, which applies the change to a fresh copy on each try.
+- A write result that tells a version mismatch apart from a timeout or error whose outcome is unknown.
 - An add that writes only when the key is absent.
 
-Typical partial: the client supports CAS, but most writes are blind sets, so the last writer wins.
+Typical partial: the client supports CAS, but most writes are blind sets, so the last writer wins. Or a timeout surfaces as a mismatch, so the helper applies the change again.
 
 ### CAP-REDIS Redis access
 
@@ -233,18 +240,23 @@ Must provide:
 
 - A client for the project's Redis, single instance or cluster, with atomic commands such as `INCR`, `SET NX PX`, `HSETNX`, and sorted sets.
 - Lua scripts for multi-key atomic updates.
-- Calls with a timeout that do not block the user actor thread.
-- A key naming convention with a hash tag for keys that one command or script touches together.
+- Calls with a timeout that do not block the user actor thread. When the project makes synchronous calls on the actor thread by design, record the timeout and the circuit breaker that guard them.
+- A call that reports an error apart from an empty result, so a caller can tell "absent" from "Redis is down".
+- On Redis Cluster, a key naming convention with a hash tag for keys that one command or script touches together.
 
-Typical partial: there is no Lua support, or keys have no hash tags while the deployment uses Redis Cluster.
+Record the deployment form: one instance or a cluster, the eviction policy, and persistence. Claim keys are often the only record of who won, so they need `noeviction` and persistence.
+
+Typical partial: there is no Lua support, keys have no hash tags while the deployment uses Redis Cluster, or the wrapper returns null on error.
 
 ### CAP-IDGEN Unique ids
 
 Must provide:
 
-- Ids that stay unique across nodes, restarts, and crashes, from Redis `INCR` per id space or from a snowflake whose node bits are unique per running process.
+- Ids that stay unique across nodes, restarts, and crashes, from Redis `INCR` or a shared store counter per id space, or from a snowflake whose node bits are unique per running process.
+- An increment that fails on a missing counter instead of creating it from zero.
+- A bounded retry, which is safe because an increment that landed and then failed only skips an id.
 
-Typical partial: an in-process counter saved on a timer, so a crash or a second node repeats ids.
+Typical partial: an in-process counter saved on a timer, so a crash or a second node repeats ids, or an increment that recreates a lost counter from zero.
 
 ### CAP-INVENTORY Currency and inventory
 
@@ -261,23 +273,25 @@ Typical partial: take and add exist, but they accept no trace id, or a multi-ite
 
 Must provide:
 
-- A message to a user's owner node that runs on that user's executor.
+- A message to a user's owner node that runs on that user's executor, with ordering per sender and a bounded queue, and a sender that never blocks on Redis.
 - A fallback to the durable inbox when the user is offline or the owner cannot be reached.
-- A receiver that moves a message of an unknown type to the user's durable inbox, without failing the executor.
+- A receiver that ignores a message type it does not know, without failing the executor. This is safe only because messages carry signals, and anything that must arrive is in the durable inbox first.
+- A periodic sweep that covers a lost message, such as an inbox sweep of online users and a periodic config reload.
 - A broadcast to every node, for cache invalidation.
 
-Typical partial: delivery works only for users on the same node.
+Typical partial: delivery works only for users on the same node, or a message carries a payload that exists nowhere else, so a pub/sub drop loses it.
 
 ### CAP-INBOX Durable inbox
 
 Must provide:
 
-- A per-user queue in Couchbase that any node or HTTP handler can append to, with a CAS retry.
-- A drain by the owner at login and on notice while the user is online.
+- A per-user queue in Couchbase that any node or HTTP handler can append to, with a CAS retry and a dedup by entry id when an append times out.
+- A drain by the owner at login and on notice while the user is online, only while this node is the confirmed owner.
 - An id per entry, so applying an entry twice has no second effect.
-- A drain that skips an entry of a type the running version does not know and leaves it in the inbox.
+- An entry that leaves the inbox only once its effect is saved. Apply, record the entry id in the user's document, save, then remove. A drain that removes first must save right after applying and put the entries back when the save fails or reports that this node is no longer the owner.
+- A drain that leaves an entry of a type the running version does not know in place, never removing it to add it back, and payloads stored as raw text that every version writes back unchanged.
 
-Typical partial: entries carry no id, the owner removes an entry before it applies the entry, or the drain drops entries of unknown types.
+Typical partial: entries carry no id, the owner removes an entry before it applies the entry and saves later on the timer, or the drain drops entries of unknown types.
 
 ### CAP-LEASE Cluster-wide job lease
 
@@ -285,7 +299,8 @@ Must provide:
 
 - A scheduler for periodic jobs.
 - A lease per job and period that one node holds, such as Redis `SET NX PX` with a token, renewed while the job runs and released at drain.
-- A token check before each write, so a node that lost the lease stops writing.
+- A held check that a job calls between units of work, with validity counted from the send time of the last successful renew on a monotonic clock.
+- A per-job lock beside the cluster lease, for a job whose data only one server version knows.
 
 Typical partial: jobs are scheduled on every node with no lease.
 
@@ -297,6 +312,8 @@ Must provide:
 - A validation hook that fails startup and names the file and key.
 - An immutable snapshot published by one reference swap, so a reload replaces it whole.
 - A test hook that sets a config instance in a unit test.
+
+When the project keeps runtime config in the store, such as a maintenance schedule, record its write path: a CAS update on a fresh copy, a broadcast reload, a periodic reload as the fallback, and reloads serialized with writes.
 
 Typical partial: config needs a restart to change, or features keep config in mutable static fields.
 
@@ -317,6 +334,7 @@ Must provide:
 - One call that returns server time in epoch milliseconds, and the timezone that day resets use.
 - Time passed into core logic as a parameter, so tests inject it.
 - A per-user time offset for cheats, ignored on live.
+- A monotonic clock, separate from the game clock, for heartbeat and lease freshness, so a wall clock step cannot make a stale heartbeat look fresh.
 
 Typical partial: there is no per-user offset, so a time cheat moves the clock of the whole node.
 
@@ -387,9 +405,11 @@ Must provide:
 
 - A unit test framework that the build runs, such as JUnit 5.
 - Per-user state that a test can build in memory, with no database or network.
-- Hooks that inject time, random numbers, config, and environment in a test, and reset them after it.
+- Hooks that inject time, random numbers, config, and environment in a test, and reset them after it, plus a reset for every process-wide gate or circuit breaker.
+- An in-memory store fake with the production write contract: a CAS token that changes on every write, add-if-absent, and switches for a refused write and for a write that fails after it applied or before it.
+- For tests of Redis scripts and coordination code, a key prefix unique to the run and a wipe helper. Record whether the test command needs a local Redis.
 
-Typical partial: state classes need a live database connection to construct.
+Typical partial: state classes need a live database connection to construct, or the store fake accepts every write, so CAS conflicts and ambiguous writes are never tested.
 
 ### CAP-BOT E2E bot
 
@@ -397,6 +417,8 @@ Must provide:
 
 - A scripted client that logs in to a running server, sends commands, and checks the responses.
 - Scenarios stored as files that a developer can add per feature.
+
+When the project has a two-process drill, record it here: two servers on one machine with distinct node ids over one store and Redis, process faults such as a hard kill, a suspend and resume, and a Redis pause, a pass or fail per scenario, and whether it can run an old build next to a new one.
 
 Typical partial: a load test client sends commands but does not check responses.
 

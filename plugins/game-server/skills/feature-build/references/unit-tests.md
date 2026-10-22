@@ -193,9 +193,34 @@ void saveKeepsFieldsFromANewerVersion() {
 }
 ```
 
-Each stored document has a test that loads a document from before the change, and a test that loads one with a field from a newer version and asserts that a save keeps it (TEST-06, BG-02, BG-09). Run both through the project's real serializer from CAP-USERSTORE, never a test-only JSON mapper, because the serializer is what drops or keeps fields.
+Each stored document has a test that loads a document from before the change. A document that keeps unknown fields, per the profile's CAP-USERSTORE entry, also has a test that loads one with a field from a newer version and asserts that a save keeps it (TEST-06, BG-02, BG-09). Run both through the project's real serializer from CAP-USERSTORE, never a test-only JSON mapper, because the serializer is what drops or keeps fields.
 
-When the document holds a nested type, the newer-version fixture also puts an unknown field inside the nested object, and the test asserts that a save keeps it (BG-02). When a stored map is keyed by an enum, one test loads a document whose map has a key that the running version does not know, and asserts that the load succeeds and a save keeps the entry (BG-01).
+When the document holds a nested type and CAP-USERSTORE says nested unknown fields are kept, the newer-version fixture also puts an unknown field inside the nested object, and the test asserts that a save keeps it (BG-02). When only top-level fields are kept, the test puts the unknown field at the top level, and new fields go there. When a stored map is keyed by an enum, one test loads a document whose map has a key that the running version does not know, and asserts that the load succeeds and a save keeps the entry (BG-01).
+
+## Shared writes and two nodes
+
+```java
+@Test
+void joinThatTimesOutAfterLandingAddsTheMemberOnce() {
+    store.failNextCas(Applied.YES);                 // the write lands, then the call throws
+    assertEquals(ErrorCode.SUCCESS, GuildCore.join(store, guildId, userId, NOW));
+    assertEquals(1, store.guild(guildId).countOf(userId));
+}
+
+@Test
+void secondNodeWithAStaleCopyCannotBuyASoldItem() {
+    SaleService a = new SaleService(store, redis, NodeId.of("a"), clock);
+    SaleService b = new SaleService(store, redis, NodeId.of("b"), clock);
+    SaleView stale = b.view(sellerId);
+    assertEquals(ErrorCode.SUCCESS, a.buy(buyer1, saleId, TRACE));
+    assertEquals(ErrorCode.SOLD_OUT, b.buyFrom(stale, buyer2, saleId, TRACE));
+}
+```
+
+- Each write that the feature retries has a test where the store applies the write and then fails, and one where it fails before applying, and each asserts exactly one effect (TEST-09, MN-04). Use the store fake from CAP-UNITTEST with its failure switches.
+- Each shared document, counter, claim, queue, or cross-node push has a test with two instances over one store and one Redis, with different node ids, and shared documents get the stale-copy case (TEST-13).
+- Each Redis result the feature maps has a test for the unknown case, which asserts retry-later and no change (MN-13).
+- A test of a Redis script runs against a real Redis under a key prefix unique to the run and wipes it afterward (TEST-01). When CAP-UNITTEST records that the test command needs a local Redis, say so in the slice report.
 
 ## HTTP callbacks and inbox entries
 
