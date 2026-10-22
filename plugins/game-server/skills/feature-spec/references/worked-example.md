@@ -331,7 +331,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | Concern | Where it lives | Writers | How it stays safe | What fails without it | Rules |
 | --- | --- | --- | --- | --- | --- |
 | Static state | The config snapshot reference only | The config loader | One reference swap at reload | A node-local value differs between nodes | MN-01 |
-| The player's own state | StreakState | The owner actor | Only the owner actor touches it | Two nodes overwrite each other's saves, and a claim is lost or granted twice | MN-02 |
+| The player's own state | StreakState | The owner actor | Only the owner actor touches it, and CAP-USERSTORE saves it with the inventory in one write | Two nodes overwrite each other's saves, or a crash keeps the reward without the claim, and a claim is lost or granted twice | MN-02, MN-12 |
 | Other users' state | The StreakState of an admin's target | AdminSetStreak | The command runs on the target's owner through cross-node delivery | An admin write and a claim on another node overwrite each other | MN-03, ADMIN-02 |
 | Shared documents | StreakState while its user is offline | AdminSetStreak, through the CAP-ADMIN offline path | Holds the user's ownership slot, then CAS with at most 3 attempts | Two support writes at once lose one repair, or a login loads before the repair and saves over it | MN-04, ADMIN-02 |
 | Cluster-wide state | none | none | The feature keeps no Redis state | none | MN-05, MN-06, PERF-08 |

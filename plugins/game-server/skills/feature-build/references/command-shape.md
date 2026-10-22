@@ -132,7 +132,7 @@ static Outcome process(EventShopState state, EventShopConfig cfg, Inventory inv,
 - Nothing after the grant throws. `recordPurchase` and `rememberResult` are in-memory writes, and `Outcome.ok` reads only values that the checks already resolved. Move a lookup or a computation that can throw above `take` (AUTH-07).
 - `item.price().times(req.quantity())` fits its type because `quantity` is at most `maxPerBuy`, and the config check at load caps the price and the reward times `maxPerBuy` (AUTH-04). A product with no such bound uses `Math.multiplyExact`. The add into the player's balance is bounded by CAP-INVENTORY, whose add refuses a total past the limit of its type.
 - Each change carries a reason constant unique to this action and the trace id (MET-03, MET-04). The reasons are the ones in the spec's Currency and item changes table.
-- `markChanged` runs after the last change, on success only. The save cycle of CAP-USERSTORE writes the document.
+- `markChanged` runs after the last change, on success only. The save cycle of CAP-USERSTORE writes this document and the inventory in one write, so a crash never keeps the grant without the purchase record (MN-12).
 
 ### Idempotent request id
 

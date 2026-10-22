@@ -73,6 +73,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 - Read the serializer. `rg -n "ObjectMapper|Gson|JsonIgnoreProperties|FAIL_ON_UNKNOWN|JsonAnySetter"`. A serializer that drops unknown fields on load is partial.
 - Find the code that keeps unknown fields, if any, and list its callers. Record which documents use it and whether it keeps nested fields or only top-level ones.
 - Find the changed flag and the save cycle. Check that a failed write is reported and the flag is not cleared before the write is confirmed. Find the hook that runs after load, which is where lazy migration goes.
+- Find where the inventory and a feature's state are stored, and read how the save cycle writes a player's changed documents. One document per player, or one batch that the store applies all or nothing, is present. A loop that writes each document on its own is partial, and its blocker names MN-12.
 
 ### CAP-CAS
 

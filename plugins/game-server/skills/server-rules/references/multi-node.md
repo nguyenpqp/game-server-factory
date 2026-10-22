@@ -309,7 +309,7 @@ scheduler.schedule(() -> plot.setReady(true), crop.growMs(), MILLISECONDS);
 
 - needs: CAP-CLOCK, CAP-USERSTORE
 
-### MN-12 Fields that must change together live in one stored document, because the store has no transaction across documents.
+### MN-12 Fields that must change together live in one stored document, or in documents that CAP-USERSTORE saves in one write, because the store has no transaction across documents.
 
 **Why.** Each document saves on its own, so a crash or a failed write between two saves keeps one change and loses the other, such as a cost recorded while the item it bought is missing.
 
@@ -333,7 +333,9 @@ harvests.markChanged();
 
 Don't split one invariant across documents to keep each one small. Split a document only when each part stays consistent on its own.
 
-**Check.** For each command that changes more than one stored document, ask what a crash after the first save leaves behind. When it breaks an invariant or loses player value, the fields belong in one document.
+A feature cannot move its fields into the core's documents, so a change that spans both, such as a grant through CAP-INVENTORY and the feature's record of the claim, relies on CAP-USERSTORE to save every changed document of the player in one write. When the profile shows that save as missing, the spec lists MN-12 in Core blockers.
+
+**Check.** For each command that changes more than one stored document, ask what a crash after the first save leaves behind. When it breaks an invariant or loses player value, the fields belong in one document, or in documents that CAP-USERSTORE saves in one write.
 
 - needs: CAP-USERSTORE
 
