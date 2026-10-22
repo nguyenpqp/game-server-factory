@@ -97,10 +97,10 @@ Use feature-review on the daily-streak branch against main.
 The skill runs the feature linter first.
 
 ```bash
-python3 <plugin>/skills/feature-review/scripts/lint_feature.py --profile docs/game-server/profile.md <paths>
+python3 <plugin>/skills/feature-review/scripts/lint_feature.py --profile docs/game-server/profile.md --diff $(git merge-base HEAD main) <paths>
 ```
 
-Pass the changed Java files or the feature package directory. The linter prints `path:line: RULE-ID message` for forbidden time and random calls, static mutable state, cheat classes without the live environment check, commands without a metric call or trace id, and blocking calls. It exits 1 when it finds anything. An empty pattern in the profile turns a check off, and the report names the checks that were off.
+Pass the changed Java files or the feature package directory. With `--diff`, the linter reports only the lines that the branch adds since its base, so old code in a shared file does not count. The linter prints `path:line: RULE-ID message` for forbidden time and random calls, static mutable state, cheat classes without the live environment check, commands without a metric call or trace id, and blocking calls. It exits 1 when it finds anything. An empty pattern in the profile turns a check off, and the report names the checks that were off.
 
 The skill then walks the checklist group by group. Each finding has a severity, a rule id, `file:line`, and a failure scenario that names who does what and what the player or operator sees. A critical finding needs a reachable trigger, or the skill demotes it. The skill reports and does not fix. To fix the findings, ask `feature-build` for each one, or hand the report back to your own task list.
 

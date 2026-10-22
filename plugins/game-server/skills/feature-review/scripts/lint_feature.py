@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lint Java feature code for the rule breaks a regex can find.
 
-Usage: lint_feature.py --profile <profile.md> <path>...
+Usage: lint_feature.py --profile <profile.md> [--diff <base>] <path>...
 
 Reads the `lint` keys, `feature_root`, `test_root`, and `generated_paths` from the
 profile's frontmatter, scans the .java files under each path, and prints one line
@@ -41,10 +41,16 @@ skipped. Files under `generated_paths` and `test_root` are skipped, even when na
 on the command line. These paths and `feature_root` are relative to the repository
 root, the directory that holds `docs/game-server/profile.md`. A profile at any other
 place is a usage error.
+
+With `--diff <base>`, the linter runs `git diff -U0 <base>` from the repository root
+and keeps only the findings on lines that the diff adds. A file git does not track is
+not in that diff, so its findings are dropped. A finding on a class line, such as
+MET-01, stays only when the class line itself is new.
 """
 import argparse
 import json
 import re
+import subprocess
 import sys
 from collections import namedtuple
 from pathlib import Path
@@ -462,9 +468,42 @@ def collect(paths, settings):
     return [f for f in files if not any(settings.under(f, root) for root in settings.skipped_roots)]
 
 
+def added_lines(repo_root, base):
+    if base.startswith("-"):
+        raise UsageError(f"--diff {base}: the base must be a commit, not an option")
+    try:
+        result = subprocess.run(
+            ["git", "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false",
+             "diff", "--relative", "--no-color", "-U0", base, "--"],
+            cwd=repo_root, capture_output=True, text=True,
+        )
+    except OSError as error:
+        raise UsageError(f"--diff {base}: cannot run git: {error.strerror}") from error
+    if result.returncode != 0:
+        raise UsageError(f"--diff {base}: git diff failed: {result.stderr.strip()}")
+    added, path = {}, None
+    for line in result.stdout.splitlines():
+        if line.startswith("+++ "):
+            path = line[6:] if line.startswith("+++ b/") else None
+        elif line.startswith("@@") and path is not None:
+            match = re.match(r"@@ -\S+ \+(\d+)(?:,(\d+))? @@", line)
+            start, count = int(match.group(1)), int(match.group(2) or 1)
+            added.setdefault(path, set()).update(range(start, start + count))
+    return added
+
+
+def on_added_line(finding, added, repo_root):
+    try:
+        relative = Path(finding.path).resolve().relative_to(repo_root).as_posix()
+    except ValueError:
+        return False
+    return finding.line in added.get(relative, ())
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--profile", required=True, type=Path, help="docs/game-server/profile.md of the project")
+    parser.add_argument("--diff", metavar="BASE", help="keep only findings on lines added since BASE")
     parser.add_argument("paths", nargs="+", help="Java files or directories")
     args = parser.parse_args(argv)
     try:
@@ -474,6 +513,9 @@ def main(argv=None):
             found, file_findings = lint_file(str(file), settings)
             findings += file_findings
             any_command = any_command or found
+        if args.diff:
+            added = added_lines(settings.repo_root, args.diff)
+            findings = [f for f in findings if on_added_line(f, added, settings.repo_root)]
     except UsageError as error:
         print(error, file=sys.stderr)
         return 2

@@ -384,6 +384,54 @@ class Checklist(unittest.TestCase):
         self.assertEqual(rows, severities)
 
 
+class DiffMode(unittest.TestCase):
+    OLD = "final class Old {\n    long t() { return System.currentTimeMillis(); }\n}\n"
+
+    def git(self, repo, *args):
+        subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+            cwd=repo, check=True, capture_output=True,
+        )
+
+    def repo_with_base(self, tmp):
+        profile = write_repo(tmp, {f"{FEATURE_DIR}/Old.java": self.OLD})
+        self.git(tmp, "init", "-q")
+        self.git(tmp, "add", "-A")
+        self.git(tmp, "commit", "-q", "-m", "base")
+        return profile
+
+    def test_only_hits_on_lines_the_diff_adds_are_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = self.repo_with_base(tmp)
+            old = Path(tmp) / FEATURE_DIR / "Old.java"
+            old.write_text(self.OLD.replace(
+                "}\n}\n", "}\n    long u() { return Instant.now().toEpochMilli(); }\n}\n"), encoding="utf-8")
+            added = Path(tmp) / FEATURE_DIR / "Added.java"
+            added.write_text("final class Added {\n    void s() { Thread.sleep(1); }\n}\n", encoding="utf-8")
+            self.git(tmp, "add", "-A")
+            code, out, err = run("--profile", profile, "--diff", "HEAD", old, added)
+            whole_code, whole_out, _ = run("--profile", profile, old, added)
+        self.assertEqual(parse_output(out), {("Old.java", 3, "AUTH-02"), ("Added.java", 2, "PERF-01")})
+        self.assertEqual(code, 1, err)
+        self.assertIn(("Old.java", 2, "AUTH-02"), parse_output(whole_out))
+        self.assertEqual(whole_code, 1)
+
+    def test_no_added_hit_exits_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = self.repo_with_base(tmp)
+            old = Path(tmp) / FEATURE_DIR / "Old.java"
+            old.write_text(self.OLD + "\nfinal class Other {\n}\n", encoding="utf-8")
+            code, out, _ = run("--profile", profile, "--diff", "HEAD", old)
+        self.assertEqual((code, out), (0, ""))
+
+    def test_an_unknown_base_is_a_usage_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = self.repo_with_base(tmp)
+            code, out, err = run("--profile", profile, "--diff", "no-such-base", Path(tmp) / FEATURE_DIR)
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("no-such-base", err)
+
+
 class CommandLine(unittest.TestCase):
     def test_exit_code_and_output_through_the_shell(self):
         bad = subprocess.run(
