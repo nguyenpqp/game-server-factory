@@ -13,7 +13,7 @@ The skill does not design the feature, and it does not review it. `feature-spec`
 
 - The profile at `docs/game-server/profile.md` in the target repository. Its format is the [profile template](../server-profile/references/profile-template.md). When the file is missing, stop and tell the developer to run `server-profile`.
 - The spec at `docs/game-server/features/<feature>/spec.md`. Its format is the [spec template](../feature-spec/references/spec-template.md). When the file is missing, stop and point to `feature-spec`.
-- The slice to build. It is one ticket from the spec's slicing, with Builds, Writes, Acceptance, and Verify, or one item of the ordered task list. When the developer names no slice, build the first slice that is not built yet and say which one.
+- The slice to build. It is one task from the spec's task list, with Builds, Writes, Acceptance, and Verify, or the spec rows the developer names. When the developer names no slice, build the first slice that is not built yet and say which one.
 
 Rule ids refer to the [rule index](../server-rules/references/index.md).
 

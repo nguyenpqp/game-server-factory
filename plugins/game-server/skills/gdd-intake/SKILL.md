@@ -43,7 +43,7 @@ Run the prompts as subagents when the harness has them, and follow them yourself
 
 The open questions in `design.md` are the list of gaps. They are the only place questions live.
 
-- **A workflow runs its own interview.** For example the nstack Interview playbook. Stop after step 3 and give the workflow the Open questions section: each question with its id, tier, source, and interim default. The workflow asks, then returns the answers. Resume at step 5 with them.
+- **A workflow runs its own interview.** Stop after step 3 and give the workflow the Open questions section: each question with its id, tier, source, and interim default. The workflow asks, then returns the answers. Resume at step 5 with them.
 - **No workflow interview.** Ask the developer yourself with AskUserQuestion, Blocker questions first, then Important. Show the question, its source, and the interim default, and offer the default plus one or two alternatives that the sources suggest. Minor questions can stay open. Do not ask a subagent to do this.
 
 Record each outcome in the question's status line: `answered on <date>: <answer>`, or `skipped by <name> on <date>`. Dates are `YYYY-MM-DD`. A skipped question keeps its interim default. At the end, report how many questions are open in each tier, because `feature-spec` stops on open Blocker questions.

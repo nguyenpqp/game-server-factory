@@ -1,6 +1,6 @@
 ---
 name: feature-spec
-description: Turn a game feature design into a Java game server spec and implementation plan. Use when a developer has a design.md from gdd-intake, a GDD, or a plain feature prompt and wants the server side designed before code. The spec covers command ids, request and response fields, checks and error codes, pushes, per-user state and migrations, Redis keys, the feature config schema, metric events and KPI queries, cheat commands, admin commands and their API spec, HTTP callbacks, multi-node safety, blue-green rollout and old client compatibility, a performance budget per command, core blockers, a test plan, and design coverage. It then slices the spec into tickets for nstack Spec build or into an ordered task list for plain Claude Code. Requires the project profile from server-profile and cites rule ids from server-rules.
+description: Turn a game feature design into a Java game server spec and implementation plan. Use when a developer has a design.md from gdd-intake, a GDD, or a plain feature prompt and wants the server side designed before code. The spec covers command ids, request and response fields, checks and error codes, pushes, per-user state and migrations, Redis keys, the feature config schema, metric events and KPI queries, cheat commands, admin commands and their API spec, HTTP callbacks, multi-node safety, blue-green rollout and old client compatibility, a performance budget per command, core blockers, a test plan, and design coverage. It then slices the spec into an ordered task list that a developer or any workflow can build from. Requires the project profile from server-profile and cites rule ids from server-rules.
 ---
 
 # Feature spec
@@ -137,11 +137,11 @@ Show the developer the spec and ask for confirmation. On confirmation, set `Stat
 
 ## Slicing
 
-When the spec is `ready` and the developer asks for a build plan, follow [slicing](references/slicing.md). It writes nstack Spec build tickets to `docs/intents/<feature>-tickets.md`, or an ordered task list for plain Claude Code to `docs/game-server/features/<feature>/tasks.md`. Never slice a `draft` or `blocked` spec.
+When the spec is `ready` and the developer asks for a build plan, follow [slicing](references/slicing.md). It writes an ordered task list to `docs/game-server/features/<feature>/tasks.md`, or to the path the developer names. Never slice a `draft` or `blocked` spec.
 
 ## Output
 
 - `docs/game-server/features/<feature>/spec.md`, the spec.
-- On request, the tickets file or the task list from slicing.
+- On request, the task list from slicing.
 
 The skill writes nothing else in the target repository.

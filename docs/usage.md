@@ -17,7 +17,7 @@ In this guide, `<plugin>` is the plugin directory. For an installed plugin, `cla
 | 1. Profile | `server-profile` | The server repository | `docs/game-server/profile.md` | Never. It reports which rules the core's gaps block. |
 | 2. Design | `gdd-intake` | GDD files or a prompt | `design.md`, draft config JSON in `config/` | The design has open questions |
 | 3. Spec | `feature-spec` | The profile and `design.md` | `spec.md` | A core blocker needs a decision, or a Blocker question is still open |
-| 4. Plan | `feature-spec` | A `ready` spec | A task list or a tickets file | Never |
+| 4. Plan | `feature-spec` | A `ready` spec | `tasks.md` | Never |
 | 5. Build | `feature-build` | The profile, the spec, and one slice | Java code and unit tests | A gate fails |
 | 6. Review | `feature-review` | The code, the profile, the spec, and the design | A findings report | Never. It reports and does not fix. |
 
@@ -84,9 +84,9 @@ A large feature builds better in slices, each small enough for one session. Ask 
 Slice the daily-streak spec into an ordered task list.
 ```
 
-The default is a task list at `docs/game-server/features/daily-streak/tasks.md`. Each task has a goal, the tasks it depends on, its files, the spec rows it builds, and a check command, which is the profile's `test_one_cmd` with the test class filled in. If a workflow you use reads a tickets file instead, ask for that. The tickets file goes to `docs/intents/daily-streak-tickets.md`, with Builds, Blocked by, Writes, Acceptance, and Verify on each ticket.
+The task list goes to `docs/game-server/features/daily-streak/tasks.md`, or to a path you name. Each task has Builds (the spec rows it makes work), Depends on, Writes (the files it may change), Acceptance (one checkable line per spec row), and Verify, which is the profile's `test_one_cmd` with the test class filled in. The format does not assume who runs the tasks. If your workflow tool wants a different file, point it at this one or have it convert the list.
 
-Either way, shared shapes come first: command ids, the state model, and the config schema. Then come the commands, the HTTP endpoints, the cheat and admin commands, the wiring that registers everything, and the KPI queries. A composite command splits into three slices. Slices with no dependency between them can build at the same time.
+Shared shapes come first: command ids, the state model, and the config schema. Then come the commands, the HTTP endpoints, the cheat and admin commands, the wiring that registers everything, and the KPI queries. A composite command splits into three slices. Slices with no dependency between them can build at the same time.
 
 ## 5. Build
 

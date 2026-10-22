@@ -58,7 +58,7 @@ The skills that exist today live inside one internal reference project. They nam
 - Missing core capability means a blocker plus a proposal, not a workaround.
 - Port the existing GDD-to-design skill into the plugin.
 - Skills trigger from their description. Skills that write files into the target repo run only on explicit request.
-- Support nstack and plain Claude Code.
+- Support nstack and plain Claude Code. Amended on 2026-10-22: the skills are workflow-neutral and name no workflow. Slicing writes one task list that any runner can build from.
 - Verification is unit tests, an E2E bot when the project has one, and a performance budget per command.
 - Admin is server commands plus an API spec. Admin web UI only when the profile declares an admin web repo.
 - Metric is a metric spec, logger calls, and KPI queries.
