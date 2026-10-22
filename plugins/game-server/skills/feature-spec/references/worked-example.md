@@ -80,7 +80,7 @@ Response:
 | 5 | `lastClaimDay` | int | no | Stored server day of the last claim, -1 before the first claim | SYNC-03 |
 | 6 | `rewardDay` | int | no | The day the next claim grants, 1 to 7 | BG-04 |
 | 7 | `nextDayStartsAt` | long | no | Epoch milliseconds of the next day boundary | BG-04, MN-11 |
-| 8 | `rewards` | list | no | The 7 reward days, each with at most 10 items | BG-04, PERF-04 |
+| 8 | `rewards` | list | no | The 7 reward days, each with its one `{id, amount}` reward | BG-04, PERF-04 |
 
 - Reject: Every error carries `serverTime`. The command changes nothing, so it has no other field to resync. Rules: SYNC-02.
 - Idempotency: None. The command changes nothing, so a retry is harmless. Rules: AUTH-08.
@@ -111,7 +111,7 @@ Checks:
 | 4 | Today, by server day, is not claimed yet | `ALREADY_CLAIMED` | ST3, TM1, EC1 | AUTH-02, AUTH-06 |
 
 - Cost: None. The claim is free. Rules: AUTH-07.
-- Effect: The core takes today's server day from `now`. It keeps `streakCount` when `lastClaimDay` is yesterday and sets it to 0 otherwise, then computes the reward day with F1. It adds the day's items through the CAP-INVENTORY add with reason `STREAK_CLAIM` and the action's trace id. Only after the add succeeds does it set `streakCount` to the old value plus 1, `lastClaimDay` to today, and the last claim fields to this request, so a failed add changes nothing. Design: R1, R2, F1, RW1, RW2, RW3, RW4, RW5, RW6, RW7, EC1. Rules: AUTH-01, AUTH-02, AUTH-07, CFG-05, MET-03, MET-04.
+- Effect: The core takes today's server day from `now`. It keeps `streakCount` when `lastClaimDay` is yesterday and sets it to 0 otherwise, then computes the reward day with F1. It adds the day's reward through the CAP-INVENTORY add with reason `STREAK_CLAIM` and the action's trace id. Only after the add succeeds does it set `streakCount` to the old value plus 1, `lastClaimDay` to today, and the last claim fields to this request, so a failed add changes nothing. Design: R1, R2, F1, RW1, RW2, RW3, RW4, RW5, RW6, RW7, EC1. Rules: AUTH-01, AUTH-02, AUTH-07, CFG-05, MET-03, MET-04.
 
 Response:
 
@@ -127,7 +127,7 @@ Response:
 
 - Reject: Every error carries `serverTime`, `streakCount`, and `lastClaimDay` with their stored values, so the client resyncs from the reject. Rules: SYNC-02.
 
-- Idempotency: StreakState keeps the last claim's `requestId` and reward day. A request with that id returns the first result, with the day's items read from the config, and grants nothing. Any other request on a claimed day gets `ALREADY_CLAIMED`. The record is one id, so the state stays bounded. Rules: AUTH-08, PERF-06.
+- Idempotency: StreakState keeps the last claim's `requestId` and reward day. A request with that id returns the first result, with the day's reward read from the config, and grants nothing. Any other request on a claimed day gets `ALREADY_CLAIMED`. The record is one id, so the state stays bounded. Rules: AUTH-08, PERF-06.
 - Rate limit: None. The command reads and writes only the player's own state. Rules: AUTH-09.
 - Pushes: None. The response carries the change. Rules: SYNC-04.
 - Metric: Action `streak_claim`, on success, on a replay, and on every error. An unexpected exception writes an exception row with the trace id and answers the shared server error code. Rules: MET-01, MET-02, MET-08.
@@ -207,7 +207,7 @@ None. The feature keeps no cluster-wide state. Rules: MN-05.
 | `unlockLevel` | int | yes | none | 1 or more | none | ST1 | CFG-02, CFG-05 |
 | `rewards` | list | yes | none | Exactly one entry for each day from 1 to 7 | Array of 7 entries indexed by day | RW1, RW2, RW3, RW4, RW5, RW6, RW7 | CFG-02, CFG-06, PERF-05 |
 | `rewards[].day` | int | yes | none | 1 to 7, each once | none | F1 | CFG-02, CFG-06 |
-| `rewards[].items` | list | yes | none | 1 to 10 `{id, amount}` records, each a known item id from CAP-INVENTORY with an amount of 1 or more | none | RW1, RW2, RW3, RW4, RW5, RW6, RW7 | CFG-02, CFG-05, CFG-09, CFG-10, PERF-04 |
+| `rewards[].reward` | object | yes | none | One `{id, amount}` record, a known item id from CAP-INVENTORY with an amount of 1 or more | none | RW1, RW2, RW3, RW4, RW5, RW6, RW7 | CFG-02, CFG-05, CFG-09, CFG-10 |
 
 Environment values:
 
@@ -238,7 +238,7 @@ Generated files:
 
 | Reason | Source or sink | Currency or item | Amount | Command | Rules |
 | --- | --- | --- | --- | --- | --- |
-| `STREAK_CLAIM` | source | The items of the reward day | From `rewards[].items` | ClaimStreakReward | MET-03, MET-04 |
+| `STREAK_CLAIM` | source | The item of the reward day | From `rewards[].reward` | ClaimStreakReward | MET-03, MET-04 |
 
 ### KPI queries
 
@@ -412,7 +412,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | `StreakConfigTest` | A reward for day 8 | unit | Load fails and names the file and the key | F1 | TEST-05 |
 | `StreakConfigTest` | Day 3 missing | unit | Load fails and names the file and the key | RW3 | TEST-05 |
 | `StreakConfigTest` | Unknown item id | unit | Load fails and names the file and the key | RW1 | TEST-05 |
-| `StreakConfigTest` | 11 items on one day | unit | Load fails and names the file and the key | RW1 | TEST-05 |
+| `StreakConfigTest` | A day 1 reward with amount 0 | unit | Load fails and names the file and the key | RW1 | TEST-05 |
 | `StreakConfigTest` | `unlockLevel` 0 | unit | Load fails and names the file and the key | ST1 | TEST-05 |
 | `StreakConfigTest` | Extra key | unit | Load succeeds and ignores a key it does not know | none | TEST-05, BG-08 |
 | `StreakStateCompatTest` | No document | compatibility | Defaults apply, and migration runs once | none | TEST-06, BG-09 |

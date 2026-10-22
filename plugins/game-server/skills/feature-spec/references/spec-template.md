@@ -93,7 +93,7 @@ Checks:
 | 4 | Today, by server day, is not claimed yet | `ALREADY_CLAIMED` | ST3, TM1 | AUTH-02, AUTH-06 |
 
 - Cost: None. Rules: AUTH-07.
-- Effect: The core computes the reward day with F1 from stored state, sets `lastClaimDay` to today, and adds the day's items with reason `STREAK_CLAIM` and the action's trace id. Design: R1, F1, RW1, RW7. Rules: AUTH-01, CFG-05, MET-03, MET-04.
+- Effect: The core computes the reward day with F1 from stored state, sets `lastClaimDay` to today, and adds the day's reward with reason `STREAK_CLAIM` and the action's trace id. Design: R1, F1, RW1, RW7. Rules: AUTH-01, CFG-05, MET-03, MET-04.
 
 Response:
 
@@ -200,7 +200,7 @@ The rows come from the design's Config tables and Timing. Each cost and reward i
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `isActive` | bool | yes | none | none | none | TM2 | CFG-04 |
 | `unlockLevel` | int | yes | none | 1 or more | none | ST1 | CFG-02, CFG-05 |
-| `rewards` | list | yes | none | Days 1 to 7, each once, each item an `{id, amount}` record with a known item id and an amount of 1 or more | Map from day to entry | RW1, RW7 | CFG-02, CFG-06, CFG-09, CFG-10, PERF-05 |
+| `rewards` | list | yes | none | Days 1 to 7, each once, each with one `reward`, an `{id, amount}` record with a known item id and an amount of 1 or more | Map from day to entry | RW1, RW7 | CFG-02, CFG-06, CFG-09, CFG-10, PERF-05 |
 
 Environment values:
 
@@ -235,7 +235,7 @@ The rows come from the design's Overview, Gameplay loop, and Rewards. They usual
 
 | Reason | Source or sink | Currency or item | Amount | Command | Rules |
 | --- | --- | --- | --- | --- | --- |
-| `STREAK_CLAIM` | source | The items of the reward day | From `rewards[].items` | ClaimStreakReward | MET-03, MET-04 |
+| `STREAK_CLAIM` | source | The item of the reward day | From `rewards[].reward` | ClaimStreakReward | MET-03, MET-04 |
 
 ### KPI queries
 

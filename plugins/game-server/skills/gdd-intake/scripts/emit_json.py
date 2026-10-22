@@ -10,7 +10,7 @@ on its Draft line, relative to the design file (or to --out-dir). The key table 
   - A key path joins object fields with dots: `limits.perDay`.
   - `[]` marks a list of objects (`tiers[].points`) or, at the end, a list of values (`tags[]`).
   - The Type column picks the JSON type: integer, number, boolean, or string. Any other type,
-    such as "list of item and amount", keeps the cell text as a string.
+    such as "date", keeps the cell text as a string.
   - A value comes from the Example column. A list key whose Example is a JSON array, such as
     `[8, 15, 30]`, gives one value per list element, in order. With --sheets, a key whose Source
     cites a sheet range takes its values from the converted CSV instead: a single cell for a
