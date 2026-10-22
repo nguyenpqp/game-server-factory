@@ -111,7 +111,7 @@ Checks:
 | 4 | Today, by server day, is not claimed yet | `ALREADY_CLAIMED` | ST3, TM1, EC1 | AUTH-02, AUTH-06 |
 
 - Cost: None. The claim is free. Rules: AUTH-07.
-- Effect: The core takes today's server day from `now`. It keeps `streakCount` when `lastClaimDay` is yesterday and sets it to 0 otherwise, then computes the reward day with F1. It adds the day's reward through the CAP-INVENTORY add with reason `STREAK_CLAIM` and the action's trace id. Only after the add succeeds does it set `streakCount` to the old value plus 1, `lastClaimDay` to today, and the last claim fields to this request, so a failed add changes nothing. When the add refuses, such as for a balance at the limit of its type, the command returns `GRANT_FAILED`. When the add throws, it has added nothing and no StreakState field has changed, so the exception goes to the runner as it is, and a retry with the same request id claims again. Design: R1, R2, F1, RW1, RW2, RW3, RW4, RW5, RW6, RW7, EC1. Rules: AUTH-01, AUTH-02, AUTH-04, AUTH-07, CFG-05, MET-03, MET-04.
+- Effect: The core takes today's server day from `now`. It keeps `streakCount` when `lastClaimDay` is yesterday and sets it to 0 otherwise, then computes the reward day with F1. It adds the day's reward through the CAP-INVENTORY add with reason `STREAK_CLAIM` and the action's trace id. Only after the add succeeds does it set `streakCount` to the old value plus 1, at most 10000, `lastClaimDay` to today, and the last claim fields to this request, so a failed add changes nothing. When the add refuses, such as for a balance at the limit of its type, the command returns `GRANT_FAILED`. When the add throws, the core catches it at the call, removes what the add put in, and rethrows, so no StreakState field changes, the runner writes the exception row, and a retry with the same request id claims again. Design: R1, R2, F1, RW1, RW2, RW3, RW4, RW5, RW6, RW7, EC1. Rules: AUTH-01, AUTH-02, AUTH-04, AUTH-07, CFG-05, MET-03, MET-04.
 
 Response:
 
@@ -141,7 +141,7 @@ The shared codes `FEATURE_INACTIVE`, `CLIENT_TOO_OLD`, `FEATURE_LOCKED`, `INVALI
 | 4201 | `ALREADY_CLAIMED` | Today's reward is already claimed | ClaimStreakReward | AUTH-10 |
 | 4202 | `OUT_OF_RANGE` | A cheat or admin value is missing or outside its range | CheatSetStreak, CheatShiftDay, AdminSetStreak | AUTH-10, ADMIN-06 |
 | 4203 | `CONFIRM_REQUIRED` | A destructive admin command on live lacks `confirm` | AdminSetStreak | ADMIN-04 |
-| 4204 | `GRANT_FAILED` | The reward add refused, and nothing changed | ClaimStreakReward | AUTH-07, AUTH-10 |
+| 4204 | `GRANT_FAILED` | The reward add refused, and nothing changed | ClaimStreakReward | AUTH-10 |
 
 ## Pushes
 
@@ -310,7 +310,7 @@ Request:
 | --- | --- | --- | --- | --- |
 | `userId` | long | yes | An existing user | ADMIN-05, ADMIN-06 |
 | `streakCount` | int | yes | 0 to 10000. A missing value returns `OUT_OF_RANGE`. | ADMIN-05, ADMIN-06 |
-| `lastClaimDay` | int | no | -1, or a server day number not after today. When absent, the stored day stays. | ADMIN-05, ADMIN-06 |
+| `lastClaimDay` | int | yes | -1, or a server day number not after today. A missing value returns `OUT_OF_RANGE`, because a count kept with a stale day resets on the next claim. | ADMIN-05, ADMIN-06 |
 | `requestId` | string | yes | 8 to 64 characters | ADMIN-05, ADMIN-07 |
 | `confirm` | bool | on live | true | ADMIN-04, ADMIN-05 |
 
@@ -389,10 +389,11 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 ## Test plan
 
 - Check: The profile's `test_one_cmd` for each test class below, after each slice. The profile shows CAP-BOT as missing, so the plan has no bot scenario. Rules: TEST-01.
+- Time: Every test passes `now` and the CAP-CLOCK zone to the core and never sets the JVM's default zone, so the plan gives the same result on a machine in any zone. Rules: TEST-02.
 
 | Test class | Case | Level | Asserts | Design | Rules |
 | --- | --- | --- | --- | --- | --- |
-| `GetStreakStateTest` | Unlocked player on an unclaimed day | unit | `serverTime` is `now`, the stored `streakCount` and `lastClaimDay`, `rewardDay` from F1, `nextDayStartsAt` at the next boundary in the CAP-CLOCK zone, which the test passes to the core with `now` | ST2, F1, UI1 | TEST-01, TEST-02 |
+| `GetStreakStateTest` | Unlocked player on an unclaimed day | unit | `serverTime` is `now`, the stored `streakCount` and `lastClaimDay`, `rewardDay` from F1, `nextDayStartsAt` at the next boundary | ST2, F1, UI1 | TEST-01, TEST-02 |
 | `GetStreakStateTest` | Player below level 5 | unit | `unlockLevel` 5 and the stored fields, state unchanged | ST1, UI2 | TEST-01 |
 | `GetStreakStateTest` | Feature inactive | unit | `FEATURE_INACTIVE` | TM2 | TEST-03 |
 | `GetStreakStateTest` | Old client 1.3.0 | unit | `CLIENT_TOO_OLD` | none | TEST-03, TEST-07 |
@@ -401,14 +402,15 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | `ClaimStreakRewardTest` | Claim on the day after a claim | unit | Reward day 2, RW2 items, `streakCount` 2 | F1, RW2 | TEST-02 |
 | `ClaimStreakRewardTest` | Claim after a missed day | unit | Reward day 1, `streakCount` restarts at 1 | R1, F1 | TEST-02 |
 | `ClaimStreakRewardTest` | Claim after a day 7 claim | unit | Reward day 1, `streakCount` 8 | R2, F1, RW7 | TEST-02 |
-| `ClaimStreakRewardTest` | Claim at 00:00:01 after a claim at 23:59:59 | unit | The claim counts for the new day. The test passes the CAP-CLOCK zone to the core with `now`, so it gives the same result under any JVM zone. | EC1, TM1 | TEST-02 |
+| `ClaimStreakRewardTest` | Claim at 00:00:01 after a claim at 23:59:59 | unit | The claim counts for the new day, and so does the same pair of times run on a machine set to UTC | EC1, TM1 | TEST-02 |
 | `ClaimStreakRewardTest` | Feature inactive | unit | `FEATURE_INACTIVE`, state unchanged | TM2 | TEST-03 |
 | `ClaimStreakRewardTest` | Old client 1.3.0 | unit | `CLIENT_TOO_OLD`, state unchanged | none | TEST-03, TEST-07 |
 | `ClaimStreakRewardTest` | Player below level 5 | unit | `FEATURE_LOCKED`, state unchanged | ST1 | TEST-03 |
 | `ClaimStreakRewardTest` | Second claim on the same day with a new request id | unit | `ALREADY_CLAIMED` with the stored `streakCount` and `lastClaimDay`, state unchanged | ST3 | TEST-03 |
 | `ClaimStreakRewardTest` | Request id of 7 characters | unit | `INVALID_REQUEST`, state unchanged | none | TEST-03 |
 | `ClaimStreakRewardTest` | The item add refuses | unit | `GRANT_FAILED` with the stored `streakCount` and `lastClaimDay`, state unchanged | none | TEST-03 |
-| `ClaimStreakRewardTest` | The item add throws | unit | The exception reaches the runner, no StreakState field changes, the request id is not stored, and a retry with the same id grants once | none | TEST-09, AUTH-07 |
+| `ClaimStreakRewardTest` | The item add adds the reward and then throws | unit | The balance is back to its value before the claim, no StreakState field changes, the request id is not stored, one exception row with the trace id is written, and a retry with the same id grants once | none | TEST-08, TEST-09, AUTH-07 |
+| `ClaimStreakRewardTest` | Claim with `streakCount` 10000 stored and yesterday claimed | unit | Reward day 5 from F1, and `streakCount` stays 10000 | F1 | TEST-02 |
 | `ClaimStreakRewardTest` | Replay of one request id | unit | One grant, and the replay returns the first reward day | none | TEST-09 |
 | `ClaimStreakRewardTest` | Metric rows | unit | One `streak_claim` row and one `STREAK_CLAIM` item row with the same trace id on success, and one `streak_claim` row on each error | none | TEST-08 |
 | `StreakCheatTest` | CheatSetStreak on live | unit | Rejected, no change | ST2, ST3 | TEST-04, TEST-11 |
@@ -417,7 +419,7 @@ None. Every caller is a logged-in player or an admin session. Rules: HTTP-01.
 | `StreakCheatTest` | CheatShiftDay by 1 day off live | unit | The acting player's day moves and another player's day does not | ST2 | TEST-02, TEST-11 |
 | `StreakAdminTest` | AdminSetStreak on live without `confirm` | unit | `CONFIRM_REQUIRED`, no change | none | TEST-03 |
 | `StreakAdminTest` | AdminSetStreak with count -1 | unit | `OUT_OF_RANGE`, no change | none | TEST-03 |
-| `StreakAdminTest` | AdminSetStreak without `streakCount` | unit | `OUT_OF_RANGE`, no change | none | TEST-03, ADMIN-06 |
+| `StreakAdminTest` | AdminSetStreak without `streakCount`, and again without `lastClaimDay` | unit | `OUT_OF_RANGE` each time, no change | none | TEST-03, ADMIN-06 |
 | `StreakAdminTest` | Replay of one AdminSetStreak request id | unit | One change and one audit row | none | TEST-09 |
 | `StreakAdminTest` | Offline AdminSetStreak whose CAS fails after it applied | unit | The retry re-reads, one change and one audit row | none | TEST-09, MN-04 |
 | `StreakAdminTest` | Offline AdminSetStreak whose CAS fails before it applied | unit | The retry applies it, one change and one audit row | none | TEST-09, MN-04 |

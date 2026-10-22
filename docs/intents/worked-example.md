@@ -12,9 +12,10 @@
 ## Outcome
 
 - ClaimStreakReward returns `GRANT_FAILED` when the CAP-INVENTORY add refuses, such as a balance at the limit of its type. The error codes table, the generated constants, and the T01 slice in `slicing.md` include the new code, and the test plan asserts it.
-- The ClaimStreakReward effect says that a throwing add changes nothing and reaches the runner. The test plan has that case, and it asserts that the request id is not stored and that a retry grants once.
-- AdminSetStreak returns `OUT_OF_RANGE` for a missing `streakCount`, and an absent `lastClaimDay` keeps the stored day. The test plan has the missing field case.
-- The day boundary tests pass the CAP-CLOCK zone to the core with `now`, so they give the same result under any JVM zone.
+- When the add throws, the ClaimStreakReward core catches it at the call, removes what the add put in, and rethrows, as AUTH-07 asks. The test plan has that case, with an add that adds and then throws, and it asserts the balance, the unstored request id, the exception row, and a retry that grants once.
+- A claim keeps `streakCount` within its stored bound of 10000, with a test at the bound.
+- AdminSetStreak returns `OUT_OF_RANGE` for a missing `streakCount` or `lastClaimDay`. Both are required, because a count kept with a stale day resets on the next claim. The test plan has both missing field cases.
+- The test plan says every test passes `now` and the CAP-CLOCK zone to the core and never sets the JVM's zone, and the day boundary test also holds on a machine set to UTC.
 - `python3 -m unittest discover -s tests` and `python3 scripts/validate_plugin.py --denylist <local denylist>` pass.
 
 ## Surfaces
@@ -43,7 +44,7 @@
 ### Mine
 
 - The failed add gets a feature code, `GRANT_FAILED`, as in the shop example, rather than a shared code that CAP-ERRORS does not list.
-- The zone goes into the test rows that cross a day boundary, not into the Check line, so each row shows what it passes.
+- The zone rule goes on one `Time:` line of the test plan, because every claim test computes a server day from `now`.
 
 ## Open questions
 
