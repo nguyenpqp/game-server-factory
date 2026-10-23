@@ -18,7 +18,7 @@ The owner asked how the plugin could better serve "vibe coding" a game server. A
 - MET-06, the spec template's KPI part, and the review checklist say that a KPI query counts only players who reached the feature, and name the default-date join as the trap.
 - `feature-spec` asks an accepted risk on fields saved in separate documents to cite MN-12 and name a process crash between the saves as its trigger.
 - The SYNC-04 index severity stays critical. The `feature-review` severity audit may lower a SYNC-04 finding to important when the pushed value was stored before the push and no value depends on its delivery.
-- `feature-spec` has a section for changing a `ready` spec. A change to a rule, number, or end condition edits `design.md` first in the design template format, citing `prompt` with the date. The skill then edits only the affected spec rows, reruns the self-check and Core blockers for them, shows the developer the change, and keeps `ready` when nothing new blocks. `feature-build` names a bug against a spec row as a valid slice. `docs/usage.md` follows.
+- `feature-spec` has a section for changing a `ready` spec. A change to a rule, number, or end condition edits `design.md` first in the design template format. The change is an answered Important question with the date, and each changed requirement cites `answer Q<n>`. The skill then edits only the affected spec rows, reruns the self-check and Core blockers for them, shows the developer the change, and keeps `ready` when nothing new blocks. `feature-build` names a bug against a spec row as a valid slice. `docs/usage.md` follows.
 - When Core blockers has open rows, `feature-spec` groups the rows that one deployment fact would bound and asks once per fact, offering acceptance for every feature. PERF-01 stays accepted call by call.
 - The two stale script folders are gone from disk.
 - `python3 -m unittest discover -s tests` and `python3 scripts/validate_plugin.py --denylist <local denylist>` pass.
@@ -58,6 +58,8 @@ The owner asked how the plugin could better serve "vibe coding" a game server. A
 - Drop the TEST-10 follow-up, because a conditional minor rule should not add a stop.
 - Put the core-push fact on CAP-INVENTORY rather than a new capability, since the grant call is where the push hides.
 - Keep each item in its own commit so the owner can drop one in review.
+- Record a design change as an answered question rather than a dated `prompt` source. The design template already gives that question a date and an `Affects` list, and `feature-review` reads an `answer Q<n>` source as having no GDD text to check, so the change does not show as a contradiction of the GDD.
+- Set the spec to `draft` while a change is edited, so `feature-build` cannot build an unconfirmed change.
 
 ## Open questions
 

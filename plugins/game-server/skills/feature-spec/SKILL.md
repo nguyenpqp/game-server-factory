@@ -1,6 +1,6 @@
 ---
 name: feature-spec
-description: Turn a game feature design into a Java game server spec and implementation plan. Use when a developer has a design.md from gdd-intake, a GDD, or a plain feature prompt and wants the server side designed before code. The spec covers command ids, request and response fields, checks and error codes, pushes, per-user state and migrations, Redis keys, the feature config schema, metric events and KPI queries, cheat commands, admin commands and their API spec, HTTP callbacks, multi-node safety, blue-green rollout and old client compatibility, a performance budget per command, core blockers, a test plan, and design coverage. It then slices the spec into an ordered task list that a developer or any workflow can build from. Requires the project profile from server-profile and cites rule ids from server-rules.
+description: Turn a game feature design into a Java game server spec and implementation plan. Use when a developer has a design.md from gdd-intake, a GDD, or a plain feature prompt and wants the server side designed before code, or wants to change a feature whose spec already exists, such as a new reward amount or an extra admin command. The spec covers command ids, request and response fields, checks and error codes, pushes, per-user state and migrations, Redis keys, the feature config schema, metric events and KPI queries, cheat commands, admin commands and their API spec, HTTP callbacks, multi-node safety, blue-green rollout and old client compatibility, a performance budget per command, core blockers, a test plan, and design coverage. It then slices the spec into an ordered task list that a developer or any workflow can build from. Requires the project profile from server-profile and cites rule ids from server-rules.
 ---
 
 # Feature spec
@@ -142,6 +142,17 @@ Before you ask the developer to confirm, read the spec once against this list an
 
 Show the developer the spec and ask for confirmation. On confirmation, set `Status: ready`. Under a workflow, the workflow's own interview confirms it. Never set `ready` while Core blockers has a row that blocks.
 
+## Change a ready spec
+
+A developer may ask to change a feature whose spec is `ready`, such as a new reward amount, an extra admin command, or a fix after a bug report. Change only what the request reaches, and keep every other row as it is.
+
+1. **Sort the request.** A change to what the player sees, does, or gets, such as a rule, a number, a state, a timer, or an end condition, is a design change. A change only to the server side, such as an admin command, a metric field, or a budget, is a spec change. A bug where the code breaks a spec row that is right needs no spec change. Tell the developer to hand it to `feature-build` as a slice that names the row, and stop.
+2. **Set `Status: draft`** while you edit, so `feature-build` does not build an unconfirmed change.
+3. **Change the design first.** For a design change, add a question under the design's Important open questions. Its title is the request, its source is `prompt`, its status is `answered on <date>: <the change>`, its interim default is the design before the change, and `Affects` lists the ids it changes. Edit each requirement the change reaches, or add one with the next free id, and cite `answer Q<n>` as its source. Never reuse an id. Check the design against the [design template](../gdd-intake/references/design-template.md). `feature-review` checks the code against this file, so a change that skips it reads as a divergence.
+4. **Change the spec rows.** Edit the rows whose `Design` cell cites a changed id and the rows the request names, and add rows where needed. A stored field, response field, or config key changes only in the ways BG-01, BG-04, and BG-08 allow. Update the Test plan and Design coverage rows for each changed id.
+5. **Recheck the changed rows.** Run the [self-check](#self-check) over them. Run the Core blockers steps for each rule id that the changed rows cite and the spec did not cite before. A new blocking row stops the change as section 12 says.
+6. **Confirm.** Show the developer what changed in `design.md` and `spec.md`. On confirmation, set `Status: ready`. When the spec has a task list, add a task for the changed rows at its end, in the [slicing](references/slicing.md) format.
+
 ## Slicing
 
 When the spec is `ready` and the developer asks for a build plan, follow [slicing](references/slicing.md). It writes an ordered task list to `docs/game-server/features/<feature>/tasks.md`, or to the path the developer names. Never slice a `draft` or `blocked` spec.
@@ -151,5 +162,6 @@ When the spec is `ready` and the developer asks for a build plan, follow [slicin
 - `docs/game-server/features/<feature>/spec.md`, the spec.
 - On request, the task list from slicing.
 - A decision in `docs/game-server/decisions.md` for each risk the developer accepts for every feature.
+- For a design change to a ready spec, the edited `design.md`.
 
 The skill writes nothing else in the target repository.
