@@ -107,6 +107,16 @@ Code that already runs on live is proven, and every edit to it risks players who
 - Behavior that designers or operators may want to change is configurable, within the limits the code validates.
 - An effect on another feature that the reply depends on, or that pays value, is a direct contract call or a durable inbox entry. Events are fine for reactions whose loss costs nothing.
 
+Every feature module has the same five parts, each with one job, so any engineer finds things in the same place and one part changes without touching the others. Name and place them the way the project already does.
+
+- **Config.** The feature's numbers and switches, loaded as the validated, immutable snapshot of principle 6.
+- **Data model.** The user model is the per-player state saved in the player's document. The server model is shared state, such as a board, a group, or a stock, kept in Redis or a shared document. Both change only by adding fields, as principle 5 requires.
+- **Logic.** The game rules as plain code over the models and the config, with time and randomness passed in. It does no I/O and builds no packets, so unit tests cover every rule.
+- **API.** The command handlers for the client, and the cheat, admin, and callback handlers. A handler validates the request, loads state, calls the logic, saves, replies, and writes the metric row. It holds no game rule.
+- **Metric log.** The feature's metric actions, reasons, and extra fields, defined in one place so every row has the same shape.
+
+Dependencies point one way: the API calls the logic, and the logic reads the models and the config. The logic never calls a handler or the store.
+
 ## 8. Every command has a bounded cost
 
 The game should hold its peak player count without one popular command taking a node down.
