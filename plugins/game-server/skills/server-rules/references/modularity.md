@@ -49,7 +49,7 @@ return Outcome.ok(item.id());
 
 Don't treat an event as durable delivery to another user. A dropped event loses the effect, so value for another user goes through the durable inbox (MN-03).
 
-The same holds for the same player. Progress that pays a reward later, such as points toward a milestone or a pass level, never rides only an event. Make it a contract call before the reply, or an entry in the player's durable inbox that the owner applies once.
+The same holds for the same player. Progress that pays a reward later, such as points toward a milestone or a pass level, never rides only an event. Make it a contract call before the reply, or an entry in the player's durable inbox whose id comes from the action's request id, so a retry adds nothing new. The append is a change step, so AUTH-07 decides what a failed append does.
 
 **Check.** For each event the feature publishes, confirm that the reply does not report its effect, and that a dropped event loses no value, for this player or another. For each cross-feature effect that the reply reports, find the contract call that completes before the reply is built.
 

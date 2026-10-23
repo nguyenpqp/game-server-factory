@@ -194,11 +194,12 @@ Do:
 
 ```java
 if (!EventLock.tryAcquire(eventId, ttlMs)) { retryLater(eventId); return; }   // any version that knows the event
+Ranking ranking = RankCopy.createIfAbsentThenRead(eventId);   // one whole copy, taken after the closed marker
 try {
-    for (long userId : winners) {
+    for (long userId : ranking.winners()) {
         if (!EventLock.stillHeld(eventId)) return;
         if (!RedisOps.hsetnx(paidKey(eventId), String.valueOf(userId), traceId)) continue;   // paid before
-        if (!Inbox.append(userId, new TopRewardEntry(eventId, rankOf(userId), traceId)))
+        if (!Inbox.append(userId, new TopRewardEntry(eventId, ranking.rankOf(userId), traceId)))
             RedisOps.hdel(paidKey(eventId), String.valueOf(userId));                      // retried later
     }
 } finally {
@@ -214,7 +215,7 @@ scheduler.everyMonday(() -> payWeeklyRanking());
 if (LeaderLease.isHeld()) payAll(winners);   // checked once, no per-user claim
 ```
 
-A job that pays by rank, or by any value that can still change, first stores its input once under the occurrence id, such as the final ranking of a season. Every unit and every retry pays from that stored copy, never from the live board, so a late write or a removed entry cannot shift ranks during the payout.
+A job that pays by rank, or by any value that can still change, pays from one stored copy of its input, such as the final ranking of a season. Take the copy after the closed marker is set (MN-14), and write it whole, in one document or one atomic write, create-if-absent under the occurrence id. Every node reads the stored copy back and pays from it, never from its own read, and the copy stays until the done marker is set. A late write or a removed entry then cannot shift ranks during the payout.
 
 Run a periodic job much more often than its period, and decide what is due from stored state, so a restart or a lease move cannot skip a run. Set the done marker only when no unit failed, and schedule the retry in a `finally` block.
 

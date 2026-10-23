@@ -47,7 +47,7 @@ Take the command id block from the profile's CAP-COMMAND entry, one block per fe
 - Order the Checks rows as they run: feature active and window, client version, unlock, ownership of named objects, state preconditions, then costs. Each row has its own error code (AUTH-10).
 - A cost is checked in full before any take, and the Effect says what is refunded if a later step fails (AUTH-07).
 - The Effect runs on a pure core that receives `now` and the RNG as parameters (AUTH-02, AUTH-03). Name the inventory call from CAP-INVENTORY with the reason constant and the trace id (MET-03, MET-04).
-- Decide idempotency per command. A command whose retry would grant value twice takes a `requestId` (AUTH-08). Store the smallest record that answers a replay with the first result, such as the last request id and its result for a once-a-day claim, and bound it (PERF-06).
+- Decide idempotency per command. A command whose retry would grant value twice takes a `requestId` (AUTH-08). Value backed by an outside transaction, such as a forwarded store receipt, also claims that transaction id once for the whole cluster (AUTH-08). Store the smallest record that answers a replay with the first result, such as the last request id and its result for a once-a-day claim, and bound it (PERF-06).
 - Add a rate limit when the command reads the database, touches other users, or fans out (AUTH-09). Otherwise say `None.` and why.
 - New error codes come from the feature's block, added the way CAP-ERRORS describes. List shared codes in the Checks table, but only the feature's own codes in the Error codes table.
 

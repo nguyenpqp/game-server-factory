@@ -44,9 +44,9 @@ boolean ready = System.currentTimeMillis() >= plot.readyAt();
 LocalDate today = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate();
 ```
 
-When the design resets at each player's local time, the player's zone is stored server state, set by a rule the design gives, and the core takes it as a parameter like the clock. A request never names the zone for one action. A zone change cannot pass the same reset twice, so it takes effect only after the next reset in both zones, or the state records the last reset by its instant.
+When the design resets at each player's local time, the player's zone is stored server state, set by a rule the design gives, and the core takes it as a parameter like the clock. A request never names the zone for one action. A zone change cannot give a reset for a period the player already had. The state stores the label of the last period it reset for, such as a day number, and a reset runs only when the current period's label is greater. When a zone change takes effect is the design's call.
 
-**Check.** Search the feature package for `currentTimeMillis`, `Instant.now`, `LocalDate.now`, `new Date()`, and the other calls in the profile's `lint.forbidden_time`. Then find each place that turns time into a date, a day, or an hour, such as `atZone`, `ofInstant`, `Calendar`, or a date format, and confirm it takes the zone from CAP-CLOCK or from the player's stored zone. For a stored zone, find what a zone change does to the next reset. A call that names no zone, such as `ZoneId.systemDefault()`, `TimeZone.getDefault()`, or `Calendar.getInstance()`, uses the JVM's zone.
+**Check.** Search the feature package for `currentTimeMillis`, `Instant.now`, `LocalDate.now`, `new Date()`, and the other calls in the profile's `lint.forbidden_time`. Then find each place that turns time into a date, a day, or an hour, such as `atZone`, `ofInstant`, `Calendar`, or a date format, and confirm it takes the zone from CAP-CLOCK or from the player's stored zone. For a stored zone, find the stored period label that a reset compares against. A call that names no zone, such as `ZoneId.systemDefault()`, `TimeZone.getDefault()`, or `Calendar.getInstance()`, uses the JVM's zone.
 
 - needs: CAP-CLOCK
 
@@ -196,9 +196,9 @@ Don't:
 state.addGems(config.packGems());
 ```
 
-A store receipt that the client forwards, or any proof of payment from outside, carries the outside system's transaction id. Claim that id once for the whole cluster before the grant, in shared state, so the same receipt sent again from this account or another one grants nothing.
+A store receipt that the client forwards, or any proof of payment from outside, is verified with the outside system first, and its transaction id comes from the verified receipt, never from the request. Claim that id in one durable record for the whole cluster, written create-if-absent with no expiry, and store the claiming user in it. The payment callback and the forwarded receipt claim the same record, so one purchase pays once whichever path comes first. Deliver the grant as an inbox entry whose id is the transaction id. A resend from the claiming user then appends the same entry, which the owner applies once, and a resend from any other user grants nothing. Release the claim only when the grant definitely failed, and keep it when the result is unknown, logged for repair (AUTH-07, MN-13).
 
-**Check.** For each command that grants value, ask what a resend after a lost response does, and find the request id guard. For value backed by an outside transaction, find the cluster-wide claim on its id.
+**Check.** For each command that grants value, ask what a resend after a lost response does, and find the request id guard. For value backed by an outside transaction, find the cluster-wide claim on its id, the user stored in it, and what a failed grant does to it.
 
 - needs: CAP-COMMAND, CAP-USERSTORE
 

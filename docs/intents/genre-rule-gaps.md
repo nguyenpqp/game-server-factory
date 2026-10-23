@@ -11,10 +11,10 @@ The review of the genre notes found four breaks that lose or forge player value 
 
 ## Outcome
 
-- MOD-02 says that a same-player effect that pays value never rides only an event. It is a contract call before the reply, or an entry in the player's durable inbox.
-- AUTH-02 allows a player zone that the server stores, set by a rule the design gives, and requires that a zone change cannot pass a reset twice. The core still takes the zone as a parameter.
-- MN-07 says that a job paying by rank, or by any value that still changes, pays every unit and every retry from one stored copy of its input.
-- AUTH-08 says that value from an outside system, such as a store receipt, is applied at most once per outside transaction id across all users.
+- MOD-02 says that a same-player effect that pays value never rides only an event. It is a contract call before the reply, or an entry in the player's durable inbox whose id comes from the action's request id.
+- AUTH-02 allows a player zone that the server stores, set by a rule the design gives, and requires a stored period label that only rises, so a zone change never gives a reset for a period already had. The core still takes the zone as a parameter, and when a change takes effect stays the design's call.
+- MN-07 says that a job paying by rank, or by any value that still changes, pays every unit and every retry from one whole stored copy of its input, taken after the closed marker and written create-if-absent.
+- AUTH-08 says that value from an outside system, such as a store receipt, is applied at most once per outside transaction id across all users. The verified id is claimed in one durable record with no expiry, shared by the callback and receipt paths, released only on a definite grant failure.
 - Each changed heading matches its index line. The review checklist rows for the four rules carry the new look-fors.
 - `python3 -m unittest discover -s tests` and `python3 scripts/validate_plugin.py --denylist <local denylist>` pass.
 
@@ -46,6 +46,7 @@ The review of the genre notes found four breaks that lose or forge player value 
 - Close the four gaps that the genre review listed, on a branch stacked on the genre notes, so the owner can take the notes without these rule changes.
 - The same-player path names the durable inbox, since it already exists for every user and is applied once by the owner.
 - A season snapshot is required by MN-07 rather than by a genre note, because any job that pays from changing data has the same break.
+- AUTH-08 keeps its `needs` line. The receipt claim is a create-if-absent insert in the store that CAP-USERSTORE already names.
 
 ## Open questions
 
