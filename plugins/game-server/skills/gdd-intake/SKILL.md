@@ -1,6 +1,6 @@
 ---
 name: gdd-intake
-description: Turns game design material into a clear, sourced feature design that server work can start from. Use when a developer hands over a game design document (GDD), feature slides (pptx), docx notes, an xlsx balance sheet, a PDF export, Markdown, images, or just a feature prompt, and the feature needs to be understood before server code is designed or written. Converts office files to Markdown with a bundled script, pulls out the rules, formulas, rewards, timing, states, and edge cases with their sources, surfaces the gaps as questions for the developer, and drafts config from the balance sheets.
+description: Turns game design material into a clear, sourced feature design that server work can start from. Use when a developer hands over a game design document (GDD), feature slides (pptx), docx notes, an xlsx balance sheet, a PDF export, Markdown, or images, or asks to turn a feature idea into a design, and the feature needs to be understood before server code is designed or written. Converts office files to Markdown with a bundled script, pulls out the rules, formulas, rewards, timing, states, and edge cases with their sources, surfaces the gaps as questions for the developer, and drafts config from the balance sheets.
 ---
 
 # GDD intake
@@ -26,7 +26,7 @@ Keep the work folder out of git, because converted text may hold content the tea
 
 - **Player terms only.** It describes rules, numbers, states, timing, rewards, and edge cases as the player experiences them. It names no commands, classes, storage keys, or metrics. Those are server decisions made later.
 - **Traceable.** Each requirement has a short id and cites where it came from: a slide, a page, a heading, a sheet range, the prompt, or the developer's answer. Reviewers use these ids to check the code against the design.
-- **Exact numbers.** Costs, rewards, rates, limits, durations, and counts are copied exactly. A sheet cell with a formula is worked out from the cells it names. Tables of balance values become draft config files, marked as drafts.
+- **Exact numbers.** Costs, rewards, rates, limits, durations, and counts are copied exactly. A sheet cell with a formula is worked out from the cells it names. Tables of balance values become draft config files, marked as drafts, in the project's config format and following the config principle in `server-principles`.
 - **Gaps are questions, not guesses.** Where the source is silent, vague, or contradicts itself, write an open question with its source, how much it matters, and a sensible default to use if nobody answers. Questions that affect player value, fairness, or what gets built matter most. Never fill a gap by inventing a rule.
 - **Edge cases are asked about.** Think about what the source rarely says: what a player who is offline at the end gets, what happens at a period boundary or a time zone change, what happens on a retry or a disconnect mid-action, ties, caps, and what an old client sees. If the feature matches a genre note in the `server-principles` skill, its questions are a good checklist.
 - **Scope is explicit.** Say whether the work is server only or also covers the client, and mark requirements that have no server effect.

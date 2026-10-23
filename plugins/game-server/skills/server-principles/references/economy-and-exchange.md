@@ -49,7 +49,7 @@ Read this note when currency or items are bought, sold, sent, or traded, such as
 - A server-wide stock is counted in node memory, or by a read and a write, so it sells more than its stock. A failed stock check reads as "sold out" or as "bought".
 - Every active player writes one stock counter. A sharded counter can no longer hold an exact limit, so the design must allow that.
 - A mailbox or a purchase history grows without a cap.
-- A payment callback grants directly, or twice. It checks the signature, the product, and the price, locks on the transaction id, and delivers through the inbox.
+- A payment callback grants directly, or twice. It checks the signature, the product, and the price, records the transaction id durably, and delivers through the inbox.
 - A refund or a chargeback callback has no path, or takes the value back twice.
 
 ### Tests and metrics

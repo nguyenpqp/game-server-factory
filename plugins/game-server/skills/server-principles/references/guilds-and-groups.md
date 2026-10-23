@@ -41,7 +41,7 @@ Read this note when players belong to a shared group, such as a guild, a clan, a
 - A player joins two groups at once on two nodes, or a group passes its member limit. The shared write rechecks the limit and the player's current group. On Redis Cluster, the keys one script touches share a hash tag.
 - An accept or a kick writes the other player's record of the group directly. The shared write goes first, and the player's record follows through that player's inbox.
 - A crash between the shared write and the inbox delivery leaves the player's record and the member list disagreeing, and actions trust the stale side. Actions read membership from the group, and the player's record is repaired from it, by the owner at load or by the feature's admin repair.
-- Several members fill one item request at once, and each pays. Claim the request, deliver through the inbox, then take the cost.
+- Several members fill one item request at once, and each pays. Claim the request atomically, save the filler's cost and the pending delivery in one write, then deliver through the inbox by the request id.
 - A kicked member keeps acting through a node's cached membership.
 - A message to members goes through a node-local session map, so members on other nodes miss it.
 - A group id comes from an in-process counter.

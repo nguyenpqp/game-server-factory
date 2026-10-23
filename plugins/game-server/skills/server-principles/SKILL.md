@@ -44,13 +44,13 @@ The client sends intents, never results. The server computes every outcome, cost
 
 Networks retry, players double-tap, nodes crash mid-command, and payment providers resend callbacks. Every path that grants or takes value gives the same result when it runs twice.
 
-- A command whose retry would pay or count toward value twice (a reward, a purchase, event progress) carries a request id applied once per player. Applied ids are kept longer than any retry can arrive, then dropped, so the record stays bounded.
+- A command whose retry would pay or count toward value twice (a reward, a purchase, event progress) carries a request id applied once per player. Applied ids are kept longer than any retry can arrive, then dropped, so the record stays bounded. Redis can lose acknowledged writes on failover, so it is never the only record of an applied id or of a counter that decides value.
 - Value from an outside system is applied once per outside transaction id across all players, recorded durably. Before anything happens, verify the signature over the raw body with a per-environment secret, reject stale timestamps, and check the payload (player, product, price) against server data. On live, an empty caller allowlist rejects every call.
-- Value for another player goes through that player's durable inbox, even when they are online on this node, and their owner applies each entry once. A best-effort message or push is never the only carrier of value.
+- Value for another player goes through that player's durable inbox, even when they are online on this node, and their owner applies each entry once: the entry's id is recorded in the player's document in the same save as its effect, and an entry already recorded is acknowledged without applying it again. A best-effort message or push is never the only carrier of value.
 
 ## 4. No node is special
 
-Any node can run any command, two nodes can run the same job at once, and any node can die between two writes. Design for it.
+Any node can receive any command or job, two nodes can run the same job at once, and any node can die between two writes. Design for it.
 
 - No game or player state in static fields, singletons, or node-wide maps. Only the immutable config snapshot lives there.
 - Only a player's owner touches their live state, and changes to another player go through that owner, even on this node. A copy of another player's state read elsewhere may reject an action but never grant one.
