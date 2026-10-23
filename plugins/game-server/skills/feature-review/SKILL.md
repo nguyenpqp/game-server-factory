@@ -9,7 +9,7 @@ Review feature code against the feature design, the rule index, the project prof
 
 ## Inputs
 
-- The code to review: a diff, a branch, or a list of paths. If none is given, review the diff of the current branch against its base branch.
+- The code to review: a diff, a branch, or a list of paths. If none is given, review the diff of the current branch against its base branch. When the design cites `code` sources, the feature was built before its spec, so review every file it cites in full, and sweep all their lines, not only the added ones.
 - The profile, `docs/game-server/profile.md`, from the `server-profile` skill. It holds the project's `lint` call patterns and the capability entries. If it is missing, stop and ask the developer to run `server-profile`. Do not guess the project's calls.
 - The spec, `docs/game-server/features/<feature>/spec.md`, from the `feature-spec` skill. If it is missing, review against the rules alone and say so at the top of the report.
 - The design, `docs/game-server/features/<feature>/design.md`, from the `gdd-intake` skill, at the path on the spec header's `Design` line. When that line says `prompt`, the prompt and the requirements the spec lists under it are the design. If the design is missing, review the code against the spec and say so at the top of the report.
@@ -29,7 +29,7 @@ Review feature code against the feature design, the rule index, the project prof
    A clean sweep says nothing about the other rules. When a `lint` key is empty, the profile found no such call, so judge that rule from the code alone. Name those rules in the report.
 3. **Check design conformance.** Open the DES section of `references/review-checklist.md`. Read the code against `design.md` itself, not only against the spec. Skip this step only when there is no design.
    - Build a trace table with one row per id in the design, open questions included. Take the ids from `design.md`, not from the spec's Design coverage, so an id the spec dropped still gets a row. Each row has the design id, the spec row, the code `file:line`, the test, a status, and `source agrees`.
-   - Fill `source agrees` from the GDD. Open the source the row cites, `S<n>` with its slide, page, heading, or sheet range, in the converted text under `.gdd-intake/<feature>/raw/`. The Sources table names the converted file. Write `yes` when the row says what the source says, `no` when its rule, number, or end condition contradicts the source, and `no source` when the row cites only the prompt or an answer. The raw folder is gitignored, so it may be missing. When it is, write `no source` on every row, say so in the report, and check against `design.md` alone.
+   - Fill `source agrees` from the GDD. Open the source the row cites, `S<n>` with its slide, page, heading, or sheet range, in the converted text under `.gdd-intake/<feature>/raw/`. The Sources table names the converted file. Write `yes` when the row says what the source says, `no` when its rule, number, or end condition contradicts the source, and `no source` when the row cites only the prompt, an answer, or code. The raw folder is gitignored, so it may be missing. When it is, write `no source` on every row, say so in the report, and check against `design.md` alone.
    - Give each row one status.
      - `matched`. The code and a test do what the design says.
      - `partial`. Only part of the id is built, or the code has no test (DES-01).

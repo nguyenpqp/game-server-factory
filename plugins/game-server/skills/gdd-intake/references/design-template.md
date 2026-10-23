@@ -46,8 +46,11 @@ Each input gets an id in the Sources table, such as `S1`. A citation names the i
 | Image | `S<n>` | `S4` |
 | Feature prompt | `prompt` | `prompt` |
 | Answer from the designer or developer | `answer Q<n>` | `answer Q2` |
+| Existing code, for a feature built before its design | `code <path>:<line>` | `code src/main/java/com/example/game/feature/streak/StreakCore.java:42` |
 
 When two sources disagree, the requirement cites the one the designer confirmed. Until then, an open question cites both.
+
+`feature-spec` writes a design from existing code when a feature was built before it had a design. A `code` citation needs no Sources entry, so such a design may write `None.` under Sources. It cites the code it read, and still says what the player sees, does, and gets, never the classes or the storage.
 
 ## Skeleton
 
