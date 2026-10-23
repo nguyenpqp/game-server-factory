@@ -1,61 +1,42 @@
 ---
 name: gdd-intake
-description: Turns game design material into a server-ready design.md. Use when a developer hands over a game design document (GDD), feature spec slides (pptx), docx notes, an xlsx balance sheet, a PDF export, Markdown, or just a plain feature prompt, and the feature needs a sourced, unambiguous description before server work starts. Converts the files, extracts rules, formulas, rewards, timing, states, and edge cases with requirement ids and source citations, lists open questions by severity, and drafts config JSON from the balance sheets. The next step is feature-spec.
+description: Turns game design material into a clear, sourced feature design that server work can start from. Use when a developer hands over a game design document (GDD), feature slides (pptx), docx notes, an xlsx balance sheet, a PDF export, Markdown, images, or just a feature prompt, and the feature needs to be understood before server code is designed or written. Converts office files to Markdown with a bundled script, pulls out the rules, formulas, rewards, timing, states, and edge cases with their sources, surfaces the gaps as questions for the developer, and drafts config from the balance sheets.
 ---
 
 # GDD intake
 
-This skill turns design material into one `design.md` that says what the player sees, does, and gets. Every requirement has an id and a source. Every gap is an open question with an interim default. The output format is fixed by [the design template](references/design-template.md). Read the template before you write or edit a design.
+The goal is one design document that says what the player sees, does, and gets, precisely enough that two engineers would build the same feature from it. It is the contract the server code is later checked against, so it has to be faithful to the source material and honest about what the source leaves open.
 
-The design holds no server design. It names no commands, classes, storage keys, or metrics. The `feature-spec` skill decides those from the design and the project profile, so hand it the finished design as the next step.
+## Reading office files
 
-## Entry paths
+GDDs arrive as slides, documents, sheets, and PDFs. Convert them to Markdown first with the bundled converter, which keeps slide order, tables, speaker notes, sheet cells and their formulas, and images:
 
-- **Folder.** The developer gives a folder of pptx, docx, xlsx, PDF, Markdown, text, CSV, JSON, or image files. Run every step below.
-- **Prompt.** The developer describes the feature in the chat. Skip step 1. Write `None.` under Sources, keep the `Scope:` line, and cite the text as `prompt`. A prompt is thin, so expect more open questions. Do not invent rules to fill the sections.
+```
+python3 -I ${CLAUDE_SKILL_DIR}/scripts/convert_office.py <input folder> <work folder>
+```
 
-Ask for the feature name if it is missing, and use it in kebab case. Ask for the scope with AskUserQuestion when the developer has not said: `server-only` (recommended), `full-stack`, or `logic-only`.
+Read the `conversion-manifest.md` it writes. It lists what it converted, skipped, and could not read. Tell the developer about anything skipped:
 
-## Where files go
+- docx needs `python-docx`, xlsx needs `openpyxl`, and PDF needs `pymupdf`. Install them with `python3 -m pip install python-docx openpyxl pymupdf`, without `--user`, because `-I` hides user packages.
+- Legacy `.doc`, `.ppt`, and `.xls` files, SmartArt, and vector drawings are not read. Ask for a modern format or a PNG export when they carry rules or numbers.
 
-| What | Path in the target repository |
-| --- | --- |
-| The design | `docs/game-server/features/<feature>/design.md` |
-| Draft config JSON | `docs/game-server/features/<feature>/config/` |
-| Work files (converted text, images, reports) | `.gdd-intake/<feature>/`, which should be gitignored |
+Keep the work folder out of git, because converted text may hold content the team does not want committed. A prompt with no files needs no conversion.
 
-## Pipeline
+## What a good design has
 
-1. **Convert.** Run `python3 -I ${CLAUDE_SKILL_DIR}/scripts/convert_office.py <input folder> .gdd-intake/<feature>`. It turns docx, pptx, xlsx, and PDF files into Markdown, copies raster images out, and copies text files as they are. Read `conversion-manifest.md` in the work folder and tell the developer what it lists. Four cases need the developer:
-   - A docx needs python-docx and an xlsx needs openpyxl (`python3 -m pip install python-docx openpyxl`, not `--user`, since `-I` hides user packages). Without them the converter lists those files under skipped. Ask the developer to install them, then run the step again.
-   - A PDF needs PyMuPDF (`python3 -m pip install pymupdf`, not `--user`, since `-I` hides user packages); without it the converter lists the PDF in `export_requests`. Ask the developer to install it, or to export the PDF to docx or Markdown into the input folder, then run the step again.
-   - Legacy `.doc`, `.ppt`, and `.xls` files are skipped. Ask for a save as docx, pptx, or xlsx.
-   - SmartArt, vector drawings, and charts outside slides are not converted. Slide charts are read as tables. If one carries rules or numbers, ask for a PNG export into the `images` folder of the work folder.
-2. **Extract.** Follow [the extractor prompt](prompts/extractor-prompt.md). It reads everything and writes the first `design.md`, with open questions and an interim default for each. Use a fresh subagent when the harness has one, because the input can be large. A subagent cannot ask the user, which is why the questions land in the file.
-3. **Check the format.** Read the draft against [the design template](references/design-template.md), its skeleton and its conventions. `feature-spec` cites the design's ids and sources, so each requirement needs its own id and a `Source:` that names an entry of the Sources table, and each open question needs its tier, source, interim default, and status. List each problem with its line. A design with open questions can pass. Do not skip this step when the draft looks right.
-4. **Questions.** See the hand-off rule below. This step ends when every question is answered, skipped by the developer, or handed to a workflow that will bring the answers back.
-5. **Refine.** Follow [the refiner prompt](prompts/refiner-prompt.md) in `apply-answers` mode, then check the format again. If it fails, run the refiner in `fix-format` mode once with the problems, and check again. If it still fails, show the problems to the developer and stop.
-6. **Self-review.** Follow [the self-reviewer prompt](prompts/self-reviewer-prompt.md) with an agent that did not write the draft. It reads the design against its sources and writes a report. When the report is not ready, run the refiner in `fix-review` mode once, then check the format and review again. If it is still not ready, show the report to the developer and let them decide.
-7. **Draft config JSON.** If the design has config tables, write the file named on each table's Draft line. The key table gives the shape, as the template's Config tables section says. Take each value from the converted sheet range that the Source cell cites, or from the Example cell when no sheet holds it, as in a prompt design. A sheet cell with a formula shows the formula, so work out its value from the cells it names. Say that the files are drafts, because the values are examples or raw sheet values that `feature-spec` still checks.
+- **Player terms only.** It describes rules, numbers, states, timing, rewards, and edge cases as the player experiences them. It names no commands, classes, storage keys, or metrics. Those are server decisions made later.
+- **Traceable.** Each requirement has a short id and cites where it came from: a slide, a page, a heading, a sheet range, the prompt, or the developer's answer. Reviewers use these ids to check the code against the design.
+- **Exact numbers.** Costs, rewards, rates, limits, durations, and counts are copied exactly. A sheet cell with a formula is worked out from the cells it names. Tables of balance values become draft config files, marked as drafts.
+- **Gaps are questions, not guesses.** Where the source is silent, vague, or contradicts itself, write an open question with its source, how much it matters, and a sensible default to use if nobody answers. Questions that affect player value, fairness, or what gets built matter most. Never fill a gap by inventing a rule.
+- **Edge cases are asked about.** Think about what the source rarely says: what a player who is offline at the end gets, what happens at a period boundary or a time zone change, what happens on a retry or a disconnect mid-action, ties, caps, and what an old client sees. If the feature matches a genre note in the `server-principles` skill, its questions are a good checklist.
+- **Scope is explicit.** Say whether the work is server only or also covers the client, and mark requirements that have no server effect.
 
-Run the prompts as subagents when the harness has them, and follow them yourself when it does not. Pass absolute paths in the brief. Run the converter yourself, since it is a script.
+## Working with the developer
 
-## Hand-off rule for open questions
+Ask the open questions that matter, most important first, and offer the default and one or two alternatives the sources suggest. Record each answer, or that the developer chose the default, in the document, so later work does not ask again. Minor questions can stay open. If a workflow the developer uses runs its own interview, hand the questions to it instead of asking twice.
 
-The open questions in `design.md` are the list of gaps. They are the only place questions live.
+When the design is large, a fresh reader is useful: have someone who did not write it (a subagent, if available) compare it against the sources and look for dropped rules, wrong numbers, and invented content.
 
-- **A workflow runs its own interview.** Stop after step 3 and give the workflow the Open questions section: each question with its id, tier, source, and interim default. The workflow asks, then returns the answers. Resume at step 5 with them.
-- **No workflow interview.** Ask the developer yourself with AskUserQuestion, Blocker questions first, then Important. Show the question, its source, and the interim default, and offer the default plus one or two alternatives that the sources suggest. Minor questions can stay open. Do not ask a subagent to do this.
+Put the design where the project keeps its docs. If the project has no convention, `docs/game-server/features/<feature>/design.md` with drafts in a `config/` folder beside it works well.
 
-Record each outcome in the question's status line: `answered on <date>: <answer>`, or `skipped by <name> on <date>`. Dates are `YYYY-MM-DD`. A skipped question keeps its interim default. At the end, report how many questions are open in each tier, because `feature-spec` stops on open Blocker questions.
-
-## Finish
-
-Report these items:
-
-- The path of `design.md` and the draft config files.
-- The count of requirements by prefix, and the open questions by tier and status.
-- The self-review verdict and any finding that stays unfixed.
-- Anything the conversion could not read.
-
-Then say that `feature-spec` is the next step.
+When done, tell the developer where the design and drafts are, how many questions remain open and how serious they are, and anything the conversion could not read.
