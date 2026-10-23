@@ -17,10 +17,11 @@ Read this note when players fight or compete against each other, live or against
 
 ### Server authority and anti-cheat
 
-- The client reports the winner, the damage, or the rewards. The server decides the result from inputs it checks, or simulates the fight itself (AUTH-01). When the design runs the fight only on the client, the result cannot be trusted, and that is a risk the design must accept in writing.
+- The client reports the winner, the damage, or the rewards. The server decides the result from inputs it checks, or simulates the fight itself (AUTH-01). A fight that runs only on the client gives a result the server cannot trust, and the spec lists that on its Accepted risks line.
 - The server simulates with a random source of its own instead of the injected RNG, so a fight cannot be replayed or tested (AUTH-03).
-- The request picks the opponent, or a result names a fight the player was not in (AUTH-01, AUTH-05).
+- The request names an opponent that the server did not offer or store for this player, such as a revenge target, or a result names a fight the player was not in (AUTH-05).
 - A result is sent twice, or for a fight that already ended or timed out (AUTH-06, AUTH-08).
+- One player holds two queue entries and is matched against themselves (AUTH-06, MN-05).
 - The fight's start, duration, or timeout comes from client time (AUTH-02).
 - The ticket is taken, and the fight fails to start, so the player pays for nothing (AUTH-07).
 
@@ -30,17 +31,24 @@ Read this note when players fight or compete against each other, live or against
 
 ### Modularity
 
-- The fight reads hero stats or items by importing those features. It takes them through their contracts (MOD-01, MOD-02).
+- The fight reads another feature's data, such as hero stats, by importing that feature. It reads through the feature's contract (MOD-01).
+- A win that feeds a ranking or a pass rides a droppable event (MOD-02).
 
 ### Multi-node and rollout
 
 - The attacker's command changes the defender's rating or resources directly, while the defender's owner runs on another node. The defender's losses go through the durable inbox (MN-02, MN-03).
-- The attacker's fight reads the defender's live state. It reads a snapshot or a stored copy (MN-02).
-- Two attackers hit the same defender at once, and both win the same resources or both pass the protection. The hit is one atomic claim on shared state, and an unknown result grants nothing (MN-05, MN-13).
-- The matchmaking queue lives in one node's memory (MN-01). A shared queue pops in atomic steps (MN-05), and one queue key that every player writes is a hot key (PERF-08).
+- The loot comes from the attacker's copy of the defender's state, so the attacker gains what the defender already spent. The attacker gains only what the defender's owner removed, sent back through the attacker's inbox (MN-02, MN-03).
+- Two attackers hit the same defender at once, and both pass the protection. The hit is one atomic claim on shared state, and an unknown result grants nothing (MN-05, MN-13).
+- Two nodes write the state of one live fight (MN-04, MN-05).
+- The timeout on one node settles a fight while the result command settles it on another (MN-07, MN-14).
+- The matchmaking queue lives in one node's memory (MN-01). A shared queue pops in atomic steps (MN-05).
+- Every queued player writes one queue key (PERF-08).
+- A dead node leaves queue entries for players who are gone (MN-10).
 - A fight id comes from an in-process counter (MN-08).
 - An abandoned fight ends on a timer in memory. Expiry comes from the stored start time when the state is read (MN-11).
-- Fight logs or replays grow without a cap, or a reply sends a whole replay (PERF-04, PERF-06).
+- A reply sends a whole replay (PERF-04).
+- Fight logs or replays in a player's state grow without a cap (PERF-06).
+- An old client and a new client are matched under different fight rules (BG-07).
 
 ### Tests and metrics
 
