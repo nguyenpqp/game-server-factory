@@ -11,6 +11,7 @@ Read this note when players fight or compete against each other, live or against
 - What does the winner gain and the loser lose, and can a defender lose resources while offline?
 - Is a defender protected after a defeat, and for how long?
 - How many fights per day, and are there revenge fights?
+- Do repeated fights between the same two players pay full rewards and rating?
 - What does the player see of a past fight: a result, a log, or a replay?
 
 ## Traps
@@ -24,6 +25,7 @@ Read this note when players fight or compete against each other, live or against
 - One player holds two queue entries and is matched against themselves (AUTH-06, MN-05).
 - The fight's start, duration, or timeout comes from client time (AUTH-02).
 - The ticket is taken, and the fight fails to start, so the player pays for nothing (AUTH-07).
+- Two players, or one player with an alt account, trade wins to farm rewards or rating, and nothing can find them. Each fight row names both players, so a query finds repeated pairs (MET-07). A cap on repeated pairs that the design sets comes from config (CFG-05).
 
 ### Config
 

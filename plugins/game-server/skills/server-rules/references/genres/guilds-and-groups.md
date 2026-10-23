@@ -40,6 +40,7 @@ Read this note when players belong to a shared group, such as a guild, a clan, a
 - Two officers on two nodes spend the treasury at once, and both spends pass (MN-04, MN-05, MN-13).
 - A player joins two groups at once on two nodes, or a group passes its member limit. The shared write rechecks the limit and the player's current group (MN-05, MN-13). On Redis Cluster, the keys one script touches share a hash tag (MN-06).
 - An accept or a kick writes the other player's record of the group directly. The shared write goes first, and the player's record follows through that player's inbox (MN-03, MN-04).
+- A crash between the shared write and the inbox delivery leaves the player's record and the member list disagreeing, and actions trust the stale side. Actions read membership from the group, and the player's record is repaired from it, by the owner at load or by the feature's admin repair (MN-13, ADMIN-08).
 - Several members fill one item request at once, and each pays. Claim the request, deliver through the inbox, then take the cost (AUTH-07, MN-03).
 - A kicked member keeps acting through a node's cached membership (MN-09).
 - A message to members goes through a node-local session map, so members on other nodes miss it (MN-10).
