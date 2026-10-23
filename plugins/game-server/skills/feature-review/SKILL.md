@@ -59,7 +59,7 @@ Review feature code against the feature design, the rule index, the project prof
    - a fix direction in one sentence.
 
    One cause that breaks several rules is one finding that lists the extra rule ids. Do not pad the report with style notes.
-7. **Audit severity.** Keep a Critical finding only when you can name a reachable trigger: a command, a packet, a job, a callback, or a config state that a player, an operator, or the system can produce. If you cannot, demote it to important and say why. A rare trigger is still reachable, so rarity does not lower severity. Never raise a finding above the index severity. Record the result in the severity audit table from the checklist.
+7. **Audit severity.** Keep a Critical finding only when you can name a reachable trigger: a command, a packet, a job, a callback, or a config state that a player, an operator, or the system can produce. If you cannot, demote it to important and say why. A rare trigger is still reachable, so rarity does not lower severity. A SYNC-04 push whose value was already stored may drop to important, as the checklist says. Never raise a finding above the index severity. Record the result in the severity audit table from the checklist.
 8. **Audit each dismissal once.** List every suspected break you decided not to report, with the reason. Then re-check each one against the code, the test it cites, and the catch block it relies on, as the checklist describes. Reverse a dismissal only on evidence, and keep the ones that hold.
 9. **Report.**
 
