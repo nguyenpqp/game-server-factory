@@ -51,7 +51,7 @@ When designing a feature, read every group that the feature touches. When review
 
 ## Genre notes
 
-[Genre notes](references/genres/index.md) cover kinds of feature that recur across games: [rankings and seasons](references/genres/rankings-and-seasons.md), [randomness and gacha](references/genres/randomness-and-gacha.md), [economy and exchange](references/genres/economy-and-exchange.md), and [events and passes](references/genres/events-and-passes.md). Each lists the questions a design must answer and the traps its code falls into, with the rule ids that cover each trap. A note guides and never prescribes a design. Read every note that matches the feature.
+[Genre notes](references/genres/index.md) cover kinds of feature that recur across games: [rankings and seasons](references/genres/rankings-and-seasons.md), [randomness and gacha](references/genres/randomness-and-gacha.md), [economy and exchange](references/genres/economy-and-exchange.md), [events and passes](references/genres/events-and-passes.md), [guilds and groups](references/genres/guilds-and-groups.md), and [PvP and matchmaking](references/genres/pvp-and-matchmaking.md). Each lists the questions a design must answer and the traps its code falls into, with the rule ids that cover each trap. A note guides and never prescribes a design. Read every note that matches the feature.
 
 ## Never
 
