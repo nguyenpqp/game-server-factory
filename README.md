@@ -20,6 +20,8 @@ Every skill works to the same fixed rulebook. The rules come from these constrai
 
 The rules are listed with ids in `plugins/game-server/skills/server-rules/references/index.md`. Specs and reviews cite them by id.
 
+Genre notes in `plugins/game-server/skills/server-rules/references/genres/` cover rankings and seasons, randomness and gacha, economy and exchange, and events and passes. Each lists the questions a design must answer and the traps the code falls into, and points each trap at its rules. The notes never fix a design, because designs vary from game to game.
+
 ## Install
 
 Add the marketplace and install the plugin from inside Claude Code.
@@ -47,7 +49,7 @@ The plugin manifest has no version, so an install tracks the commit of the marke
 
 | Skill | Runs when | Input | Output |
 | --- | --- | --- | --- |
-| `server-rules` | Triggers when you design, write, or review Java game server feature code | A rule id or a topic | The rule with a reason, a Java do and don't, and a reviewer check. Writes no files. |
+| `server-rules` | Triggers when you design, write, or review Java game server feature code | A rule id or a topic | The rule with a reason, a Java do and don't, and a reviewer check, or the genre note for a kind of feature. Writes no files. |
 | `server-profile` | Explicit only (`/game-server:server-profile`) | The target server repository, read-only | `docs/game-server/profile.md`, which records how the core provides each capability and which gaps block multi-node or blue-green safety |
 | `gdd-intake` | Triggers when you hand over a GDD folder, slides, docs, a balance sheet, or a feature prompt | A folder of pptx, docx, xlsx, PDF, Markdown, or images, or a prompt | `docs/game-server/features/<feature>/design.md` with sourced requirements and open questions, plus draft config JSON in the `config` folder beside it |
 | `feature-spec` | Triggers when you want a server design or plan for a feature, or a change to a feature that has one | `design.md` or a prompt, plus the profile | `docs/game-server/features/<feature>/spec.md`. On request, also an ordered task list at `docs/game-server/features/<feature>/tasks.md` |

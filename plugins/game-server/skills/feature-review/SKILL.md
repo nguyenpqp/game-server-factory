@@ -50,6 +50,8 @@ Review feature code against the feature design, the rule index, the project prof
    - Every capability the spec marks `missing` or `partial` in Core blockers is handled as the spec says, and the code does not work around the blocker.
 
    Skip a group only when the diff has nothing for it, and name the skipped groups in the report.
+
+   Then read each [genre note](../server-rules/references/genres/index.md) that matches the feature, and look for each of its traps in the code. A trap you find is a finding on the rule ids it cites.
 5. **Check lifecycle parity.** For each piece of state the feature touches, list every entry point that reads or changes it: gameplay command, login, offline load, periodic job, cheat command, admin command, HTTP callback, cross-node message, inbox drain, and drain. Check that each one follows the same rules as the main path. A break on a side path is a finding even when the main path is correct. The checklist has the details.
 6. **Write the findings.** Each finding has:
    - a severity: `critical`, `important`, or `minor`, equal to the rule's severity in the index unless the audit in step 7 lowers it;
@@ -68,7 +70,7 @@ Review feature code against the feature design, the rule index, the project prof
 
    Scope: <files reviewed>. Design: <path, "prompt", or "none">. GDD text: <raw folder or "missing">. Spec: <path or "none">. Profile: <path>.
    Sweep: <n findings>. Rules with an empty `lint` key: <list or "none">.
-   Groups skipped: <list with reasons or "none">.
+   Groups skipped: <list with reasons or "none">. Genre notes read: <list or "none">.
 
    ### Findings
    1. [critical] MN-03 `src/.../GiftCommand.java:88`. Scenario: <who, what, result>. Fix: <one sentence>.
