@@ -21,6 +21,7 @@ Read this note when players are ranked against each other by a score, such as a 
 - The client sends a score or a score change. The server computes the score from the actions it ran itself (AUTH-01).
 - A retried request adds the same points twice (AUTH-08).
 - A tie is ordered by a time the client sent, or by the JVM clock. Use the server clock (AUTH-02).
+- The board closes or resets in a zone that the server does not name, or a player who changes zone passes the same reset twice (AUTH-02).
 - A request names a board, a group, or a season the player does not belong to (AUTH-05).
 - Points land after the board closed, or before it opened (AUTH-06, CFG-04).
 
@@ -32,16 +33,20 @@ Read this note when players are ranked against each other by a score, such as a 
 
 ### Modularity
 
-- The feature that earns the points, such as battles, imports the ranking package. It calls the ranking contract, or sends an event when its reply does not show the rank (MOD-01, MOD-02).
+- The feature that earns the points, such as battles, imports the ranking package (MOD-01).
+- Points that decide a reward travel on a best-effort message, which can drop them. Send them through the ranking contract (MOD-02).
 
 ### Multi-node and rollout
 
-- The board is shared by all nodes, so it is not kept in a node's memory (MN-01). A shared board changes in one atomic step, never by a read, a change in Java, and a write (MN-05). When the tie order matters, the stored score carries it, so the atomic step keeps it.
+- The board lives in a node's memory, so each node ranks a different board (MN-01).
+- A shared board changes by a read, a change in Java, and a write, so two nodes overwrite each other's points (MN-05).
+- The atomic update loses the tie order, so equal scores sort by chance (MN-05).
 - Every active player writes one global key (PERF-08).
 - A failed write to the board reads as "not ranked" (MN-13).
 - Two nodes run the season close at once, and players get the rank reward twice. The close stays correct when it runs twice, and each player's reward is claimed once per season id (MN-07, MN-14).
+- The close pays from a board that still changes, so a late write or a removed entry shifts the ranks during the payout, and one player is paid twice or skipped (MN-07, MN-14).
 - The close loads and saves each winner's document directly. Rewards reach players through the durable inbox (MN-03), and a large close runs as a batched job (PERF-07).
-- A late write from the old season moves a closed board (MN-14, MN-15).
+- A write from the old season lands on a closed board. The write rechecks that the season is open, and the close stores a closed marker (AUTH-06, MN-05, MN-14).
 - A board page or a neighbor list has no size cap, or reads one entry per call (PERF-03, PERF-04).
 
 ### Tests and metrics

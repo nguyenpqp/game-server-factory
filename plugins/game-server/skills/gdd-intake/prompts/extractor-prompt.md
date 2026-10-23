@@ -12,6 +12,7 @@ The brief gives absolute paths for these.
 - Feature prompt. Present when there are no files, or when the developer added text to the files.
 - Feature name and scope: `server-only`, `full-stack`, or `logic-only`.
 - Template. `../references/design-template.md`. Read it fully before you write.
+- Genre notes. `../../server-rules/references/genres/index.md`, and the notes it lists.
 - Design path. Where to write `design.md`.
 
 ## Method
@@ -47,7 +48,7 @@ Search for six kinds of gap.
 5. Concepts used but never explained.
 6. Numbers with no reason given. Record these only when changing them would change the design.
 
-Then open [the genre notes index](../../server-rules/references/genres/index.md) and read each note whose "Read when" line matches the feature. Each of its questions that the sources leave open is a gap of the first or second kind. Write it in the game's terms, and skip a question that does not fit this game.
+Then open the genre notes index and read each note whose "Read when" line matches the feature. Each of its questions that the sources leave open is a gap of the first or second kind. Write it in the game's terms, and skip a question that does not fit this game.
 
 For each gap, choose a severity, an interim default, and a confidence.
 

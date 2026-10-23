@@ -11,7 +11,7 @@ Read this note when a random outcome carries value, such as a gacha, a loot box,
 - What does a duplicate turn into?
 - What does one pull cost, does a multi-pull cost less, and are there free pulls with a cooldown?
 - Must the game show the rates, and must the shown rates match the real ones exactly?
-- What happens to unused tickets and pity progress when a banner ends?
+- What happens to unused tickets and pity progress when a banner ends? Does a rerun of a banner keep them?
 - Is any prize limited across the whole server, and what does a pull get when it is gone?
 
 ## Traps
@@ -22,7 +22,7 @@ Read this note when a random outcome carries value, such as a gacha, a loot box,
 - A player drops the connection after a pull and retries until the result is good. A retry returns the first result and never rolls again (AUTH-08).
 - The roll or the grant fails after the cost is taken, and the player keeps neither. Check the whole cost first, and refund when a later step fails or throws (AUTH-07).
 - The request picks the pull count. Only the counts the config offers pass the check (AUTH-04).
-- The pity counter and the prize it pays are saved apart, so a crash between the saves loses one of them (MN-12).
+- A pull runs on a banner before it opens or after it ends (AUTH-06, CFG-04).
 
 ### Config
 
@@ -30,7 +30,8 @@ Read this note when a random outcome carries value, such as a gacha, a loot box,
 - A pool with a zero or negative weight, an unknown item id, or a pity limit below 1 passes the load (CFG-02).
 - One pull reads two config snapshots, so a reload mid-pull mixes the old and new tables (CFG-03).
 - The pity counter refers to a pool by list position, so a new pool in the list moves every player's pity (CFG-06).
-- Rates that the game shows come from a copy apart from the config the roll uses, so they drift (CFG-05).
+- The rates that the game shows are a second copy of the weights, so the two drift apart (CFG-10).
+- The shown rates are rounded, or leave out pity and guarantees, so they differ from the real chance of each prize (DES-02).
 
 ### Modularity
 
@@ -38,9 +39,11 @@ Read this note when a random outcome carries value, such as a gacha, a loot box,
 
 ### Multi-node and rollout
 
-- A server-wide limited prize is counted in node memory or by a read and a write. It changes in one atomic step on shared state (MN-01, MN-05).
+- The pity counter and the prize it pays are saved apart, so a crash between the saves loses one of them (MN-12).
+- A rerun of a banner reuses the counts or the pity of the last run when the design does not carry them over (MN-14).
+- A server-wide limited prize is counted in node memory, or by a read and a write, so it is given out more times than its stock (MN-01, MN-05).
 - A failed stock check reads as "sold out" or as "won" (MN-13).
-- New pity or banner state is added as new fields and never retypes old ones (BG-01).
+- New pity or banner state renames or retypes an old field (BG-01).
 
 ### Tests and metrics
 
