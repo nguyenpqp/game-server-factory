@@ -59,7 +59,7 @@ Put production code in the Java package that the spec header names. Its director
 Run these steps for each slice, in order.
 
 1. Read the spec rows that the slice covers. They are its commands, pushes, state documents, config keys, metric actions, cheats, admin commands, HTTP endpoints, and test plan rows. Note each row's rule ids.
-2. Write the failing unit tests first, against the pure core. Take the cases from the slice's rows in the Test plan, and add the cases that [unit tests](references/unit-tests.md) requires for each shape the slice adds. Run them once with `test_one_cmd` and confirm that they fail because the code is absent, not because a fixture is broken.
+2. Write the failing unit tests first, against the pure core. Take the cases from the slice's rows in the Test plan, and add the cases that [unit tests](references/unit-tests.md) requires for each shape the slice adds. Run them once with `test_one_cmd` and confirm that they fail because the code is absent, or because of the reported bug, not because a fixture is broken.
 3. Implement the slice with the matching reference. Write only the code that the slice's spec rows ask for.
    - A client command uses [command shape](references/command-shape.md).
    - Feature config uses [config class](references/config-class.md).

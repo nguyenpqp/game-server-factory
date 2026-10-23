@@ -265,7 +265,7 @@ Rules for the table:
 - A trigger that is rare is still reachable. Rarity is not a reason to lower severity.
 - Never raise a finding above its index severity. If the index looks wrong for the case, write it as a follow-up for the rule index.
 - Lower a finding only with evidence, such as a guard on the path that you read and that cannot be bypassed.
-- SYNC-04 is critical because value that only a push carries is lost. Lower a SYNC-04 finding to important when you read that the pushed value was stored before the push and that nothing the player gets depends on the push arriving, such as a balance push after a grant that already saved. Name the save in the Reason cell.
+- SYNC-04 is critical because value that only a push carries is lost. Lower a SYNC-04 finding to important when you read that the pushed value is stored, in the user's state or the durable inbox, before the push is sent, and that nothing the player gets depends on the push arriving, such as a balance push after a grant to the user's state. Name the save in the Reason cell.
 
 ## Dismissal audit
 

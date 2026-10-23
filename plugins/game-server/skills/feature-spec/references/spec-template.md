@@ -19,7 +19,7 @@ The header's `Status` line holds one value.
 
 | Status | Meaning |
 | --- | --- |
-| `draft` | Sections are still being filled. |
+| `draft` | Sections are still being filled, or a change to a ready spec waits for the developer's confirmation. |
 | `blocked` | Core blockers has a row that blocks. `feature-build` does not start. |
 | `ready` | Every section is filled, no Core blockers row blocks, and the developer confirmed the spec. |
 
