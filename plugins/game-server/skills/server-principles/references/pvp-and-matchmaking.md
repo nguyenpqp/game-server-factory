@@ -29,7 +29,7 @@ Read this note when players fight or compete against each other, live or against
 
 ### Config
 
-- Rating constants, brackets, costs, rewards, and protection times are in code. Each bracket and each reward is a row with an id, and each reward is one `{id, amount}` record.
+- Rating constants, brackets, costs, rewards, and protection times are in code. Each bracket and each reward is a row with an id, and each reward is one record in the shared cost-and-reward shape.
 
 ### Modularity
 

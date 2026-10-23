@@ -32,7 +32,7 @@ The client sends intents, never results. The server computes every outcome, cost
 - Check that every object the request names (an item, a slot, a target player, a group) belongs to or is reachable by the acting player.
 - Check every precondition against server state: the feature is active, the player unlocked it, the state transition is legal, the cooldown is over.
 - Read time only from the server clock, passed into the logic, and turn it into a date only with a zone the server owns. Draw random numbers only from a server RNG passed into the logic. Both make the logic testable and keep the client out of it.
-- Check the full cost before taking any of it. Take it after any shared claim the action needs, and give it back when a later step definitely fails.
+- Check the full cost before taking any of it. When the action needs a shared claim (limited stock, a group treasury, a one-time slot), claim first and take the cost after. Give the cost back only when a later step definitely failed. An unknown result is re-read or retried, never refunded blindly.
 - A rejected request changes nothing and returns an error code specific to the reason.
 - Rate-limit commands that are expensive or touch other players.
 
@@ -41,8 +41,8 @@ The client sends intents, never results. The server computes every outcome, cost
 Networks retry, players double-tap, nodes crash mid-command, and payment providers resend callbacks. Every path that grants or takes value must give the same result when it runs twice.
 
 - A command whose retry would pay twice carries a request id, and the server applies each id once per player.
-- Value from an outside system (a purchase, a platform reward) is applied once per outside transaction id across all players, recorded durably. Verify the caller's signature over the raw body and the business payload against server data before anything happens.
-- Value for a player who is not on this node, or who may be offline, goes through that player's durable inbox, and the owner applies each entry once.
+- Value from an outside system (a purchase, a platform reward) is applied once per outside transaction id across all players, recorded durably. Before anything happens, verify the caller's signature over the raw body with a per-environment secret, reject stale timestamps, and check the business payload (player, product, price) against server data. On live, an empty caller allowlist rejects every call rather than allowing all.
+- Value for another player goes through that player's durable inbox, even when they are on this node or online, and their owner applies each entry once.
 - A best-effort message or push must never be the only carrier of value.
 
 ## 4. No node is special
@@ -50,14 +50,16 @@ Networks retry, players double-tap, nodes crash mid-command, and payment provide
 Any node can run any command, two nodes can run the same job at once, and any node can die between two writes. Design for that, and do not rely on it not happening.
 
 - Keep no game or player state in static fields, singletons, or node-wide maps. Only the immutable config snapshot may live there.
-- Only the owner of a player touches that player's live state. Changes to another player go through their owner, even when the owner is this node.
+- Only the owner of a player touches that player's live state. Changes to another player go through their owner, even when the owner is this node. A copy of another player's state read elsewhere may reject an action but never grant one.
 - A document several nodes write is updated with compare-and-set and a bounded retry, on a fresh copy.
-- Cluster-wide state changes in one atomic Redis step (a command or a script), never as read, change in Java, then write. The script rechecks every fact the caller decided on.
-- A job that runs on the cluster stays correct when two nodes run it together. A lease only saves duplicate work, so each unit of work is claimed or idempotent. A job that pays from data that still changes pays from one stored copy taken after the data closed.
+- Cluster-wide state changes in one atomic Redis step (a command or a script), never as read, change in Java, then write. The script rechecks every fact the caller decided on. On Redis Cluster, keys touched together share a hash tag.
+- A job that runs on the cluster stays correct when two nodes run it together. A lease only saves duplicate work, so each unit of work is claimed or idempotent, and the job rechecks its lease between units. A job that pays from data that still changes pays from one stored copy taken after the data closed. A job for data only the new version understands must not rely on a lease the old version can also take.
 - Fields that must change together are saved together. Two separate saves can be split by a crash.
 - A Redis or store call has three outcomes, yes, no, and unknown. An unknown result is re-read, never treated as success or failure that grants, denies, or hides value.
 - A shared thing that can close and open again (a season, a room, an event round) carries the id of that occurrence, and closing it leaves an explicit closed marker instead of deleting the key.
-- Timed effects come from stored timestamps read at use time, not from in-memory timers. Unique ids come from the cluster, not from a node counter.
+- A late or buffered write from a former owner, flushed after a handover, cannot move shared state backward: make it monotone or version-checked.
+- A node-local cache of shared data has a stated staleness bound and an invalidation path, unless staleness only errs on the safe side. Online checks and pushes to other players go through the ownership record, not a node-local session map.
+- Timed effects come from stored timestamps read at use time, not from in-memory timers. Unique ids come from the cluster (a Redis counter, or a snowflake with unique node bits), not from a node counter.
 
 ## 5. Two versions and old clients at the same time
 
@@ -67,7 +69,9 @@ During a deploy, old and new servers read and write the same data, and old clien
 - A new meaning gets a new field or a new command id. An old id never takes a new meaning.
 - New request fields are optional and their absence means the old behavior. New response fields are appended and optional. An old client never receives a packet it cannot parse, and new behavior is gated on the client version.
 - Config stays readable by both versions, so new keys have defaults.
-- Migration is lazy on load, idempotent, and derived from stored data only. A format the old version cannot read is a one-way door that ships only in a maintenance deploy, with the rollback step written down.
+- Migration is idempotent and derived from stored data only. Per-player data migrates lazily when its owner loads it. Shared data migrated at boot is written only where the target is absent, because two nodes can boot at once. A format the old version cannot read is a one-way door that ships only in a maintenance deploy, with the rollback step written down.
+- An inbox entry of a type this node does not know stays in the inbox untouched for a newer node. Fire-and-forget cross-node messages carry only a signal, so ignoring an unknown one loses nothing.
+- A draining node refuses new logins, finishes queued commands, and confirms every save before releasing ownership. If the final save fails, it keeps ownership and retries.
 - A step that runs at boot and fails stops the boot. A node never reports healthy with a step undone.
 
 ## 6. Numbers live in config
@@ -79,6 +83,7 @@ Designers tune balance after launch, often during live events. Code that hard-co
 - A loaded config is an immutable snapshot that a reload swaps whole, and one command reads one snapshot from start to end.
 - A feature has an on switch and, when it is time-bound, start and end times checked against server time.
 - Stored data and packets refer to config entries by stable id, never by list position. Rows have explicit ids, and costs and rewards share one record shape with the item id as a value.
+- An option that is not offered is left out, never written as zero, since a zero price sells for free. No string in config hides a mini-language that code has to parse.
 - Secrets, endpoints, and allowlists are environment config, apart from balance.
 
 ## 7. Features are modules
@@ -117,7 +122,7 @@ Support, analytics, and incident response all start from metric rows and logs. I
 ## 11. Testers and support have tools, and live is protected
 
 - Each feature ships cheat commands that put a test account into every state the client needs to test, including time shifts for that account only. Cheats change state through the feature's own logic, are not registered on live, and refuse to act on live anyway.
-- Each feature ships admin commands that read and repair its per-player state. Admin commands authenticate every call, act through the player's owner, audit every change, need explicit confirmation for destructive changes on live, have no second effect on retry, and are documented with their fields and errors.
+- Each feature ships admin commands that read and repair its per-player state. Admin commands authenticate every call, act through the player's owner (or, for an offline player, hold the ownership slot and write with compare-and-set), audit every change, need explicit confirmation for destructive changes on live, have no second effect on retry, and are documented with their fields and errors.
 
 ## 12. Tests prove behavior
 

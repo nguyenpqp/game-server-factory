@@ -27,7 +27,7 @@ Read this note when players belong to a shared group, such as a guild, a clan, a
 
 ### Config
 
-- The member limit, the level table, donation limits, and wait times are in code. Each level and each reward is a row with an id, and each reward is one `{id, amount}` record.
+- The member limit, the level table, donation limits, and wait times are in code. Each level and each reward is a row with an id, and each reward is one record in the shared cost-and-reward shape.
 
 ### Modularity
 

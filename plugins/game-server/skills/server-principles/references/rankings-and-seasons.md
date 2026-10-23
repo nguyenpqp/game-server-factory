@@ -27,7 +27,7 @@ Read this note when players are ranked against each other by a score, such as a 
 
 ### Config
 
-- The period, the close time, the group size, and the reward bands are in code. Each band is a row with an id, and each reward is one `{id, amount}` record.
+- The period, the close time, the group size, and the reward bands are in code. Each band is a row with an id, and each reward is one record in the shared cost-and-reward shape.
 - Bands with a gap or an overlap pass the load. Check that the bands cover the paid ranks once each.
 - Stored entries and claims refer to a season by its list position.
 

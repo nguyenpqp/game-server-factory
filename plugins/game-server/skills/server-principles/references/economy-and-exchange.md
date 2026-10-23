@@ -29,7 +29,7 @@ Read this note when currency or items are bought, sold, sent, or traded, such as
 
 ### Config
 
-- Prices, limits, offers, and their windows are in code. Each offer is a row with an id, and each cost and grant is one `{id, amount}` record.
+- Prices, limits, offers, and their windows are in code. Each offer is a row with an id, and each cost and grant is one record in the shared cost-and-reward shape.
 - An offer that is not for sale is written as a zero price, so it sells for free.
 - Stored purchase counts refer to an offer by list position.
 - Store product ids and payment secrets sit in the balance file. They go to environment config.
