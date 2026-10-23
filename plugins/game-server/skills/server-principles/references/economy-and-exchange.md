@@ -23,13 +23,13 @@ Read this note when currency or items are bought, sold, sent, or traded, such as
 - The cost is taken before every cost is checked, or a grant that throws keeps the cost.
 - A grant past a balance cap, into a full bag, or into a full mailbox drops the value, or throws after the cost was taken.
 - A retried purchase or claim buys or grants twice.
-- The purchase limit resets by the JVM's zone, or by a timer in memory. The limit and its reset come from stored times and server time.
+- The purchase limit resets by a zone the server does not own, or by a timer in memory. The limit and its reset come from stored times and server time.
 - A player floods gifts or mail to other players.
 - A store receipt that the client sends is accepted again, on the same account or on another one. The server checks the receipt with the store and remembers its transaction id.
 
 ### Config
 
-- Prices, limits, offers, and their windows are in code. Each offer is a row with an id, and each cost and grant is one record in the shared cost-and-reward shape.
+- Prices, limits, offers, and their windows are in code. Each offer is a row with an id.
 - An offer that is not for sale is written as a zero price, so it sells for free.
 - Stored purchase counts refer to an offer by list position.
 - Store product ids and payment secrets sit in the balance file. They go to environment config.
@@ -42,7 +42,7 @@ Read this note when currency or items are bought, sold, sent, or traded, such as
 ### Multi-node and rollout
 
 - A gift or a trade loads and saves the other player's document. The other player receives through the durable inbox, applied once by their owner.
-- The sender pays, and the delivery fails. Take the sender's cost first, and refund it only when the delivery definitely failed. An unknown result is logged for repair and not refunded.
+- The sender pays, and the delivery fails. Take the cost and record the pending delivery in one save, deliver idempotently by the request id, and retry an unknown result. Refund only when the delivery definitely failed.
 - A claim mark and the attachment it grants are saved apart.
 - A crash or a retry at any step of a trade loses or duplicates either side's items.
 - A trade goes through after one side's item changed, after both confirmed.

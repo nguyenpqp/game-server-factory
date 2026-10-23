@@ -20,14 +20,14 @@ Read this note when players belong to a shared group, such as a guild, a clan, a
 - A request names a member, a role, or a group that the player has no right over.
 - A kick or a promotion runs on a role that changed a moment before, such as a leader who was just replaced. The shared write rechecks the role.
 - A donation amount is negative, or large enough to wrap the treasury.
-- The donor pays, and the write to the group fails. Write the shared side first and take the cost last, and do not refund an unknown result.
+- The donor pays, and the write to the group fails, or the group is credited and the node crashes before the donor pays. Take the cost and record the pending donation in one save, credit the group idempotently by the request id, and retry an unknown result. Refund only when the group definitely refused it.
 - A retried donation or a retried accept applies twice.
 - A player leaves and rejoins to collect join rewards again, because the wait after leaving is not stored.
 - A player floods join requests, invites, or item requests to many players.
 
 ### Config
 
-- The member limit, the level table, donation limits, and wait times are in code. Each level and each reward is a row with an id, and each reward is one record in the shared cost-and-reward shape.
+- The member limit, the level table, donation limits, and wait times are in code. Each level and each reward is a row with an id.
 
 ### Modularity
 

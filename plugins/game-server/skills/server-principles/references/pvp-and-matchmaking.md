@@ -29,7 +29,7 @@ Read this note when players fight or compete against each other, live or against
 
 ### Config
 
-- Rating constants, brackets, costs, rewards, and protection times are in code. Each bracket and each reward is a row with an id, and each reward is one record in the shared cost-and-reward shape.
+- Rating constants, brackets, costs, rewards, and protection times are in code. Each bracket and each reward is a row with an id.
 
 ### Modularity
 
@@ -40,6 +40,7 @@ Read this note when players fight or compete against each other, live or against
 
 - The attacker's command changes the defender's rating or resources directly, while the defender's owner runs on another node. The defender's losses go through the durable inbox.
 - The loot comes from the attacker's copy of the defender's state, so the attacker gains what the defender already spent. The attacker gains only what the defender's owner removed, sent back through the attacker's inbox.
+- The defender is offline, so the inbox waits for the next login, and the loot arrives days later. When the attacker needs the result now, take it with an atomic claim on shared state, or hold the defender's ownership slot and write with compare-and-set. Otherwise the reply shows the result as pending.
 - Two attackers hit the same defender at once, and both pass the protection. The hit is one atomic claim on shared state, and an unknown result grants nothing.
 - Two nodes write the state of one live fight.
 - The timeout on one node settles a fight while the result command settles it on another.
