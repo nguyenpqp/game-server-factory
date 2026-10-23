@@ -75,8 +75,14 @@ During a deploy, old and new servers read and write the same data, and old clien
 
 - Stored data changes by adding fields and keys only. Nothing is removed, renamed, or retyped.
 - Check whether the version already running keeps fields it does not know when it saves. If it drops them, a new field is erased by every save from an old node, so the change ships in two deploys: first teach the code to keep unknown fields, then add the field.
+- A new field that is missing from older data reads as "not set", never as a real value. In Java, an absent `int` reads as 0, which can look like level 0 or zero uses left, so give the field an explicit unset state or fill it when the data loads.
+- Old code meets new values inside fields it already knows: an item id, an enum code, or a config id that only the new version grants. It keeps the value it does not know untouched and skips it, and never crashes or deletes it. A rollback is safe only when the old version tolerates everything the new version wrote.
 - A new meaning gets a new field or a new command id. An old id never takes a new meaning. While both versions run, the new version also keeps the old field correct, because a player can move back to an old node mid-deploy.
-- New request fields are optional and their absence means the old behavior. New response fields are appended and optional. An old client never receives a packet it cannot parse, and new behavior is gated on the client version.
+- New request fields are optional and their absence means the old behavior. New response fields are appended and optional. An old client never receives a packet it cannot parse, and new behavior is gated on the client version. The same holds for values: an old client never gets a new reward type, item kind, error code, or enum value in an old field. The server leaves it out or maps it to something the old client understands.
+- When a change cannot be served safely to old clients, such as new economy or fight rules, raise the minimum client version rather than run old and new rules side by side. Code kept only for old clients has a stated end, the version after which it is removed.
+- A command is retired only after metrics show no client still calls it. An old client that calls a retired command gets a clear error code, not a disconnect.
+- Requests and replies between nodes follow the same rules as client packets, since an old node and a new node call each other during a deploy.
+- Old and new Redis scripts that touch the same keys keep the same invariants. A new structure gets a new key rather than a new type on an old key, which would fail on the old nodes.
 - Config stays readable by both versions, so new keys have defaults.
 - Deploy dark, then turn on. New code that writes new data or changes behavior ships switched off and is enabled through config only once every node runs the new version. Change in two steps: first add the new path next to the old one, then remove the old one in a later deploy when nothing reads it.
 - Migration is idempotent and derived from stored data only. Per-player data migrates lazily when its owner loads it. Shared data migrated at boot is written only where the target is absent, because two nodes can boot at once. A format the old version cannot read is a one-way door that ships only in a maintenance deploy, with the rollback step written down.
@@ -156,7 +162,7 @@ Support, analytics, and incident response all start from metric rows and logs. I
 - The feature's logic runs in unit tests without a network or database, with injected time and randomness, so every window, cooldown, and random outcome is tested deterministically. Redis scripts are tested against a real Redis.
 - Each rejection has a test that checks the error code and that nothing changed.
 - Tests replay retried requests and duplicate callbacks and check for exactly one effect, including a write that fails after it applied.
-- Compatibility tests load old data and data with unknown newer fields, and decode old-client requests, and check that nothing is lost and old behavior holds.
+- Compatibility tests load old data, data with unknown newer fields, and data holding item ids or enum codes the code does not know, and decode old-client requests. They check that a save loses nothing and old behavior holds.
 - Cross-node logic is tested with two instances over one shared store, including a stale copy and a store fault.
 - Metric rows, config validation, and cheats being refused on live have tests.
 - Tests check what users of the code can observe. Skip tests of getters, constants, framework behavior, or mock wiring.
