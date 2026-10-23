@@ -25,7 +25,7 @@ inventory.addGold(gold, Reason.HARVEST, traceId);
 
 - needs: CAP-COMMAND
 
-### AUTH-02 Game logic reads time only from the server clock, passed into the core as a parameter, and turns it into a date only with the zone that CAP-CLOCK names.
+### AUTH-02 Game logic reads time only from the server clock, passed into the core as a parameter, and turns it into a date only with the zone that CAP-CLOCK names or a player zone that the server stores.
 
 **Why.** Client time and node-local calls are forgeable or skewed, and a core that reads the clock itself cannot be tested. A date built in the JVM's default zone moves the day boundary on a node or a test machine set to another zone.
 
@@ -44,7 +44,9 @@ boolean ready = System.currentTimeMillis() >= plot.readyAt();
 LocalDate today = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate();
 ```
 
-**Check.** Search the feature package for `currentTimeMillis`, `Instant.now`, `LocalDate.now`, `new Date()`, and the other calls in the profile's `lint.forbidden_time`. Then find each place that turns time into a date, a day, or an hour, such as `atZone`, `ofInstant`, `Calendar`, or a date format, and confirm it takes the zone from CAP-CLOCK. A call that names no zone, such as `ZoneId.systemDefault()`, `TimeZone.getDefault()`, or `Calendar.getInstance()`, uses the JVM's zone.
+When the design resets at each player's local time, the player's zone is stored server state, set by a rule the design gives, and the core takes it as a parameter like the clock. A request never names the zone for one action. A zone change cannot pass the same reset twice, so it takes effect only after the next reset in both zones, or the state records the last reset by its instant.
+
+**Check.** Search the feature package for `currentTimeMillis`, `Instant.now`, `LocalDate.now`, `new Date()`, and the other calls in the profile's `lint.forbidden_time`. Then find each place that turns time into a date, a day, or an hour, such as `atZone`, `ofInstant`, `Calendar`, or a date format, and confirm it takes the zone from CAP-CLOCK or from the player's stored zone. For a stored zone, find what a zone change does to the next reset. A call that names no zone, such as `ZoneId.systemDefault()`, `TimeZone.getDefault()`, or `Calendar.getInstance()`, uses the JVM's zone.
 
 - needs: CAP-CLOCK
 
@@ -172,7 +174,7 @@ The runner that catches an exception only logs it, so a throw after the first ch
 
 - needs: CAP-INVENTORY
 
-### AUTH-08 A command whose retry would grant value twice carries a request id, and the server applies each request id at most once per user.
+### AUTH-08 A command whose retry would grant value twice carries a request id, the server applies each request id at most once per user, and value from an outside system is applied at most once per outside transaction id across all users.
 
 **Why.** Mobile clients resend on reconnect, so a non-idempotent claim pays out twice.
 
@@ -194,7 +196,9 @@ Don't:
 state.addGems(config.packGems());
 ```
 
-**Check.** For each command that grants value, ask what a resend after a lost response does, and find the request id guard.
+A store receipt that the client forwards, or any proof of payment from outside, carries the outside system's transaction id. Claim that id once for the whole cluster before the grant, in shared state, so the same receipt sent again from this account or another one grants nothing.
+
+**Check.** For each command that grants value, ask what a resend after a lost response does, and find the request id guard. For value backed by an outside transaction, find the cluster-wide claim on its id.
 
 - needs: CAP-COMMAND, CAP-USERSTORE
 

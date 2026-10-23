@@ -20,13 +20,13 @@ Read each command handler and the core method it calls, in order. Trace every re
 | Rule | Severity | Look for |
 | --- | --- | --- |
 | AUTH-01 | critical | A request field that carries a price, amount, reward, result, or success flag. A handler that trusts a client-computed value. |
-| AUTH-02 | critical | Any read of wall time in feature code, or a core method that fetches time itself instead of taking `now`. The profile's `lint.forbidden_time` names the direct calls. Look also for time read through a helper or a stored static. A date, a day, or an hour built without the zone from CAP-CLOCK, such as with `ZoneId.systemDefault()`. |
+| AUTH-02 | critical | Any read of wall time in feature code, or a core method that fetches time itself instead of taking `now`. The profile's `lint.forbidden_time` names the direct calls. Look also for time read through a helper or a stored static. A date, a day, or an hour built without the zone from CAP-CLOCK or the player's stored zone, such as with `ZoneId.systemDefault()`. A zone from the request, or a zone change that passes a reset twice. |
 | AUTH-03 | critical | Any random source other than the injected one. Look for seeds taken from the request, and for a roll done twice so a client can retry for a better result. |
 | AUTH-04 | critical | A request decoded and used before a range, length, enum, or null check. A list field with no size cap. A string used as a key with no length cap. A product or sum of a request field and a config value, such as a price times a quantity, with no bound that keeps it within its type. |
 | AUTH-05 | critical | An item, slot, or target id from the request used without a check that the acting user owns it or may reach it. A friend or guild member id used without a membership check. |
 | AUTH-06 | critical | A state change that runs before the active, unlocked, state-transition, or cooldown check. A check that reads client-sent state. A claim or grant command that does not check the feature's terminal state, such as finished, expired, or closed, before it grants, even when a claimed list seems to cover it. |
 | AUTH-07 | critical | Several costs taken one by one with no up-front check. A cost taken before a later step that can fail, with no refund on that failure. A cost taken before the shared claim it pays for. A refund after a shared write that timed out and may have landed. A call after the first change that can throw, with no catch that undoes what ran, or a request id stored after such a call. |
-| AUTH-08 | critical | A grant, purchase, or claim command with no request id. A request id stored before a step that can still fail or throw, or in another document than the grant. A retry path that can run the grant twice. |
+| AUTH-08 | critical | A grant, purchase, or claim command with no request id. A forwarded receipt or outside transaction claimed per user only, so another account can replay it. A request id stored before a step that can still fail or throw, or in another document than the grant. A retry path that can run the grant twice. |
 | AUTH-09 | important | A command that loads other users or the database, or fans out, with no per-user limit. A limit that still applies the effect once exceeded. |
 | AUTH-10 | important | A failure branch that changes state before it returns, or returns one generic code for different failures. |
 
@@ -42,7 +42,7 @@ Ask which node and which thread run each line. Ask what happens when two nodes r
 | MN-04 | critical | A `set` or `replace` on a document that two users or two nodes write. A CAS loop with no attempt limit. A catch inside the loop that applies the change again without re-reading. A change made to an object the live state also holds. A log, push, or grant inside the loop. |
 | MN-05 | critical | A Redis `GET`, Java arithmetic, then `SET`. A check-then-act on a counter or a board across two calls. A fact checked in Java, such as a role or a slot's item, that the script does not recheck. An index updated in a second call. A periodic job that rebuilds an index. |
 | MN-06 | important | A key name built inside a Lua script instead of passed in KEYS. On Redis Cluster, a script or a multi-key command over keys that have no shared hash tag. |
-| MN-07 | critical | A scheduled job with no lease or lock. A job that checks it once at the start and runs every unit after. A unit that pays a user with no per-user claim or idempotent write. A done marker set while a unit failed. A retry scheduled outside `finally`. A job for data only the new version has that waits on the cluster lease. A weekly job that fires once instead of ticking often. |
+| MN-07 | critical | A scheduled job with no lease or lock. A job that checks it once at the start and runs every unit after. A unit that pays a user with no per-user claim or idempotent write. A done marker set while a unit failed. A retry scheduled outside `finally`. A job for data only the new version has that waits on the cluster lease. A weekly job that fires once instead of ticking often. A payout by rank read from the live board instead of a stored copy. |
 | MN-08 | critical | A counter field or an `AtomicLong` used to make ids that are stored or sent to other users. A snowflake node id read from config that two nodes can share. An increment that recreates a missing counter from zero. |
 | MN-09 | important | A node-local cache of shared data with no stated staleness bound, or with no invalidation call where a stale value is not on the safe side. |
 | MN-10 | important | A lookup in a node-local session map to push to a user or test if the user is online. An online check that reads the owner record without the owner's heartbeat. |
@@ -191,7 +191,7 @@ Read the imports of every changed file, and every call that reaches another feat
 | Rule | Severity | Look for |
 | --- | --- | --- |
 | MOD-01 | important | An import of another feature's package that the profile's `lint.allowed_import` does not allow. Look also for names used fully qualified in code, and for a static lookup of another feature's service. |
-| MOD-02 | critical | A reply that reports a cross-feature effect, such as a debit or a grant, that only an event applies. An event used to deliver value to another user. |
+| MOD-02 | critical | A reply that reports a cross-feature effect, such as a debit or a grant, that only an event applies. An event used to deliver value to another user, or progress toward a reward to the same player. |
 
 ## SYNC: Client sync
 

@@ -41,7 +41,7 @@ Take the command id block from the profile's CAP-COMMAND entry, one block per fe
 - One entry per thing the player can do, from the `The player can do` column of the UI touchpoints. A client-facing feature also has one read command whose response carries all of its client-visible state, so a client that reconnects rebuilds its view from it (SYNC-01).
 - A mutating command's response carries server time and the post-change value of each field and balance it changed, and nothing else of the state. Its errors carry the same fields with the stored values (SYNC-02).
 - Responses carry stored values and the stored instant of each timer. A boolean the client can derive, such as claimed today, and the second end of a timer stay out (SYNC-03).
-- An effect on another feature that the response reports runs through that feature's contract before the response. An event only carries reactions that may run later (MOD-02).
+- An effect on another feature that the response reports runs through that feature's contract before the response. An effect that pays value later, such as progress toward a reward, is a contract call or a durable inbox entry. An event only carries reactions that may run later and lose no value when dropped (MOD-02).
 - Requests carry intents only. A request never names an amount, a price, a reward, or a result (AUTH-01).
 - Every request field has a type, a range or a length, and allowed values, checked before the Checks rows run (AUTH-04).
 - Order the Checks rows as they run: feature active and window, client version, unlock, ownership of named objects, state preconditions, then costs. Each row has its own error code (AUTH-10).

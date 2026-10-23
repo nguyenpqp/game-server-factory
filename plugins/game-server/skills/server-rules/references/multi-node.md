@@ -186,7 +186,7 @@ RedisOps.eval(MOVE_SCRIPT, List.of("board:" + guildId, "members:" + guildId), ar
 
 - needs: CAP-REDIS
 
-### MN-07 A cluster-wide job stays correct when two nodes run it at once: a lease or lock only saves duplicate work, the job rechecks it between units, each unit is claimed or idempotent, and a job for data only the new version knows does not depend on a lease the old version can hold.
+### MN-07 A cluster-wide job stays correct when two nodes run it at once: a lease or lock only saves duplicate work, the job rechecks it between units, each unit is claimed or idempotent, a job that pays from data that still changes pays from one stored copy of it, and a job for data only the new version knows does not depend on a lease the old version can hold.
 
 **Why.** A lease can lapse mid-run, and then two nodes run the job, so only a per-unit claim keeps a reward paid once. The cluster lease may sit on the old version for hours, so a job that only the new config knows would never run.
 
@@ -214,9 +214,11 @@ scheduler.everyMonday(() -> payWeeklyRanking());
 if (LeaderLease.isHeld()) payAll(winners);   // checked once, no per-user claim
 ```
 
+A job that pays by rank, or by any value that can still change, first stores its input once under the occurrence id, such as the final ranking of a season. Every unit and every retry pays from that stored copy, never from the live board, so a late write or a removed entry cannot shift ranks during the payout.
+
 Run a periodic job much more often than its period, and decide what is due from stored state, so a restart or a lease move cannot skip a run. Set the done marker only when no unit failed, and schedule the retry in a `finally` block.
 
-**Check.** List every scheduled task in the feature. Each cluster-wide one takes a lease or a lock, rechecks it between units, and claims or idempotently writes each unit. Name the lease a job uses: a job for data that only the new version has must not wait for the cluster lease. Compare the tick with the job's period.
+**Check.** List every scheduled task in the feature. Each cluster-wide one takes a lease or a lock, rechecks it between units, and claims or idempotently writes each unit. Name the lease a job uses: a job for data that only the new version has must not wait for the cluster lease. Compare the tick with the job's period. For a job that pays by rank or by a changing value, find the stored copy it pays from.
 
 - needs: CAP-LEASE
 
