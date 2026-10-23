@@ -100,7 +100,7 @@ Designers tune balance after launch, often during live events. Code that hard-co
 
 Code that already runs on live is proven, and every edit to it risks players who never touch the new feature. A new feature should plug in beside the existing ones, not into them.
 
-- A new feature avoids editing other features' code. It extends them through their published contracts, extension points, or events. When an existing feature truly must change, keep the change small, behind its contract, and switched by config, and say why it was unavoidable.
+- A new feature avoids editing other features' code. It extends them through their published contracts, extension points, or events. When an existing feature truly must change, keep the change small, behind its contract, and switched by config, and say why it was unavoidable. Before changing running code, find every caller and say who is affected if the change is wrong.
 - A feature imports only its own package, shared code, and other features' published contracts.
 - A feature is plug-and-play: it registers its own commands, config, jobs, and handlers, and turning it off in config, or removing it, leaves the rest of the server working.
 - Parts that may change are swappable: a reward source, a matchmaking rule, or a storage detail sits behind an interface with one clear job, so a new implementation replaces the old one without touching callers.

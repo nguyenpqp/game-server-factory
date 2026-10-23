@@ -33,7 +33,7 @@ The plugin manifest has no version, so an install tracks the commit of the marke
 | --- | --- | --- |
 | `server-principles` | Planning, building, changing, or reviewing any game server feature | Fourteen principles with their reasons, under a stability-first stance: work through the core, the server decides, value moves exactly once, no node is special, two versions and old clients at once, numbers live in config, features are independent modules, bounded cost, the client can catch up, every action can be traced, tools for testers and support, tests prove behavior, code is typed and quiet, and build what the design says. Plus genre notes for rankings, gacha, economy, events, guilds, and PvP, each listing design questions and code traps. |
 | `gdd-intake` | A developer hands over a GDD (pptx, docx, xlsx, PDF, Markdown, images) or a feature prompt | A converter from office files to Markdown, and what a good feature design has: player terms only, traceable requirements, exact numbers, and gaps raised as questions instead of guesses. |
-| `feature-review` | Reviewing feature code, a pull request, or a diff | How to review against the design and the principles, and what a finding needs: severity, location, the principle it breaks, and a concrete failure scenario. |
+| `feature-review` | Reviewing feature code, a pull request, or a diff | How to review against the design and the principles, how to weigh the blast radius of changes to code already running on live, and what a finding needs: severity, location, the principle it breaks, and a concrete failure scenario. |
 
 The skills do not prescribe a workflow, branch strategy, or file layout. Use them in a plain chat or under any workflow plugin.
 
