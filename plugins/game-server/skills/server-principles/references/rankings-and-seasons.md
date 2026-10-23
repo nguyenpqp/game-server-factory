@@ -20,14 +20,14 @@ Read this note when players are ranked against each other by a score, such as a 
 
 - The client sends a score or a score change. The server computes the score from the actions it ran itself.
 - A retried request adds the same points twice.
-- A tie is ordered by a time the client sent, or by the JVM clock. Use the server clock.
+- A tie is ordered by a time the client sent, or by each node's own clock, which drift apart. Order ties by one shared time, such as the Redis time inside the update script.
 - The board closes or resets in a zone that the server does not name, or a player who changes zone passes the same reset twice.
 - A request names a board, a group, or a season the player does not belong to.
 - Points land after the board closed, or before it opened.
 
 ### Config
 
-- The period, the close time, the group size, and the reward bands are in code. Each band is a row with an id, and each reward is one record in the shared cost-and-reward shape.
+- The period, the close time, the group size, and the reward bands are in code. Each band is a row with an id.
 - Bands with a gap or an overlap pass the load. Check that the bands cover the paid ranks once each.
 - Stored entries and claims refer to a season by its list position.
 
@@ -41,12 +41,12 @@ Read this note when players are ranked against each other by a score, such as a 
 - The board lives in a node's memory, so each node ranks a different board.
 - A shared board changes by a read, a change in Java, and a write, so two nodes overwrite each other's points.
 - The atomic update loses the tie order, so equal scores sort by chance.
-- Every active player writes one global key.
+- Every score change writes the board key with no estimate of the peak write rate. An exact board stays one key, so merge each player's changes before writing.
 - A failed write to the board reads as "not ranked".
 - Two nodes run the season close at once, and players get the rank reward twice. The close stays correct when it runs twice, and each player's reward is claimed once per season id.
 - The close pays from a board that still changes, so a late write or a removed entry shifts the ranks during the payout, and one player is paid twice or skipped.
 - The close loads and saves each winner's document directly. Rewards reach players through the durable inbox, and a large close runs as a batched job.
-- A write from the old season lands on a closed board. The write rechecks that the season is open, and the close stores a closed marker.
+- A write from the old season lands on a closed board. The write rechecks that the season is open, and the close stores a closed marker that outlives any late write.
 - A board page or a neighbor list has no size cap, or reads one entry per call.
 
 ### Tests and metrics

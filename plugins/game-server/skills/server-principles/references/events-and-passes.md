@@ -20,7 +20,7 @@ Read this note when players make progress inside a time window, such as a limite
 - One action counts twice, because the command that caused it grants nothing itself and so has no request id.
 - A milestone claim trusts the client's count, or skips the check that the milestone is reached and not yet claimed.
 - A retried claim pays twice.
-- The window or a reset is checked with the client's time, the JVM clock, or the JVM's zone, or a player who changes zone passes the same reset twice.
+- The window or a reset is checked with the client's time, each node's own clock, or a zone the server does not own, or a player who changes zone passes the same reset twice.
 
 ### Config
 

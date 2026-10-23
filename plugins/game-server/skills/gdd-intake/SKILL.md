@@ -37,6 +37,6 @@ Ask the open questions that matter, most important first, and offer the default 
 
 When the design is large, a fresh reader is useful: have someone who did not write it (a subagent, if available) compare it against the sources and look for dropped rules, wrong numbers, and invented content.
 
-Put the design where the project keeps its docs. If the project has no convention, `docs/game-server/features/<feature>/design.md` with drafts in a `config/` folder beside it works well.
+Put the design and the config drafts where the project keeps its docs.
 
 When done, tell the developer where the design and drafts are, how many questions remain open and how serious they are, and anything the conversion could not read.

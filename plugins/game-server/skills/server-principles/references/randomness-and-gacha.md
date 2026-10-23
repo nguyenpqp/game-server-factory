@@ -20,7 +20,7 @@ Read this note when a random outcome carries value, such as a gacha, a loot box,
 
 - The client rolls the result, or sends a seed or a choice that decides it. The server draws from its own injected RNG.
 - A player drops the connection after a pull and retries until the result is good. A retry returns the first result and never rolls again.
-- The roll or the grant fails after the cost is taken, and the player keeps neither. Check the whole cost first, and refund when a later step fails or throws.
+- The roll or the grant fails after the cost is taken, and the player keeps neither. Check the whole cost first, then save the cost, the pity counters, and the result in one write to the player's document, so there is nothing to refund.
 - The request picks the pull count. Only the counts the config offers pass the check.
 - A pull runs on a banner before it opens or after it ends.
 

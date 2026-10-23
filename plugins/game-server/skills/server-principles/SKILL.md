@@ -31,8 +31,8 @@ The client sends intents, never results. The server computes every outcome, cost
 - Check every request field for presence, type, range, and allowed values, and keep computed amounts inside their type. Overflow and negative amounts are classic exploits.
 - Check that every object the request names (an item, a slot, a target player, a group) belongs to or is reachable by the acting player.
 - Check every precondition against server state: the feature is active, the player unlocked it, the state transition is legal, the cooldown is over.
-- Read time only from the server clock, passed into the logic, and turn it into a date only with a zone the server owns. Draw random numbers only from a server RNG passed into the logic. Both make the logic testable and keep the client out of it.
-- Check the full cost before taking any of it. When the action needs a shared claim (limited stock, a group treasury, a one-time slot), claim first and take the cost after. Give the cost back only when a later step definitely failed. An unknown result is re-read or retried, never refunded blindly.
+- Read time and random numbers only from a clock and an RNG passed into the logic, never from the client, and turn time into a date only with a zone the server owns. This keeps the client out and makes the logic testable. Node clocks drift apart, so a comparison that decides value across nodes (a tie order, a window edge, a protection expiry) uses one shared time, such as the Redis time inside the script or an instant already stored.
+- Check the full cost before taking any of it. Order the steps so that a crash between them can never create value. When the effect lives outside the player's document, take the cost and record the pending effect, keyed by the request id, in the same save. Then apply the effect idempotently by that id, and keep retrying an unknown result until it is definite. The owner resumes a pending effect after a crash. Refund only when the effect definitely failed, such as stock that ran out or a group that is gone. When the action reserves a limited thing, reserve it first and release it if the cost cannot be taken. When cost and effect live in the same document, save them together and there is nothing to refund.
 - A rejected request changes nothing and returns an error code specific to the reason.
 - Rate-limit commands that are expensive or touch other players.
 
@@ -40,7 +40,7 @@ The client sends intents, never results. The server computes every outcome, cost
 
 Networks retry, players double-tap, nodes crash mid-command, and payment providers resend callbacks. Every path that grants or takes value must give the same result when it runs twice.
 
-- A command whose retry would pay twice carries a request id, and the server applies each id once per player.
+- A command whose retry would pay or count toward value twice, such as a reward, a purchase, or event progress, carries a request id, and the server applies each id once per player.
 - Value from an outside system (a purchase, a platform reward) is applied once per outside transaction id across all players, recorded durably. Before anything happens, verify the caller's signature over the raw body with a per-environment secret, reject stale timestamps, and check the business payload (player, product, price) against server data. On live, an empty caller allowlist rejects every call rather than allowing all.
 - Value for another player goes through that player's durable inbox, even when they are on this node or online, and their owner applies each entry once.
 - A best-effort message or push must never be the only carrier of value.
@@ -52,11 +52,12 @@ Any node can run any command, two nodes can run the same job at once, and any no
 - Keep no game or player state in static fields, singletons, or node-wide maps. Only the immutable config snapshot may live there.
 - Only the owner of a player touches that player's live state. Changes to another player go through their owner, even when the owner is this node. A copy of another player's state read elsewhere may reject an action but never grant one.
 - A document several nodes write is updated with compare-and-set and a bounded retry, on a fresh copy.
+- Every save of a player's document carries its compare-and-set value or the owner's ownership epoch, so a stalled former owner (a long GC pause, a network split) cannot overwrite the new owner's save after its ownership lapsed.
 - Cluster-wide state changes in one atomic Redis step (a command or a script), never as read, change in Java, then write. The script rechecks every fact the caller decided on. On Redis Cluster, keys touched together share a hash tag.
 - A job that runs on the cluster stays correct when two nodes run it together. A lease only saves duplicate work, so each unit of work is claimed or idempotent, and the job rechecks its lease between units. A job that pays from data that still changes pays from one stored copy taken after the data closed. A job for data only the new version understands must not rely on a lease the old version can also take.
 - Fields that must change together are saved together. Two separate saves can be split by a crash.
 - A Redis or store call has three outcomes, yes, no, and unknown. An unknown result is re-read, never treated as success or failure that grants, denies, or hides value.
-- A shared thing that can close and open again (a season, a room, an event round) carries the id of that occurrence, and closing it leaves an explicit closed marker instead of deleting the key.
+- A shared thing that can close and open again (a season, a room, an event round) carries the id of that occurrence, and closing it leaves an explicit closed marker instead of deleting the key. The marker expires only after any late writer could still arrive.
 - A late or buffered write from a former owner, flushed after a handover, cannot move shared state backward: make it monotone or version-checked.
 - A node-local cache of shared data has a stated staleness bound and an invalidation path, unless staleness only errs on the safe side. Online checks and pushes to other players go through the ownership record, not a node-local session map.
 - Timed effects come from stored timestamps read at use time, not from in-memory timers. Unique ids come from the cluster (a Redis counter, or a snowflake with unique node bits), not from a node counter.
@@ -65,8 +66,9 @@ Any node can run any command, two nodes can run the same job at once, and any no
 
 During a deploy, old and new servers read and write the same data, and old clients talk to new servers. Every change must be safe in both directions until the old version is gone.
 
-- Stored data changes by adding fields and keys only. Nothing is removed, renamed, or retyped. A writer keeps fields it does not know about.
-- A new meaning gets a new field or a new command id. An old id never takes a new meaning.
+- Stored data changes by adding fields and keys only. Nothing is removed, renamed, or retyped.
+- Check whether the version already running keeps fields it does not know when it saves. If it drops them, a new field is erased by every save from an old node, so the change ships in two deploys: first teach the code to keep unknown fields, then add the field.
+- A new meaning gets a new field or a new command id. An old id never takes a new meaning. While both versions run, the new version also keeps the old field correct, because a player can move back to an old node mid-deploy.
 - New request fields are optional and their absence means the old behavior. New response fields are appended and optional. An old client never receives a packet it cannot parse, and new behavior is gated on the client version.
 - Config stays readable by both versions, so new keys have defaults.
 - Migration is idempotent and derived from stored data only. Per-player data migrates lazily when its owner loads it. Shared data migrated at boot is written only where the target is absent, because two nodes can boot at once. A format the old version cannot read is a one-way door that ships only in a maintenance deploy, with the rollback step written down.
@@ -82,7 +84,7 @@ Designers tune balance after launch, often during live events. Code that hard-co
 - Config is validated at load, and a bad file fails the load with the file and key named, never the first player who hits it.
 - A loaded config is an immutable snapshot that a reload swaps whole, and one command reads one snapshot from start to end.
 - A feature has an on switch and, when it is time-bound, start and end times checked against server time.
-- Stored data and packets refer to config entries by stable id, never by list position. Rows have explicit ids, and costs and rewards share one record shape with the item id as a value.
+- Stored data and packets refer to config entries by stable id, never by list position. Rows have explicit ids. Costs and rewards share one record shape with the item id as a value, so every grant and every log goes through one path.
 - An option that is not offered is left out, never written as zero, since a zero price sells for free. No string in config hides a mini-language that code has to parse.
 - Secrets, endpoints, and allowlists are environment config, apart from balance.
 
@@ -98,7 +100,7 @@ The game should hold its peak player count without one popular command taking a 
 - Each command makes a known, small number of store and Redis calls, never one per item in a loop. Batch with multi-get, pipelines, or one script.
 - Every stored list or map has a cap or an eviction rule, for per-player data and for shared documents like a guild's. Lists sent to the client are capped or paged.
 - A command touches a bounded number of other players. Larger fan-out runs as a batched job.
-- No single Redis key takes a write from every active player. Shard or batch hot counters and boards.
+- Estimate the peak writes per second to each shared Redis key. When one key takes too many, merge writes per player or batch them first, and shard only when the feature still works sharded. An exact leaderboard needs one sorted set, while a global counter can be split.
 
 ## 9. The client can always catch up
 
@@ -162,5 +164,5 @@ Some kinds of feature come back in game after game with the same design gaps and
 When you judge a break, in review or when deciding what to fix first:
 
 - **Critical.** It can lose, duplicate, or corrupt player value or stored data, open an exploit, run a cheat on live, leak a secret, break servers or clients during a rollout, or stall other players.
-- **Important.** It misses a performance budget, a compatibility guarantee, observability, or modularity, with no direct harm to players.
+- **Important.** The game keeps working but worse: a missed performance budget, a gap in observability or modularity, or a compatibility weakness that harms no player.
 - **Minor.** It costs maintenance time only.
