@@ -9,7 +9,7 @@ Review feature code against the feature design, the rule index, the project prof
 
 ## Inputs
 
-- The code to review: a diff, a branch, or a list of paths. If none is given, review the diff of the current branch against its base branch.
+- The code to review: a diff, a branch, or a list of paths. If none is given, review the diff of the current branch against its base branch. When the design cites `code` sources, the feature was built before its spec, so review every file it cites in full, and sweep all their lines, not only the added ones.
 - The profile, `docs/game-server/profile.md`, from the `server-profile` skill. It holds the project's `lint` call patterns and the capability entries. If it is missing, stop and ask the developer to run `server-profile`. Do not guess the project's calls.
 - The spec, `docs/game-server/features/<feature>/spec.md`, from the `feature-spec` skill. If it is missing, review against the rules alone and say so at the top of the report.
 - The design, `docs/game-server/features/<feature>/design.md`, from the `gdd-intake` skill, at the path on the spec header's `Design` line. When that line says `prompt`, the prompt and the requirements the spec lists under it are the design. If the design is missing, review the code against the spec and say so at the top of the report.

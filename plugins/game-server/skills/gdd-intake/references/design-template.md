@@ -50,7 +50,7 @@ Each input gets an id in the Sources table, such as `S1`. A citation names the i
 
 When two sources disagree, the requirement cites the one the designer confirmed. Until then, an open question cites both.
 
-`feature-spec` writes a design from existing code when a feature was built before it had one. That design cites the code it read, and still says what the player sees, does, and gets, never the classes or the storage.
+`feature-spec` writes a design from existing code when a feature was built before it had a design. A `code` citation needs no Sources entry, so such a design may write `None.` under Sources. It cites the code it read, and still says what the player sees, does, and gets, never the classes or the storage.
 
 ## Skeleton
 
