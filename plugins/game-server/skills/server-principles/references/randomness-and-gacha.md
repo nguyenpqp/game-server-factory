@@ -23,6 +23,7 @@ Read this note when a random outcome carries value, such as a gacha, a loot box,
 - The roll or the grant fails after the cost is taken, and the player keeps neither. Check the whole cost first, then save the cost, the pity counters, and the result in one write to the player's document, so there is nothing to refund.
 - The request picks the pull count. Only the counts the config offers pass the check.
 - A pull runs on a banner before it opens or after it ends.
+- The reply or the config sent to the client reveals the next result, a pre-rolled seed, or pity counters and rates the design keeps hidden.
 
 ### Config
 

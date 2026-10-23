@@ -26,6 +26,8 @@ Read this note when players fight or compete against each other, live or against
 - The fight's start, duration, or timeout comes from client time.
 - The ticket is taken, and the fight fails to start, so the player pays for nothing.
 - Two players, or one player with an alt account, trade wins to farm rewards or rating, and nothing can find them. Each fight row names both players, so a query finds repeated pairs. A cap on repeated pairs that the design sets comes from config.
+- The opponent's full state, including a hidden lineup or resources, reaches the client.
+- A fight ends faster than its shortest possible length, or a player finishes fights at a rate the game cannot produce.
 
 ### Config
 

@@ -43,6 +43,7 @@ Read this note when players make progress inside a time window, such as a limite
 - The end-of-event mail sends a reward that the player claims at the same moment, so it pays twice. The mail goes through the inbox, and the owner applies it against the claim mark.
 - A pass bought with real money is granted by the payment callback directly, or twice. It checks the product and the price, locks on the transaction id, and goes through the inbox.
 - A new event type reaches an old client, or changes the meaning of an old config key.
+- Every player hits the daily reset or the event opening in the same second. A job that resets everyone at once, or shared data loaded on the first request, stalls the cluster. Reset lazily per player and load shared data ahead of time.
 
 ### Tests and metrics
 
