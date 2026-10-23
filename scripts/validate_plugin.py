@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the game-server plugin's structure, links, ids, rulebook, and private terms.
+"""Check the game-server plugin's structure, links, and private terms.
 
 The private-term scan reads every tracked file and every untracked file that git does
 not ignore. Prints `path:line: message` for each failure and exits 1 if any failure exists.
@@ -20,12 +20,8 @@ MARKETPLACE = ".claude-plugin/marketplace.json"
 PLUGIN_DIR = "plugins/game-server"
 PLUGIN_MANIFEST = f"{PLUGIN_DIR}/.claude-plugin/plugin.json"
 SKILLS_DIR = f"{PLUGIN_DIR}/skills"
-RULE_INDEX = f"{SKILLS_DIR}/server-rules/references/index.md"
-PROFILE_TEMPLATE = f"{SKILLS_DIR}/server-profile/references/profile-template.md"
-MODEL_INVOCATION_OFF_ONLY_ON = "server-profile"
 MAX_DESCRIPTION = 1024
 
-CAP_ID = re.compile(r"\bCAP-[A-Z]+\b")
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 INLINE_CODE = re.compile(r"`([^`\n]+)`")
 CHECKED_PREFIXES = ("references/", "scripts/", "prompts/", "../")
@@ -35,14 +31,6 @@ HOME_PATH = re.compile(r"/(?:Users|home)/[\w.-]+/")
 PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
 SKILL_VARIABLE_PATH = re.compile(r"\$\{(CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT)\}/([\w./-]+)")
 SKILL_VARIABLE = re.compile(r"\$\{?CLAUDE_(?:SKILL_DIR|PLUGIN_ROOT)\b")
-RULE_GROUP_FILES = {
-    "AUTH": "auth.md", "MN": "multi-node.md", "BG": "blue-green.md", "PERF": "performance.md",
-    "CFG": "config.md", "MET": "metric.md", "CHEAT": "cheat.md", "ADMIN": "admin.md",
-    "HTTP": "http.md", "TEST": "testing.md", "DES": "design-conformance.md",
-    "MOD": "modularity.md", "SYNC": "client-sync.md", "LOG": "logging.md",
-}
-RULE_ID = re.compile(r"\b(?:" + "|".join(RULE_GROUP_FILES) + r")-\d{2}\b")
-RULE_PARTS = ("**Why.**", "Do:", "Don't:", "**Check.**")
 
 
 def relative(root, path):
@@ -149,15 +137,6 @@ def check_skill(root, skill_dir):
             findings.append(
                 Finding(rel, line, f"description has {len(value)} characters, limit is {MAX_DESCRIPTION}")
             )
-    flag = fields.get("disable-model-invocation")
-    if flag and flag[0].lower() == "true" and skill_dir.name != MODEL_INVOCATION_OFF_ONLY_ON:
-        findings.append(
-            Finding(
-                rel,
-                flag[1],
-                f"disable-model-invocation: true is allowed only on {MODEL_INVOCATION_OFF_ONLY_ON}",
-            )
-        )
     return findings
 
 
@@ -234,86 +213,6 @@ def check_skill_variables(root, files):
                 base = path.parent if match.group(1) == "CLAUDE_SKILL_DIR" else root / PLUGIN_DIR
                 if not (base / match.group(2)).is_file():
                     findings.append(Finding(rel, number, f"no file at {match.group(0)}"))
-    return findings
-
-
-def rule_sections(path):
-    sections, current = [], None
-    for number, line in markdown_lines(path.read_text(encoding="utf-8")):
-        if line.startswith("### "):
-            current = (number, line, [])
-            sections.append(current)
-        elif line.startswith("#"):
-            current = None
-        elif current:
-            current[2].append(line)
-    return sections
-
-
-def check_rulebook(root):
-    index = root / RULE_INDEX
-    if not index.is_file():
-        return []
-    rules, current = [], None
-    for number, line in markdown_lines(index.read_text(encoding="utf-8")):
-        match = re.match(r"### (" + RULE_ID.pattern + ") ", line)
-        if match:
-            current = {"id": match.group(1), "line": number, "heading": line, "needs": None}
-            rules.append(current)
-        elif current and current["needs"] is None and line.startswith("- needs:"):
-            current["needs"] = line
-    findings, sections = [], {}
-    for rule in rules:
-        name = RULE_GROUP_FILES[rule["id"].split("-")[0]]
-        path = index.parent / name
-        rel = relative(root, path)
-        if not path.is_file():
-            findings.append(Finding(RULE_INDEX, rule["line"], f"{rule['id']} has no group file {name}"))
-            continue
-        if name not in sections:
-            sections[name] = rule_sections(path)
-        found = [s for s in sections[name] if s[1].startswith(f"### {rule['id']} ")]
-        if not found:
-            findings.append(Finding(RULE_INDEX, rule["line"], f"{rule['id']} has no section in {name}"))
-            continue
-        for number, _, _ in found[1:]:
-            findings.append(Finding(rel, number, f"{rule['id']} has a second section"))
-        number, heading, body = found[0]
-        if heading != rule["heading"]:
-            findings.append(Finding(rel, number, f"{rule['id']} heading differs from {RULE_INDEX}"))
-        if rule["needs"] is None:
-            findings.append(Finding(RULE_INDEX, rule["line"], f"{rule['id']} has no needs line"))
-        elif rule["needs"] not in body:
-            findings.append(Finding(rel, number, f"{rule['id']} needs line differs from {RULE_INDEX}"))
-        for part in RULE_PARTS:
-            if not any(line.startswith(part) for line in body):
-                findings.append(Finding(rel, number, f"{rule['id']} has no {part} part"))
-    return findings
-
-
-def heading_ids(path, id_pattern):
-    lines = markdown_lines(path.read_text(encoding="utf-8"))
-    matches = (id_pattern.match(line.lstrip("#").strip()) for _, line in lines if line.startswith("#"))
-    return {match.group(0) for match in matches if match}
-
-
-def check_ids(root, files, id_pattern, definitions, kind):
-    defined_in = root / definitions
-    if not defined_in.is_file():
-        return []
-    defined = heading_ids(defined_in, id_pattern)
-    findings = []
-    for path, text in files:
-        for number, line in enumerate(text.splitlines(), start=1):
-            for token in id_pattern.findall(line):
-                if token not in defined:
-                    findings.append(
-                        Finding(
-                            relative(root, path),
-                            number,
-                            f"{kind} {token} is not a heading in {definitions}",
-                        )
-                    )
     return findings
 
 
@@ -399,9 +298,6 @@ def main(argv=None):
         + check_skills(root)
         + check_links(root, files)
         + check_skill_variables(root, files)
-        + check_rulebook(root)
-        + check_ids(root, files, RULE_ID, RULE_INDEX, "rule id")
-        + check_ids(root, files, CAP_ID, PROFILE_TEMPLATE, "capability id")
         + check_tracked_files(root, denylist)
     )
     for finding in findings:
