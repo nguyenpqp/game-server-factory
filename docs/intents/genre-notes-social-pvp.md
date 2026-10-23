@@ -34,6 +34,7 @@ The first genre notes covered rankings, gacha, economy, and events, and left gui
 
 - Take the two genres the first round left for later, under the owner's standing goal, rather than start a direction the owner did not pick.
 - A gap found while writing is reported in the pull request, as before.
+- One gap, the size of a shared group document, is closed here by extending PERF-06 to shared documents, the same way the earlier rounds extended rules instead of adding ids.
 
 ## Open questions
 
