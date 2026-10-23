@@ -100,6 +100,7 @@ Search recipes for filling the profile of a Java game server. The patterns use `
 
 - Search for currency and item methods. `rg -n "\b(spend|take|consume|deduct|add|grant|give)\w*\((.*)(Item|Currency|Gold|Gem|Coin)"`.
 - Check that each change takes a reason and a trace id, writes a metric row, and rejects unknown ids and non-positive amounts. Find a multi-item check-then-take.
+- Follow take and add down to the network layer, and note any packet they send to the user, such as an item-changed push. Look for a flag or a second method that skips it. Record both in `api`.
 
 ### CAP-CROSSNODE
 

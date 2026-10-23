@@ -54,6 +54,8 @@ Take the command id block from the profile's CAP-COMMAND entry, one block per fe
 
 Take the rows from the `Changes without player action` column of the UI touchpoints, and from server-side changes such as another player's action or a support repair. A push reports only a change that the client did not cause, and its row says why the client cannot know it (SYNC-04). The player's own command answers with the change, and a client that logs in or reconnects calls the read command, so the feature pushes nothing at login or after the player's own command. A change the client can compute from stored values and server time, such as a countdown that reaches zero, needs no push. Let the client refresh at a time the server sent, such as `nextDayStartsAt`. A server timer per user breaks MN-11. A push is best effort, so the value it reports is stored first, in the user's state or the durable inbox (SYNC-04). Every push has a minimum client and is never sent to an older one (BG-06).
 
+A core call can push by itself. When the profile's CAP-INVENTORY `api` says a take or an add sends a push, every command that makes that call sends it after the player's own action. Use the form of the call that sends none when the profile names one. Otherwise add a row for the push, with the core call as its trigger, so the review can weigh it against SYNC-04, and keep the post-change balance in the reply (SYNC-02).
+
 ### 3. State model
 
 - Put new per-user state in its own document, or as new fields on an existing one. Never rename, remove, or retype a stored field (BG-01).

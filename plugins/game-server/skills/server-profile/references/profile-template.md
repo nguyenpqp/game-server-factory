@@ -276,6 +276,8 @@ Must provide:
 
 Typical partial: take and add exist, but they accept no trace id, a multi-item take or add can stop halfway, or an add can wrap a balance.
 
+The `api` field also says whether a check, take, or add sends a push to the client by itself, and names the push and any form of the call that sends none. Feature code cannot see that push at the call site.
+
 ### CAP-CROSSNODE Cross-node delivery
 
 Must provide:

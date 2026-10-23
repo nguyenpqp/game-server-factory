@@ -202,7 +202,7 @@ Read each reply and push that the diff adds or changes, field by field, against 
 | SYNC-01 | important | A client-facing feature with no read command, or a read command that leaves out a part that a screen shows. State that reaches the client only in a push. |
 | SYNC-02 | important | A mutating reply with no server time, with a delta instead of the post-change value, or with values the command did not change. A reject that carries only the error code while the client may hold the fields wrong. |
 | SYNC-03 | important | A boolean in a reply or push that compares stored values, config, or server time, such as `ready` or `claimedToday`. Both the start and the end of one timer. |
-| SYNC-04 | critical | A push after the player's own command or at login. A push for a time the client can compute. Value that exists only in a push, with no stored state or inbox entry behind it. |
+| SYNC-04 | critical | A push after the player's own command or at login, including one that a core call such as an inventory add sends by itself. Read the profile's CAP-INVENTORY `api` for those. A push for a time the client can compute. Value that exists only in a push, with no stored state or inbox entry behind it. |
 
 ## LOG: Logging
 
