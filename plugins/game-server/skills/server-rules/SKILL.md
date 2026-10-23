@@ -18,7 +18,7 @@ This skill is the rulebook for feature code on a Java game server. The server is
 
 ## Boundary
 
-This skill holds rules and nothing else. It does not scan a project, write a spec, write code, or run a review.
+This skill holds rules, and genre notes that point at them. It does not scan a project, write a spec, write code, or run a review.
 
 - The project profile from `server-profile` names the real classes behind each capability id, such as `CAP-CLOCK`. The examples here use generic names (`UserActor`, `KvStore`, `FeatureConfig`, `MetricLogger`, `FeatureLogs`, `TraceIds`, `ServerClock`, `RedisOps`, `Inbox`, `Env`, `GameRandom`). Map them to the profile's names before writing code.
 - `feature-spec`, `feature-build`, and `feature-review` apply the rules and cite them by id.
@@ -48,6 +48,10 @@ When designing a feature, read every group that the feature touches. When review
 - [MOD, modularity](references/modularity.md). Imports only of the feature's own, shared, and contract packages, and contract calls for every cross-feature effect a reply depends on.
 - [SYNC, client sync](references/client-sync.md). A read command that rebuilds the client's view, absolute post-change values with server time, stored instants only, and pushes only for changes the client did not cause.
 - [LOG, logging](references/logging.md). The feature's own logger, a level that matches the harm, the exception last, the user id and trace id on each line, no success-path lines, and no rule ids in code text.
+
+## Genre notes
+
+[Genre notes](references/genres/index.md) cover kinds of feature that recur across games: [rankings and seasons](references/genres/rankings-and-seasons.md), [randomness and gacha](references/genres/randomness-and-gacha.md), [economy and exchange](references/genres/economy-and-exchange.md), and [events and passes](references/genres/events-and-passes.md). Each lists the questions a design must answer and the traps its code falls into, with the rule ids that cover each trap. A note guides and never prescribes a design. Read every note that matches the feature.
 
 ## Never
 
