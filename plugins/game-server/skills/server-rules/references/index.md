@@ -26,7 +26,7 @@ Each rule's reason, Java do and don't, and review check are in [auth.md](auth.md
 - severity: critical
 - needs: CAP-COMMAND
 
-### AUTH-02 Game logic reads time only from the server clock, passed into the core as a parameter, and turns it into a date only with the zone that CAP-CLOCK names.
+### AUTH-02 Game logic reads time only from the server clock, passed into the core as a parameter, and turns it into a date only with the zone that CAP-CLOCK names or a player zone that the server stores.
 
 - severity: critical
 - needs: CAP-CLOCK
@@ -56,7 +56,7 @@ Each rule's reason, Java do and don't, and review check are in [auth.md](auth.md
 - severity: critical
 - needs: CAP-INVENTORY
 
-### AUTH-08 A command whose retry would grant value twice carries a request id, and the server applies each request id at most once per user.
+### AUTH-08 A command whose retry would grant value twice carries a request id, the server applies each request id at most once per user, and value from an outside system is applied at most once per outside transaction id across all users.
 
 - severity: critical
 - needs: CAP-COMMAND, CAP-USERSTORE
@@ -105,7 +105,7 @@ Each rule's reason, Java do and don't, and review check are in [multi-node.md](m
 - severity: important
 - needs: CAP-REDIS
 
-### MN-07 A cluster-wide job stays correct when two nodes run it at once: a lease or lock only saves duplicate work, the job rechecks it between units, each unit is claimed or idempotent, and a job for data only the new version knows does not depend on a lease the old version can hold.
+### MN-07 A cluster-wide job stays correct when two nodes run it at once: a lease or lock only saves duplicate work, the job rechecks it between units, each unit is claimed or idempotent, a job that pays from data that still changes pays from one stored copy of it, and a job for data only the new version knows does not depend on a lease the old version can hold.
 
 - severity: critical
 - needs: CAP-LEASE
@@ -590,7 +590,7 @@ Each rule's reason, Java do and don't, and review check are in [modularity.md](m
 - severity: important
 - needs: CAP-MODULE
 
-### MOD-02 A cross-feature effect that the reply depends on is a synchronous contract call, and an event carries only best-effort reactions that may run after the reply.
+### MOD-02 A cross-feature effect that the reply depends on is a synchronous contract call, an effect that pays player value is a contract call or a durable inbox entry, and an event carries only best-effort reactions whose loss costs no value.
 
 - severity: critical
 - needs: CAP-MODULE

@@ -26,7 +26,7 @@ Don't reach the other feature's state through a shared helper either. A static l
 
 - needs: CAP-MODULE
 
-### MOD-02 A cross-feature effect that the reply depends on is a synchronous contract call, and an event carries only best-effort reactions that may run after the reply.
+### MOD-02 A cross-feature effect that the reply depends on is a synchronous contract call, an effect that pays player value is a contract call or a durable inbox entry, and an event carries only best-effort reactions whose loss costs no value.
 
 **Why.** An event runs after the reply, in no fixed order, and can be dropped, so a reply that counts on it reports an effect that has not happened, such as an item granted before its price is taken.
 
@@ -36,7 +36,7 @@ Do:
 if (!inventory.take(userId, price, REASON, traceId)) {
     return Outcome.error(Errors.NOT_ENOUGH);
 }
-events.publish(new ItemBoughtEvent(userId, item.id(), traceId));   // quest progress, best effort
+events.publish(new ItemBoughtEvent(userId, item.id(), traceId));   // a news feed line, best effort
 return Outcome.ok(item.id());
 ```
 
@@ -49,6 +49,8 @@ return Outcome.ok(item.id());
 
 Don't treat an event as durable delivery to another user. A dropped event loses the effect, so value for another user goes through the durable inbox (MN-03).
 
-**Check.** For each event the feature publishes, confirm that the reply does not report its effect. For each cross-feature effect that the reply reports, find the contract call that completes before the reply is built.
+The same holds for the same player. Progress that pays a reward later, such as points toward a milestone or a pass level, never rides only an event. Make it a contract call before the reply, or an entry in the player's durable inbox whose id comes from the action's request id, so a retry adds nothing new. The append is a change step, so AUTH-07 decides what a failed append does.
+
+**Check.** For each event the feature publishes, confirm that the reply does not report its effect, and that a dropped event loses no value, for this player or another. For each cross-feature effect that the reply reports, find the contract call that completes before the reply is built.
 
 - needs: CAP-MODULE

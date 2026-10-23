@@ -41,13 +41,13 @@ Take the command id block from the profile's CAP-COMMAND entry, one block per fe
 - One entry per thing the player can do, from the `The player can do` column of the UI touchpoints. A client-facing feature also has one read command whose response carries all of its client-visible state, so a client that reconnects rebuilds its view from it (SYNC-01).
 - A mutating command's response carries server time and the post-change value of each field and balance it changed, and nothing else of the state. Its errors carry the same fields with the stored values (SYNC-02).
 - Responses carry stored values and the stored instant of each timer. A boolean the client can derive, such as claimed today, and the second end of a timer stay out (SYNC-03).
-- An effect on another feature that the response reports runs through that feature's contract before the response. An event only carries reactions that may run later (MOD-02).
+- An effect on another feature that the response reports runs through that feature's contract before the response. An effect that pays value later, such as progress toward a reward, is a contract call or a durable inbox entry. An event only carries reactions that may run later and lose no value when dropped (MOD-02).
 - Requests carry intents only. A request never names an amount, a price, a reward, or a result (AUTH-01).
 - Every request field has a type, a range or a length, and allowed values, checked before the Checks rows run (AUTH-04).
 - Order the Checks rows as they run: feature active and window, client version, unlock, ownership of named objects, state preconditions, then costs. Each row has its own error code (AUTH-10).
 - A cost is checked in full before any take, and the Effect says what is refunded if a later step fails (AUTH-07).
 - The Effect runs on a pure core that receives `now` and the RNG as parameters (AUTH-02, AUTH-03). Name the inventory call from CAP-INVENTORY with the reason constant and the trace id (MET-03, MET-04).
-- Decide idempotency per command. A command whose retry would grant value twice takes a `requestId` (AUTH-08). Store the smallest record that answers a replay with the first result, such as the last request id and its result for a once-a-day claim, and bound it (PERF-06).
+- Decide idempotency per command. A command whose retry would grant value twice takes a `requestId` (AUTH-08). Value backed by an outside transaction, such as a forwarded store receipt, also claims that transaction id once for the whole cluster (AUTH-08). Store the smallest record that answers a replay with the first result, such as the last request id and its result for a once-a-day claim, and bound it (PERF-06).
 - Add a rate limit when the command reads the database, touches other users, or fans out (AUTH-09). Otherwise say `None.` and why.
 - New error codes come from the feature's block, added the way CAP-ERRORS describes. List shared codes in the Checks table, but only the feature's own codes in the Error codes table.
 

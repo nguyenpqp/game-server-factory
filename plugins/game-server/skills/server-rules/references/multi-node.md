@@ -186,7 +186,7 @@ RedisOps.eval(MOVE_SCRIPT, List.of("board:" + guildId, "members:" + guildId), ar
 
 - needs: CAP-REDIS
 
-### MN-07 A cluster-wide job stays correct when two nodes run it at once: a lease or lock only saves duplicate work, the job rechecks it between units, each unit is claimed or idempotent, and a job for data only the new version knows does not depend on a lease the old version can hold.
+### MN-07 A cluster-wide job stays correct when two nodes run it at once: a lease or lock only saves duplicate work, the job rechecks it between units, each unit is claimed or idempotent, a job that pays from data that still changes pays from one stored copy of it, and a job for data only the new version knows does not depend on a lease the old version can hold.
 
 **Why.** A lease can lapse mid-run, and then two nodes run the job, so only a per-unit claim keeps a reward paid once. The cluster lease may sit on the old version for hours, so a job that only the new config knows would never run.
 
@@ -194,11 +194,12 @@ Do:
 
 ```java
 if (!EventLock.tryAcquire(eventId, ttlMs)) { retryLater(eventId); return; }   // any version that knows the event
+Ranking ranking = RankCopy.createIfAbsentThenRead(eventId);   // one whole copy, taken after the closed marker
 try {
-    for (long userId : winners) {
+    for (long userId : ranking.winners()) {
         if (!EventLock.stillHeld(eventId)) return;
         if (!RedisOps.hsetnx(paidKey(eventId), String.valueOf(userId), traceId)) continue;   // paid before
-        if (!Inbox.append(userId, new TopRewardEntry(eventId, rankOf(userId), traceId)))
+        if (!Inbox.append(userId, new TopRewardEntry(eventId, ranking.rankOf(userId), traceId)))
             RedisOps.hdel(paidKey(eventId), String.valueOf(userId));                      // retried later
     }
 } finally {
@@ -214,9 +215,11 @@ scheduler.everyMonday(() -> payWeeklyRanking());
 if (LeaderLease.isHeld()) payAll(winners);   // checked once, no per-user claim
 ```
 
+A job that pays by rank, or by any value that can still change, pays from one stored copy of its input, such as the final ranking of a season. Take the copy after the closed marker is set (MN-14), and write it whole, in one document or one atomic write, create-if-absent under the occurrence id. Every node reads the stored copy back and pays from it, never from its own read, and the copy stays until the done marker is set. A late write or a removed entry then cannot shift ranks during the payout.
+
 Run a periodic job much more often than its period, and decide what is due from stored state, so a restart or a lease move cannot skip a run. Set the done marker only when no unit failed, and schedule the retry in a `finally` block.
 
-**Check.** List every scheduled task in the feature. Each cluster-wide one takes a lease or a lock, rechecks it between units, and claims or idempotently writes each unit. Name the lease a job uses: a job for data that only the new version has must not wait for the cluster lease. Compare the tick with the job's period.
+**Check.** List every scheduled task in the feature. Each cluster-wide one takes a lease or a lock, rechecks it between units, and claims or idempotently writes each unit. Name the lease a job uses: a job for data that only the new version has must not wait for the cluster lease. Compare the tick with the job's period. For a job that pays by rank or by a changing value, find the stored copy it pays from.
 
 - needs: CAP-LEASE
 
