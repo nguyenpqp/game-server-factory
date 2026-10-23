@@ -83,7 +83,7 @@ Count the calls per command, and read every loop.
 | PERF-03 | important | A database or Redis call inside a `for`, `forEach`, or stream over users, items, or rows. A single `get` repeated where a multi-get exists. |
 | PERF-04 | important | A list put into a response or push with no cap. A push sent for every change instead of once per command. |
 | PERF-05 | important | A linear search through a config list on the command path. An index built per call. |
-| PERF-06 | important | A list or map in user state with no cap or eviction. A history that only grows. A counter or accumulated amount with no numeric cap, or a cap with no stated reject or clamp policy. A login or logout hook that creates a document for a user who never used the feature. |
+| PERF-06 | important | A list or map in user state or in a shared document with no cap or eviction. A history that only grows. A counter or accumulated amount with no numeric cap, or a cap with no stated reject or clamp policy. A login or logout hook that creates a document for a user who never used the feature. |
 | PERF-07 | important | A loop that pushes to or changes many users inside one command. |
 | PERF-08 | important | A single Redis key that every active user writes on the command path. |
 

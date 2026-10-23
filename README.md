@@ -20,7 +20,7 @@ Every skill works to the same fixed rulebook. The rules come from these constrai
 
 The rules are listed with ids in `plugins/game-server/skills/server-rules/references/index.md`. Specs and reviews cite them by id.
 
-Genre notes in `plugins/game-server/skills/server-rules/references/genres/` cover rankings and seasons, randomness and gacha, economy and exchange, and events and passes. Each lists the questions a design must answer and the traps the code falls into, and points each trap at its rules. The notes never prescribe a design, because designs vary from game to game.
+Genre notes in `plugins/game-server/skills/server-rules/references/genres/` cover rankings and seasons, randomness and gacha, economy and exchange, events and passes, guilds and groups, and PvP and matchmaking. Each lists the questions a design must answer and the traps the code falls into, and points each trap at its rules. The notes never prescribe a design, because designs vary from game to game.
 
 ## Install
 

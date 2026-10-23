@@ -19,3 +19,5 @@ The rule index stays the authority. A trap only points at a rule. When a case ne
 | [Randomness and gacha](randomness-and-gacha.md) | A random outcome that carries value, such as a gacha, a loot box, a random drop, a wheel, or a craft that can fail |
 | [Economy and exchange](economy-and-exchange.md) | Currency or items that are bought, sold, sent, or traded, such as a shop with limits, rotating offers, mail with attachments, gifts, trades, or a real money purchase |
 | [Events and passes](events-and-passes.md) | Progress inside a time window, such as a limited event, missions, point milestones, a battle pass, or a login calendar |
+| [Guilds and groups](guilds-and-groups.md) | Players in a shared group, such as a guild, a clan, an alliance, a party, or a friend list |
+| [PvP and matchmaking](pvp-and-matchmaking.md) | Players who fight or compete against each other, live or against a stored defense, with opponents the server picks |
