@@ -115,7 +115,7 @@ Follow one action from its first line to each return and each catch.
 | MET-03 | important | A currency or inventory call with no trace id argument, or with a new one. |
 | MET-04 | important | A source or sink with no reason constant, or a reason shared with another feature action. A grant API that writes a change row only when the grant fails. |
 | MET-05 | important | A multi-step flow with one metric action for all steps. |
-| MET-06 | important | A success measure in the spec with no KPI query. A query that names a column that does not exist. |
+| MET-06 | important | A success measure in the spec with no KPI query. A query that names a column that does not exist. A share whose denominator counts players the measure does not name, such as a join that gives every account a default date. |
 | MET-07 | important | A new fixed column for new metric data. An extra field with no stated meaning. |
 | MET-08 | important | A command with no catch that writes an exception row, or a catch that swallows the error and sends no response. |
 | MET-09 | critical | A metric extra or log line that includes a token, signature, key, or payment credential. |

@@ -134,7 +134,7 @@ Don't:
 // KPI: claim rate. Query to be written after launch.
 ```
 
-**Check.** For each success measure in the spec, find its query and confirm the table, action names, and columns exist.
+**Check.** For each success measure in the spec, find its query and confirm the table, action names, and columns exist. For a share or a rate, confirm that the denominator holds only the players the measure names. A join that fills a missing date with a default counts every account.
 
 - needs: CAP-METRIC
 
