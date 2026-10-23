@@ -68,7 +68,7 @@ Use feature-spec to write the server spec for daily-streak from its design.md.
 
 The skill writes `spec.md` section by section. Each row cites rule ids from the rulebook, and each row taken from the design cites its design id. The spec covers commands, pushes, state, config, metrics, cheats, admin commands, HTTP endpoints, the multi-node analysis, the blue-green and old-client matrix, the performance budget, and the test plan.
 
-If a capability the feature needs is missing or partial, the Core blockers section gets a row that names the capability, the rules it breaks, what players would see, and the smallest core change. The spec status becomes `blocked`, and the skill stops. Choose one resolution per row.
+If a capability the feature needs is missing or partial, the Core blockers section gets a row that names the capability, the rules it breaks, what players would see, and the smallest core change. The spec status becomes `blocked`, and the skill stops. It groups the rows that one deployment fact would bound, such as one game process per realm, and asks once per fact with the evidence it found and how the fact bounds each row. Confirm or reject the fact for the whole group. Choose one resolution per group or per row.
 
 - **Change the core.** Make the change, rerun `server-profile`, then continue the spec.
 - **Descope.** Drop what depends on the capability.

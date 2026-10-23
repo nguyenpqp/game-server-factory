@@ -113,10 +113,10 @@ When any row counts as `open`:
 
 1. Set the header to `Status: blocked`.
 2. Leave sections 13 and 14 under their headings with the line `Not written while Core blockers has an open row.`
-3. Save the file and give the Core blockers section to the developer. For each open row, offer the resolutions: change the core, descope, accept for this feature, or accept for every feature. Leave out accept for every feature on a row that blocks PERF-01.
+3. Save the file and give the Core blockers section to the developer. Ask about the open rows in groups, because one fact about how the project runs often bounds many of them. Read the profile and the project's deploy files, such as deploy scripts and server config, for candidate facts, such as one game process per realm. Group the rows that one fact would bound, and for each row in a group write how the fact bounds its `What fails for players` cell. Ask one question per group, showing the fact, its evidence, and each row's bound. The developer confirms the fact or rejects it, and chooses this feature or every feature. Offer the other resolutions too: change the core, descope, or accept with another reason. Ask about a row that no fact bounds on its own, with the same resolutions. Keep a row that blocks PERF-01 out of the groups, and never offer accept for every feature on it.
 4. Stop. Only the developer sets a resolution. Never design around a missing capability.
 
-When the developer accepts a row for every feature, add a decision to `docs/game-server/decisions.md` in the decisions template format, with the developer's name and today's date. Create the file with its title, header row, and separator row when it does not exist. Read the new decision against the template, then resolve the row from it. When the developer resolves every row, finish the remaining sections.
+When the developer accepts a row for every feature, add a decision to `docs/game-server/decisions.md` in the decisions template format, with the developer's name and today's date. A group accepted for every feature adds one decision per capability, each with the group's fact. Create the file with its title, header row, and separator row when it does not exist. Read the new decision against the template, then resolve the row from it. When the developer resolves every row, finish the remaining sections.
 
 ### 13. Test plan
 
