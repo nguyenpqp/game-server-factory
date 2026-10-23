@@ -1,6 +1,6 @@
 ---
 name: feature-spec
-description: Turn a game feature design into a Java game server spec and implementation plan. Use when a developer has a design.md from gdd-intake, a GDD, or a plain feature prompt and wants the server side designed before code, or wants to change a feature whose spec already exists, such as a new reward amount or an extra admin command. The spec covers command ids, request and response fields, checks and error codes, pushes, per-user state and migrations, Redis keys, the feature config schema, metric events and KPI queries, cheat commands, admin commands and their API spec, HTTP callbacks, multi-node safety, blue-green rollout and old client compatibility, a performance budget per command, core blockers, a test plan, and design coverage. It then slices the spec into an ordered task list that a developer or any workflow can build from. Requires the project profile from server-profile and cites rule ids from server-rules.
+description: Turn a game feature design into a Java game server spec and implementation plan. Use when a developer has a design.md from gdd-intake, a GDD, or a plain feature prompt and wants the server side designed before code, or wants to change a feature whose spec already exists, such as a new reward amount or an extra admin command, or wants to work on a feature built before the plugin that has no spec yet. The spec covers command ids, request and response fields, checks and error codes, pushes, per-user state and migrations, Redis keys, the feature config schema, metric events and KPI queries, cheat commands, admin commands and their API spec, HTTP callbacks, multi-node safety, blue-green rollout and old client compatibility, a performance budget per command, core blockers, a test plan, and design coverage. It then slices the spec into an ordered task list that a developer or any workflow can build from. Requires the project profile from server-profile and cites rule ids from server-rules.
 ---
 
 # Feature spec
@@ -13,6 +13,7 @@ A complete spec for a daily login streak is in the [worked example](references/w
 
 - **The design.** `docs/game-server/features/<feature>/design.md`, written by `gdd-intake` in the [design template](../gdd-intake/references/design-template.md) format. Its requirement ids (`SM ST R F RW TM EC UI Q`) are what the spec's `Design` cells cite.
 - **Or a prompt.** A plain description of the feature. The header then says `Design: prompt`, and the prompt follows the header as a quote. Under the quote, list the requirements you read from it, grouped by the design template's section names (States, Rules, Formulas, Rewards, Timing, Edge cases, Config tables, UI touchpoints, Open questions), each with a design-format id and `Source: prompt`. Use bold lead-ins for the groups, never `##` headings, so the spec keeps its 14 fixed sections. A prompt longer than a page, or one with balance tables, goes through `gdd-intake` first.
+- **Or existing code.** A feature that was built before this plugin and has no design or spec. Follow [Spec a feature that already exists](#spec-a-feature-that-already-exists).
 - **The profile.** `docs/game-server/profile.md`, in the [profile template](../server-profile/references/profile-template.md) format. It names every core call the spec may use, the command id scheme, the metric tables, and the test commands.
 - **The rules.** The [rule index](../server-rules/references/index.md) lists every rule id with its severity and the capabilities it needs. Load `server-rules` for the do and don't of each rule.
 - **The genre notes.** Read each [genre note](../server-rules/references/genres/index.md) that matches the feature. Design every row that a trap touches so the trap cannot happen, and cite the trap's rule ids on that row.
@@ -143,6 +144,16 @@ Before you ask the developer to confirm, read the spec once against this list an
 
 Show the developer the spec and ask for confirmation. On confirmation, set `Status: ready`. Under a workflow, the workflow's own interview confirms it. Never set `ready` while Core blockers has a row that blocks.
 
+## Spec a feature that already exists
+
+A developer may ask to change, fix, or review a feature that was built before this plugin and has no spec. Write its design and its spec from the code first. Change no code in this run.
+
+1. **Find the feature.** Start from the profile. Find the feature's package under `feature_root`, its command handlers where CAP-COMMAND registers them, its stored state, its config file, its metric actions, and its cheat and admin commands. List the files you read.
+2. **Write the design from the code.** Use the [design template](../gdd-intake/references/design-template.md) at `docs/game-server/features/<feature>/design.md`. Each requirement says what the player sees, does, or gets today, in game terms, and cites `code <path>:<line>`. When the developer also gives GDD files or a description, cite them too, and add them to Sources.
+3. **Ask about what looks wrong.** Behavior that contradicts itself, contradicts a source, or breaks a rule in a way players would notice if fixed becomes an open question: keep it or change it. Its interim default is the current behavior. Ask the developer as the stops above say.
+4. **Write the spec as the feature should run.** Follow the procedure above. A rule break that players cannot see, such as a missing request id or a blind save, is written as the rule-correct row. A break that players would see follows the answer to its question. The header's `Design` line names the new design.
+5. **Confirm.** Show the developer both files and the list of rows where the spec departs from the code today. On confirmation, set `Status: ready`. Then `feature-review` on the existing code reports each departure as a finding, and `feature-build` fixes them one slice at a time.
+
 ## Change a ready spec
 
 A developer may ask to change a feature whose spec is `ready`, such as a new reward amount, an extra admin command, or a fix after a bug report. Change only what the request reaches, and keep every other row as it is.
@@ -164,5 +175,6 @@ When the spec is `ready` and the developer asks for a build plan, follow [slicin
 - On request, the task list from slicing.
 - A decision in `docs/game-server/decisions.md` for each risk the developer accepts for every feature.
 - For a design change to a ready spec, the edited `design.md` and draft config JSON.
+- For a feature that already exists, its new `design.md`.
 
 The skill writes nothing else in the target repository.

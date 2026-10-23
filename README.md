@@ -66,6 +66,8 @@ The plugin manifest has no version, so an install tracks the commit of the marke
 4. **Build.** Run `feature-build` on the spec, one slice at a time for a large feature.
 5. **Review.** Run `feature-review` over the finished branch.
 
+For a feature built before the plugin, skip intake. Ask `feature-spec` to spec the existing feature. It writes the design and the spec from the code, asks about behavior that looks wrong, and changes no code. Then review the old code and build the fixes.
+
 `server-rules` is not a step. The other skills load it when they need a rule.
 
 The skills work in a plain chat, across sessions, or under any workflow plugin. [Use the skills](docs/usage.md) walks through this order.
