@@ -14,12 +14,12 @@ A review answers three questions: does the code do what the design says, can it 
 - **Think like an attacker and like a crash.** For each command ask what a hostile client can send, what happens when it is retried, when two nodes run it at once, when the node dies between two writes, when Redis times out, and when an old server or old client meets the new data. The worst bugs on a game server hide in those moments, not in the happy path.
 - **Know the project's idiom.** Find how this project does clocks, randomness, storage, config, metrics, and module boundaries, and check the new code uses those. A call that bypasses them is often a finding by itself.
 - **Check compatibility in four directions.** For every change to stored data, packets, or calls between nodes, ask what happens when an old server reads the new data, a new server reads old data, an old client gets the new reply, and an old client calls the new server. Then ask whether rolling back is still safe.
-- **Check the module's shape.** Each part of the feature does its own job, as principle 7 of `server-principles` describes. A game rule inside a handler, I/O inside the logic, or a balance number outside the config is a finding, because it breaks testing, swapping, or tuning.
+- **Check the module's shape.** Each of the five parts in principle 7 does its own job. A game rule inside a handler, I/O inside the logic, or a balance number outside the config is a finding, because it breaks testing, swapping, or tuning.
 - **Use the genre notes.** If the feature matches a note in `server-principles`, check the code for each trap the note lists.
 
 ## Blast radius of changes to running code
 
-The server is shared by thousands of players, and code already on live is proven. One changed line in the save path or the inventory can hurt every player, while a hundred new lines inside a new feature can hurt only that feature. Weigh the diff by that, not by size.
+One changed line in the save path or the inventory can hurt every player, while a hundred new lines inside a new feature hurt only that feature. Weigh the diff by reach, not size.
 
 - **Split the diff.** Separate the new feature's own code from every change to code that already runs: the core, shared code, other features, and shared config. Review the second part hardest.
 - **Trace every change to running code.** Find all its callers across the server, not only the new feature. Ask whether their behavior changes, whether the code sits on a path every player takes (login, load and save, inventory, currency), whether stored data or the wire format changes, whether the change can be switched off by config or rolled back without a deploy, and whether tests pin the old behavior.
@@ -28,11 +28,11 @@ The server is shared by thousands of players, and code already on live is proven
 
 ## Load at peak
 
-Thousands of players share each node and each database. A command that is cheap once can still take the cluster down when everyone calls it.
+A command that is cheap once can still take the cluster down when everyone calls it.
 
 - **Multiply by frequency.** For each hot command, estimate the cost of one call (store and Redis round trips, bytes read and written), how often a player calls it, and the peak player count. The product is the load on the document store, on Redis, and on each hot key. A cheap command every player spams can outweigh an expensive one that is rare.
 - **Count the real round trips.** Follow the actual path, including calls hidden behind helpers, lazy getters, and loops over another service. N+1 reads hide there.
-- **Check the database patterns** in principle 8 of `server-principles`: key lookups rather than queries on hot paths, no O(N) Redis command on a large key or long script, document size times save rate, memory per online player, and what the feature adds to login.
+- **Check the database patterns** in principle 8 of `server-principles`.
 - **Severity follows who pays.** Work that saturates a shared database or Redis, and so slows every player, is critical. Work that only exceeds the feature's own budget is important.
 
 ## What a finding needs
