@@ -18,6 +18,8 @@ These principles describe what good feature code on a game server looks like. Th
 
 The server this plugin has in mind runs one world on many peer nodes behind a load balancer. One node owns a user at a time. Per-user data lives in a document store such as Couchbase, and cluster-wide state lives in Redis. Two server versions run side by side during a deploy, and players keep using older clients for weeks. Expect real players to probe every request for an exploit. If the project you are working on differs, adapt the principles to it rather than the other way round.
 
+Thousands of players share each node, and one bad deploy hurts all of them at once. Put stability and safety ahead of speed of delivery and clever code. Prefer the plain design that cannot lose value over the fast one that usually does not, and the change that touches the least running code over the neat refactor.
+
 ## 1. Work through the project's own core
 
 Feature code adds features. It does not reinvent the network layer, login, sessions, storage clients, config loading, metrics, or the admin channel. Before writing anything, find out how this project already does each of those, and write code that reads like the code around it.
@@ -35,12 +37,15 @@ The client sends intents, never results. The server computes every outcome, cost
 - Check the full cost before taking any of it. Order the steps so that a crash between them can never create value. When the effect lives outside the player's document, take the cost and record the pending effect, keyed by the request id, in the same save. Then apply the effect idempotently by that id, and keep retrying an unknown result until it is definite. The owner resumes a pending effect after a crash. Refund only when the effect definitely failed, such as stock that ran out or a group that is gone. When the action reserves a limited thing, reserve it first and release it if the cost cannot be taken. When cost and effect live in the same document, save them together and there is nothing to refund.
 - A rejected request changes nothing and returns an error code specific to the reason.
 - Rate-limit commands that are expensive or touch other players.
+- Check that actions are plausible over time, not only valid one by one. A fight cannot end, a timer cannot finish, and progress cannot pile up faster than the game allows. Speed hacks send requests that each look valid.
+- Send the client only what the player is allowed to know. A reply or config that carries the next gacha result, a pity counter or drop rate the design hides, an opponent's hidden lineup, or another player's private data is read by anyone who inspects packets.
+- Cap what each source of value can grant a player per period at a generous but sane level, and alert when a player hits it. A duplication bug the other principles missed then stays small and gets noticed.
 
 ## 3. Value moves exactly once
 
 Networks retry, players double-tap, nodes crash mid-command, and payment providers resend callbacks. Every path that grants or takes value must give the same result when it runs twice.
 
-- A command whose retry would pay or count toward value twice, such as a reward, a purchase, or event progress, carries a request id, and the server applies each id once per player.
+- A command whose retry would pay or count toward value twice, such as a reward, a purchase, or event progress, carries a request id, and the server applies each id once per player. Applied ids are kept for a stated time, longer than any client or callback retry can arrive, and then dropped, so the record stays bounded.
 - Value from an outside system (a purchase, a platform reward) is applied once per outside transaction id across all players, recorded durably. Before anything happens, verify the caller's signature over the raw body with a per-environment secret, reject stale timestamps, and check the business payload (player, product, price) against server data. On live, an empty caller allowlist rejects every call rather than allowing all.
 - Value for another player goes through that player's durable inbox, even when they are on this node or online, and their owner applies each entry once.
 - A best-effort message or push must never be the only carrier of value.
@@ -60,6 +65,8 @@ Any node can run any command, two nodes can run the same job at once, and any no
 - A shared thing that can close and open again (a season, a room, an event round) carries the id of that occurrence, and closing it leaves an explicit closed marker instead of deleting the key. The marker expires only after any late writer could still arrive.
 - A late or buffered write from a former owner, flushed after a handover, cannot move shared state backward: make it monotone or version-checked.
 - A node-local cache of shared data has a stated staleness bound and an invalidation path, unless staleness only errs on the safe side. Online checks and pushes to other players go through the ownership record, not a node-local session map.
+- Every call to Redis, the store, or another node has a timeout, and retries have a budget with jitter, so a slow dependency does not turn into a retry storm. When a dependency is down, anything that grants or takes value refuses with an error, while read-only views may serve stale data.
+- Many players hit the same moment together: a daily reset, an event opening, a season close. Reset per player lazily when their state is read, spread cluster jobs out with jitter, and load shared data before the moment rather than on the first request.
 - Timed effects come from stored timestamps read at use time, not from in-memory timers. Unique ids come from the cluster (a Redis counter, or a snowflake with unique node bits), not from a node counter.
 
 ## 5. Two versions and old clients at the same time
@@ -71,6 +78,7 @@ During a deploy, old and new servers read and write the same data, and old clien
 - A new meaning gets a new field or a new command id. An old id never takes a new meaning. While both versions run, the new version also keeps the old field correct, because a player can move back to an old node mid-deploy.
 - New request fields are optional and their absence means the old behavior. New response fields are appended and optional. An old client never receives a packet it cannot parse, and new behavior is gated on the client version.
 - Config stays readable by both versions, so new keys have defaults.
+- Deploy dark, then turn on. New code that writes new data or changes behavior ships switched off and is enabled through config only once every node runs the new version. Change in two steps: first add the new path next to the old one, then remove the old one in a later deploy when nothing reads it.
 - Migration is idempotent and derived from stored data only. Per-player data migrates lazily when its owner loads it. Shared data migrated at boot is written only where the target is absent, because two nodes can boot at once. A format the old version cannot read is a one-way door that ships only in a maintenance deploy, with the rollback step written down.
 - An inbox entry of a type this node does not know stays in the inbox untouched for a newer node. Fire-and-forget cross-node messages carry only a signal, so ignoring an unknown one loses nothing.
 - A draining node refuses new logins, finishes queued commands, and confirms every save before releasing ownership. If the final save fails, it keeps ownership and retries.
@@ -88,9 +96,16 @@ Designers tune balance after launch, often during live events. Code that hard-co
 - An option that is not offered is left out, never written as zero, since a zero price sells for free. No string in config hides a mini-language that code has to parse.
 - Secrets, endpoints, and allowlists are environment config, apart from balance.
 
-## 7. Features are modules
+## 7. Features are independent modules
 
-A feature imports only its own package, shared code, and other features' published contracts. An effect on another feature that the reply depends on, or that pays value, is a direct contract call or a durable inbox entry. Events are fine for reactions whose loss costs nothing. This keeps a feature removable and testable on its own.
+Code that already runs on live is proven, and every edit to it risks players who never touch the new feature. A new feature should plug in beside the existing ones, not into them.
+
+- A new feature avoids editing other features' code. It extends them through their published contracts, extension points, or events. When an existing feature truly must change, keep the change small, behind its contract, and switched by config, and say why it was unavoidable.
+- A feature imports only its own package, shared code, and other features' published contracts.
+- A feature is plug-and-play: it registers its own commands, config, jobs, and handlers, and turning it off in config, or removing it, leaves the rest of the server working.
+- Parts that may change are swappable: a reward source, a matchmaking rule, or a storage detail sits behind an interface with one clear job, so a new implementation replaces the old one without touching callers.
+- Behavior that designers or operators may want to change is configurable, within the limits the code validates.
+- An effect on another feature that the reply depends on, or that pays value, is a direct contract call or a durable inbox entry. Events are fine for reactions whose loss costs nothing.
 
 ## 8. Every command has a bounded cost
 
@@ -136,7 +151,12 @@ Support, analytics, and incident response all start from metric rows and logs. I
 - Metric rows, config validation, and cheats being refused on live have tests.
 - Tests check what users of the code can observe. Skip tests of getters, constants, framework behavior, or mock wiring.
 
-## 13. Build what the design says
+## 13. Code is typed and quiet
+
+- Use enums for states, types, reasons, and error codes instead of integer or string constants, in new code even when older code nearby uses integers. The compiler then catches a wrong value and a missing case. When an enum value is stored or sent to the client, give each constant an explicit, stable code and map by that code, never by ordinal or name, because a reordered or renamed constant would silently change stored data and break old clients.
+- Write comments only when the code cannot say why: a non-obvious constraint, a race, or a deliberate trade-off. Names and structure explain what the code does.
+
+## 14. Build what the design says
 
 The game design is the contract with designers and players. Every requirement in it is built and tested, or explicitly descoped with the developer's agreement. Numbers, rules, state transitions, and end conditions in code and config equal the design. Decisions already made, including answers to questions and agreed defaults, hold in the code.
 
