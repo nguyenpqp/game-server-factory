@@ -26,8 +26,17 @@ The server is shared by thousands of players, and code already on live is proven
 - **Unneeded edits are findings.** A refactor, rename, or reformat of running code that the feature does not need adds risk with no gain.
 - **Severity follows reach.** A change to shared code that alters behavior for features that did not ask for it, on a path every player takes, with no switch, is critical even when it looks correct. The same change behind a switch with tests pinning the old behavior is much smaller.
 
+## Load at peak
+
+Thousands of players share each node and each database. A command that is cheap once can still take the cluster down when everyone calls it.
+
+- **Multiply by frequency.** For each hot command, estimate the cost of one call (store and Redis round trips, bytes read and written), how often a player calls it, and the peak player count. The product is the load on the document store, on Redis, and on each hot key. A cheap command every player spams can outweigh an expensive one that is rare.
+- **Count the real round trips.** Follow the actual path, including calls hidden behind helpers, lazy getters, and loops over another service. N+1 reads hide there.
+- **Check the database patterns** in principle 8 of `server-principles`: key lookups rather than queries on hot paths, no O(N) Redis command on a large key or long script, document size times save rate, memory per online player, and what the feature adds to login.
+- **Severity follows who pays.** Work that saturates a shared database or Redis, and so slows every player, is critical. Work that only exceeds the feature's own budget is important.
+
 ## What a finding needs
 
 Each finding has a severity (from `server-principles`), the file and line, the principle it breaks, and a concrete failure scenario: what input or timing, what goes wrong, and who loses what. If you cannot describe a scenario, it is not a finding yet. Say how confident you are when the scenario depends on something you could not see.
 
-Open the report with one line on blast radius: how many files of running code changed, which of them sit on paths every player takes, and whether each can be switched off. Then order findings by severity. Keep style preferences out unless they hide a real risk. End with what you did not check, such as files you could not read or a missing design, so nobody mistakes a partial review for a clean one.
+Open the report with one line on blast radius, and one line on the hot commands and their estimated load at peak. For blast radius, state how many files of running code changed, which of them sit on paths every player takes, and whether each can be switched off. Then order findings by severity. Keep style preferences out unless they hide a real risk. End with what you did not check, such as files you could not read or a missing design, so nobody mistakes a partial review for a clean one.

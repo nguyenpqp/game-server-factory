@@ -132,6 +132,11 @@ The game should hold its peak player count without one popular command taking a 
 - Every stored list or map has a cap or an eviction rule, for per-player data and for shared documents like a guild's. Lists sent to the client are capped or paged.
 - A command touches a bounded number of other players. Larger fan-out runs as a batched job.
 - Estimate the peak writes per second to each shared Redis key. When one key takes too many, merge writes per player or batch them first, and shard only when the feature still works sharded. An exact leaderboard needs one sorted set, while a global counter can be split.
+- On the command path, the document store is read and written by known key. A query or index scan on a hot path is a red flag, because its cost grows with the data and it competes with every player's saves.
+- Redis runs commands one at a time. An O(N) command on a large key, such as `KEYS`, a full `HGETALL` or `SMEMBERS`, or a `ZRANGE` over a whole board, or a long Lua script, stalls every node that shares that Redis.
+- A save writes the whole player document, so its cost is document size times save rate. History, logs, and other growing lists do not live in the player document, or they make every save heavier over time.
+- State held in memory for each online player, multiplied by the peak player count, fits the node's heap.
+- What a feature adds to login is paid by every player at once after maintenance, the worst peak the server sees. Load feature data when it is first needed, not at login, unless the login reply needs it.
 
 ## 9. The client can always catch up
 
