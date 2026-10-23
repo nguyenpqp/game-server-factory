@@ -68,7 +68,7 @@ Use feature-spec to write the server spec for daily-streak from its design.md.
 
 The skill writes `spec.md` section by section. Each row cites rule ids from the rulebook, and each row taken from the design cites its design id. The spec covers commands, pushes, state, config, metrics, cheats, admin commands, HTTP endpoints, the multi-node analysis, the blue-green and old-client matrix, the performance budget, and the test plan.
 
-If a capability the feature needs is missing or partial, the Core blockers section gets a row that names the capability, the rules it breaks, what players would see, and the smallest core change. The spec status becomes `blocked`, and the skill stops. Choose one resolution per row.
+If a capability the feature needs is missing or partial, the Core blockers section gets a row that names the capability, the rules it breaks, what players would see, and the smallest core change. The spec status becomes `blocked`, and the skill stops. It groups the rows that one deployment fact would bound, such as one game process per realm, and asks once per fact with the evidence it found and how the fact bounds each row. Confirm or reject the fact for the whole group. Choose one resolution per group or per row.
 
 - **Change the core.** Make the change, rerun `server-profile`, then continue the spec.
 - **Descope.** Drop what depends on the capability.
@@ -150,5 +150,6 @@ The skills work the same under any workflow, with a few limits.
 
 - The profile, design, and spec are plain files in your repository. Edit them like any other file.
 - After a core change, rerun `server-profile`, then rerun the Core blockers step of every spec not yet built. That step checks each decision in `decisions.md` against the new profile. `profile_version` is the version of the profile template, so it does not catch a core change.
-- When a design rule changes, edit `design.md`, check it against the design template, and ask `feature-spec` to update the spec rows that cite the changed ids.
+- To change a built feature, describe the change to `feature-spec`, such as "use feature-spec to raise the day 7 reward of daily-streak to 500 gems". It records a game rule change in `design.md` as an answered question, edits only the spec rows the change reaches, and asks you to confirm. Then build the changed rows with `feature-build`.
+- To fix a bug where the code breaks a spec row, give `feature-build` the report and the row. It writes a test that shows the bug, then fixes the code.
 - `server-rules` loads on its own when a skill needs a rule. To read the rules yourself, start from `<plugin>/skills/server-rules/references/index.md`.

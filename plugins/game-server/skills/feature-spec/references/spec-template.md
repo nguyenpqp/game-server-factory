@@ -19,7 +19,7 @@ The header's `Status` line holds one value.
 
 | Status | Meaning |
 | --- | --- |
-| `draft` | Sections are still being filled. |
+| `draft` | Sections are still being filled, or a change to a ready spec waits for the developer's confirmation. |
 | `blocked` | Core blockers has a row that blocks. `feature-build` does not start. |
 | `ready` | Every section is filled, no Core blockers row blocks, and the developer confirmed the spec. |
 
@@ -217,7 +217,7 @@ Generated files:
 
 ### Metric events and KPI queries
 
-The section has three parts: actions, currency and item changes, and one KPI query per success measure. Extra fields state their meaning. KPI queries run against the tables that the profile's CAP-METRIC entry describes.
+The section has three parts: actions, currency and item changes, and one KPI query per success measure. Extra fields state their meaning. KPI queries run against the tables that the profile's CAP-METRIC entry describes. A share or rate counts in its denominator only the players the measure names, such as players active in the period or past the unlock. A join that fills a missing date or row with a default counts every account instead.
 
 The rows come from the design's Overview, Gameplay loop, and Rewards. They usually cite MET-01 to MET-09.
 
@@ -245,12 +245,13 @@ The rows come from the design's Overview, Gameplay loop, and Rewards. They usual
 - Rules: MET-06.
 
 ```sql
-SELECT COUNT(DISTINCT user_id) AS day7_claimers
+SELECT
+  COUNT(DISTINCT CASE
+    WHEN action = 'streak_claim' AND result = 0 AND extra_reward_day = 7
+    THEN user_id END) * 1.0
+  / COUNT(DISTINCT user_id) AS day7_share
 FROM user_action
-WHERE action = 'streak_claim'
-  AND result = 0
-  AND extra_reward_day = 7
-  AND event_time >= :week_start
+WHERE event_time >= :week_start
   AND event_time < :week_end
 ```
 ````

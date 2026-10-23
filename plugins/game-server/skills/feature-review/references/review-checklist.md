@@ -115,7 +115,7 @@ Follow one action from its first line to each return and each catch.
 | MET-03 | important | A currency or inventory call with no trace id argument, or with a new one. |
 | MET-04 | important | A source or sink with no reason constant, or a reason shared with another feature action. A grant API that writes a change row only when the grant fails. |
 | MET-05 | important | A multi-step flow with one metric action for all steps. |
-| MET-06 | important | A success measure in the spec with no KPI query. A query that names a column that does not exist. |
+| MET-06 | important | A success measure in the spec with no KPI query. A query that names a column that does not exist. A share whose denominator counts players the measure does not name, such as a join that gives every account a default date. |
 | MET-07 | important | A new fixed column for new metric data. An extra field with no stated meaning. |
 | MET-08 | important | A command with no catch that writes an exception row, or a catch that swallows the error and sends no response. |
 | MET-09 | critical | A metric extra or log line that includes a token, signature, key, or payment credential. |
@@ -202,7 +202,7 @@ Read each reply and push that the diff adds or changes, field by field, against 
 | SYNC-01 | important | A client-facing feature with no read command, or a read command that leaves out a part that a screen shows. State that reaches the client only in a push. |
 | SYNC-02 | important | A mutating reply with no server time, with a delta instead of the post-change value, or with values the command did not change. A reject that carries only the error code while the client may hold the fields wrong. |
 | SYNC-03 | important | A boolean in a reply or push that compares stored values, config, or server time, such as `ready` or `claimedToday`. Both the start and the end of one timer. |
-| SYNC-04 | critical | A push after the player's own command or at login. A push for a time the client can compute. Value that exists only in a push, with no stored state or inbox entry behind it. |
+| SYNC-04 | critical | A push after the player's own command or at login, including one that a core call such as an inventory add sends by itself. Read the profile's CAP-INVENTORY `api` for those. A push for a time the client can compute. Value that exists only in a push, with no stored state or inbox entry behind it. |
 
 ## LOG: Logging
 
@@ -265,6 +265,7 @@ Rules for the table:
 - A trigger that is rare is still reachable. Rarity is not a reason to lower severity.
 - Never raise a finding above its index severity. If the index looks wrong for the case, write it as a follow-up for the rule index.
 - Lower a finding only with evidence, such as a guard on the path that you read and that cannot be bypassed.
+- SYNC-04 is critical because value that only a push carries is lost. Lower a SYNC-04 finding to important when you read that the pushed value is stored, in the user's state or the durable inbox, before the push is sent, and that nothing the player gets depends on the push arriving, such as a balance push after a grant to the user's state. Name the save in the Reason cell.
 
 ## Dismissal audit
 

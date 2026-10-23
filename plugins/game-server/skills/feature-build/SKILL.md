@@ -14,6 +14,7 @@ The skill does not design the feature, and it does not review it. `feature-spec`
 - The profile at `docs/game-server/profile.md` in the target repository. Its format is the [profile template](../server-profile/references/profile-template.md). When the file is missing, stop and tell the developer to run `server-profile`.
 - The spec at `docs/game-server/features/<feature>/spec.md`. Its format is the [spec template](../feature-spec/references/spec-template.md). When the file is missing, stop and point to `feature-spec`.
 - The slice to build. It is one task from the spec's task list, with Builds, Writes, Acceptance, and Verify, or the spec rows the developer names. When the developer names no slice, build the first slice that is not built yet and say which one.
+- A bug report or a review finding on built code is also a slice. Name the spec rows that the code breaks. The failing test in step 2 shows the bug, so it fails because of the bug, not because code is absent. When the report shows that the spec row itself is wrong, stop and point to feature-spec's Change a ready spec section.
 
 Rule ids refer to the [rule index](../server-rules/references/index.md).
 
@@ -58,7 +59,7 @@ Put production code in the Java package that the spec header names. Its director
 Run these steps for each slice, in order.
 
 1. Read the spec rows that the slice covers. They are its commands, pushes, state documents, config keys, metric actions, cheats, admin commands, HTTP endpoints, and test plan rows. Note each row's rule ids.
-2. Write the failing unit tests first, against the pure core. Take the cases from the slice's rows in the Test plan, and add the cases that [unit tests](references/unit-tests.md) requires for each shape the slice adds. Run them once with `test_one_cmd` and confirm that they fail because the code is absent, not because a fixture is broken.
+2. Write the failing unit tests first, against the pure core. Take the cases from the slice's rows in the Test plan, and add the cases that [unit tests](references/unit-tests.md) requires for each shape the slice adds. Run them once with `test_one_cmd` and confirm that they fail because the code is absent, or because of the reported bug, not because a fixture is broken.
 3. Implement the slice with the matching reference. Write only the code that the slice's spec rows ask for.
    - A client command uses [command shape](references/command-shape.md).
    - Feature config uses [config class](references/config-class.md).
