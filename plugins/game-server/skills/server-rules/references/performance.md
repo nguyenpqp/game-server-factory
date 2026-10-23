@@ -113,9 +113,9 @@ CropDef crop = config.crops().stream().filter(c -> c.id() == cropId).findFirst()
 
 - needs: CAP-CONFIG
 
-### PERF-06 Per-user state has a stated size bound, and every list or map in it has a cap or an eviction rule.
+### PERF-06 Per-user state and every shared document, such as a group's, have a stated size bound, and every list or map in them has a cap or an eviction rule.
 
-**Why.** A list that only grows makes the user's document slower to load and save until it hits the store's size limit.
+**Why.** A list that only grows makes the document slower to load and save until it hits the store's size limit. A shared document that grows also makes every CAS retry by its writers slower.
 
 Do:
 
@@ -132,7 +132,7 @@ Don't:
 state.history().add(entry);
 ```
 
-**Check.** For each collection in the stored state, find its cap or eviction rule, and the spec's size bound.
+**Check.** For each collection in the stored state, and in each shared document the feature writes, find its cap or eviction rule, and the spec's size bound.
 
 - needs: CAP-USERSTORE
 

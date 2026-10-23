@@ -248,7 +248,7 @@ Each rule's reason, Java do and don't, and review check are in [performance.md](
 - severity: important
 - needs: CAP-CONFIG
 
-### PERF-06 Per-user state has a stated size bound, and every list or map in it has a cap or an eviction rule.
+### PERF-06 Per-user state and every shared document, such as a group's, have a stated size bound, and every list or map in them has a cap or an eviction rule.
 
 - severity: important
 - needs: CAP-USERSTORE

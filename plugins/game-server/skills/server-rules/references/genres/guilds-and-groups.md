@@ -47,7 +47,7 @@ Read this note when players belong to a shared group, such as a guild, a clan, a
 - A disband deletes the group's keys, so a late write creates the group again. It stores a closed marker (MN-14).
 - A periodic group reward pays from a member list that still changes, or runs twice on two nodes (MN-07).
 - A player who switches groups between two payouts is paid by both. Each payout is claimed per player and period, not per group (MN-07, MN-14).
-- A member list or a request list sent to the client has no cap (PERF-04). A message or a reward to every member runs inside one command (PERF-07).
+- A member list, a request list, or a log in the group document grows without a cap (PERF-06), or is sent to the client whole (PERF-04). A message or a reward to every member runs inside one command (PERF-07).
 - The group document gains fields while the old server version still writes it, and the old version drops them (BG-02).
 
 ### Tests and metrics
